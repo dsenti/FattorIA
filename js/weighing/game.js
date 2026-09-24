@@ -4,14 +4,16 @@
 import { CONFIG } from '../config.js';
 import { Slider } from '../slider.js';
 import { xLabel, yLabel } from './farmers.js';
-import { makeRound, takeUnit, measure, scoreLine, sliderToLine, startSliders } from './round.js';
+import { makeRound, takeUnit, measure, scoreLine, sliderToLine, startSliders, applyLiveLevels } from './round.js';
 import { clamp } from '../stats.js';
+import { C, FONT } from './draw.js';
+import { drawScanner, drawScannerBeam, drawUpgradeFx, upgradePop, scannerMetrics } from './scanner.js';
+import { drawVehicle, VEHICLE_NAMES } from './vehicles.js';
+import { drawUnloader, UNLOADER_NAMES, HERDER_NAMES } from './unloaders.js';
+import { drawPile } from './pile.js';
 
-const C = {
-  soil: '#5B3A29', olive: '#6B7F2A', wheat: '#E9D8A6', cream: '#FBF7EF',
-  tomato: '#D9502B', sky: '#4A8FA3', harvest: '#B89A5E', grid: 'rgba(91,58,41,0.08)',
-};
-const FONT = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji"';
+const UNLOADER_LABEL = (animal, level) => `${(animal ? HERDER_NAMES : UNLOADER_NAMES)[level]}!`;
+
 
 const easeOut = (t) => 1 - (1 - t) ** 3;
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
@@ -55,6 +57,8 @@ export class WeighingGame {
     this.units = [];       // units on the belt: { idx, x, spawnAt, measured, gone }
     this.carry = null;     // { t0 }
     this.scanFlash = 0;
+    this.fx = {};          // start times of upgrade moments: { scanner, belt, truck }
+    this.shown = null;     // levels the scene last showed
     this.lastFarmerId = null;
     this.raf = 0;
     this.loop = (t) => this.frame(t);
@@ -257,7 +261,7 @@ export class WeighingGame {
 
   // ------------------------------------------------------------ simulation + drawing
   geo() {
-    return { truckRear: 0.33, farmerIdle: 0.385, beltStart: 0.44, beltEnd: 0.99, scanner: 0.7, pick: 0.31 };
+    return { truckRear: 0.37, farmerIdle: 0.42, beltStart: 0.48, beltEnd: 0.99, scanner: 0.75, pick: 0.36 };
   }
 
   frame(now) {
@@ -424,8 +428,10 @@ export class WeighingGame {
     const r = this.round;
     const f = r.farmer;
     const g = this.geo();
+    const lv = this.app.getState().levels;
     const ground = H * 0.86;
     ctx.clearRect(0, 0, W, H);
+    this.checkUpgrades(now, lv);
 
     // ground
     ctx.fillStyle = '#DCC792';
@@ -445,7 +451,12 @@ export class WeighingGame {
     ctx.fillStyle = C.soil;
     for (let x = bx0 + 8; x < bx1; x += 30) { ctx.fillRect(x, by + 9, 4, ground - by - 9); }
 
-    // units on the belt
+    // scanner body, then the products passing through it, then the scan beam on top
+    const sc = {
+      cx: g.scanner * W, ground, H, level: lv.scanner, now, beltY: by,
+      flashAge: now - (this.scanFlash || -1e9), upgradeAge: now - (this.fx.scanner ?? -1e9),
+    };
+    drawScanner(ctx, sc);
     const us = Math.min(26, H * 0.24);
     ctx.font = `${us}px ${FONT}`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
@@ -454,282 +465,106 @@ export class WeighingGame {
       const bob = f.animal ? Math.abs(Math.sin(now / 90 + u.idx)) * 3 : 0;
       ctx.fillText(f.unit, u.x * W, by - 1 - bob);
     }
+    drawScannerBeam(ctx, sc);
 
-    // scanner arch
-    const sx = g.scanner * W, sw = Math.max(40, W * 0.12), sh = H * 0.62;
-    const flash = clamp(1 - (now - this.scanFlash) / 250, 0, 1);
-    if (flash > 0) {
-      ctx.fillStyle = `rgba(217,80,43,${0.35 * flash})`;
-      ctx.fillRect(sx - 3, ground - sh + 14, 6, sh - 26);
-    }
-    ctx.fillStyle = C.sky;
-    ctx.fillRect(sx - sw / 2, ground - sh, 8, sh);
-    ctx.fillRect(sx + sw / 2 - 8, ground - sh, 8, sh);
-    ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(sx - sw / 2, ground - sh - 4, sw, 18, 6) : ctx.rect(sx - sw / 2, ground - sh - 4, sw, 18);
-    ctx.fill();
-    ctx.fillStyle = flash > 0 ? C.tomato : C.wheat;
-    ctx.beginPath(); ctx.arc(sx, ground - sh + 5, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = C.cream;
-    ctx.font = `700 9px system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText('SCANNER', sx, ground - sh - 8);
-
-    // truck: drives in from the left, and drives back out to the left when sent away
+    // vehicle: drives in from the left, and drives back out to the left when sent away
     let tOff = 0;
-    if (this.phase === 'arriving') tOff = -(1 - easeOut(clamp((now - this.phaseT0) / CONFIG.TRUCK_ARRIVE_MS, 0, 1))) * W * 0.5;
+    if (this.phase === 'arriving') tOff = -(1 - easeOut(clamp((now - this.phaseT0) / CONFIG.TRUCK_ARRIVE_MS, 0, 1))) * W * 0.6;
     if (this.truckLeave) {
       const t = clamp((now - this.truckLeave.t0) / CONFIG.TRUCK_LEAVE_MS, 0, 1);
-      tOff = -(t * t * t) * W * 0.6;
+      tOff = -(t * t * t) * W * 0.75;
       if (t >= 1) { this.truckGone = true; this.truckLeave = null; }
     }
-    if (!this.truckGone) this.drawTruck(ctx, W, H, ground, tOff, now);
+    if (!this.truckGone) {
+      const tappable = (this.truckTappable(now) && r.sample.length === 0) || this.truckCanLeave();
+      const pulse = tappable ? 1 + 0.025 * Math.sin(now / 160) : 1;
+      const tPop = upgradePop(now - (this.fx.truck ?? -1e9));
+      ctx.save();
+      const ax = g.truckRear * W + tOff;
+      ctx.translate(ax, ground); ctx.scale(pulse * tPop, pulse * tPop); ctx.translate(-ax, -ground);
+      const bed = drawVehicle(ctx, { level: r.truckLevel, xRear: g.truckRear * W, ground, W, H, now, off: tOff });
+      // While the farmer walks to the truck, the boxes being fetched are still on the pile.
+      let shown = r.cratesLeft;
+      if (this.carry && now - this.carry.t0 < CONFIG.CARRY_MS * 0.35) shown += this.carry.boxes;
+      const per = f.animal ? r.unitsPerBox : 1;   // animals are drawn one by one
+      drawPile(ctx, f.unit, f.animal, r.cratesTotal * per, shown * per, bed.bx, bed.bw, bed.floorY, bed.maxH);
+      ctx.restore();
+    }
 
-    // farmer
-    let fx = g.farmerIdle, carrying = false;
+    // unloading: farmer, helpers or tools, moving between truck and belt
+    const idleX = g.farmerIdle * W, pickX = g.pick * W, dropX = (g.beltStart + 0.01) * W;
+    let x = idleX, carrying = false, tripP = null, walking = false;
     if (this.carry) {
       const t = now - this.carry.t0;
+      tripP = clamp(t / (CONFIG.CARRY_MS + CONFIG.RETURN_MS), 0, 1);
+      walking = true;
       if (t < CONFIG.CARRY_MS) {
         const p = t / CONFIG.CARRY_MS;
-        if (p < 0.35) fx = g.farmerIdle + (g.pick - g.farmerIdle) * easeInOut(p / 0.35);
-        else { fx = g.pick + (g.beltStart + 0.01 - g.pick) * easeInOut((p - 0.35) / 0.65); carrying = true; }
+        if (p < 0.35) x = idleX + (pickX - idleX) * easeInOut(p / 0.35);
+        else { x = pickX + (dropX - pickX) * easeInOut((p - 0.35) / 0.65); carrying = true; }
       } else {
         const p = (t - CONFIG.CARRY_MS) / CONFIG.RETURN_MS;
-        fx = g.beltStart + 0.01 + (g.farmerIdle - g.beltStart - 0.01) * easeInOut(clamp(p, 0, 1));
+        x = dropX + (idleX - dropX) * easeInOut(clamp(p, 0, 1));
       }
     }
     if (this.phase !== 'arriving') {
-      const fs = Math.min(38, H * 0.34);
-      const walking = this.carry && now - this.carry.t0 < CONFIG.CARRY_MS + CONFIG.RETURN_MS;
-      const bob = walking ? Math.abs(Math.sin(now / 70)) * 3 : 0;
-      ctx.font = `${fs}px ${FONT}`;
-      ctx.textAlign = 'center';
-      ctx.fillText(f.face, fx * W, ground - 2 - bob);
-      if (carrying) {
-        if (f.animal) {
-          // The animals of this trip follow the farmer in a line.
-          const count = this.carry.boxes * r.unitsPerBox;
-          const drawn = Math.min(count, 3);
-          ctx.font = `${us}px ${FONT}`;
-          for (let i = 0; i < drawn; i++) {
-            const b2 = Math.abs(Math.sin(now / 90 + i)) * 2;
-            ctx.fillText(f.unit, fx * W - fs * 0.75 - i * us * 0.55, ground - 2 - b2);
-          }
-          if (count > drawn) {
-            ctx.font = `800 12px ${FONT}`;
-            ctx.lineWidth = 3; ctx.strokeStyle = C.cream; ctx.fillStyle = C.soil;
-            ctx.strokeText(`+${count - drawn}`, fx * W, ground - fs - 6);
-            ctx.fillText(`+${count - drawn}`, fx * W, ground - fs - 6);
-          }
-        } else {
-          this.drawCarryStack(ctx, fx * W, ground - fs * 0.85 - bob, this.carry.boxes, f.unit);
-        }
-      }
+      const uPop = upgradePop(now - (this.fx.belt ?? -1e9));
+      ctx.save();
+      ctx.translate(x, ground); ctx.scale(uPop, uPop); ctx.translate(-x, -ground);
+      drawUnloader(ctx, {
+        level: lv.belt, animal: f.animal, x, ground, H, now, carrying, walking,
+        boxes: this.carry ? this.carry.boxes : 0, unitsPerBox: r.unitsPerBox, unit: f.unit, face: f.face,
+        tripP, pickX, dropX, idleX,
+      });
+      ctx.restore();
     }
 
-    // hint
-    // hints (to the right of the pile, which can be tall)
+    // upgrade moments: sparkles and a label
+    drawUpgradeFx(ctx, sc.cx, ground - scannerMetrics(lv.scanner, H).heightPx * 0.6, now - (this.fx.scanner ?? -1e9), `Scanner ${lv.scanner}!`);
+    drawUpgradeFx(ctx, idleX, ground - H * 0.45, now - (this.fx.belt ?? -1e9), UNLOADER_LABEL(f.animal, lv.belt));
+    if (!this.truckGone) drawUpgradeFx(ctx, g.truckRear * W * 0.55, H * 0.3, now - (this.fx.truck ?? -1e9), `${VEHICLE_NAMES[r.truckLevel]}!`);
+
+    // hints (to the right of the pile, which can be tall), outlined so they read over anything
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    if (this.truckTappable(now) && r.sample.length === 0 && this.units.length === 0) {
-      const a = 0.6 + 0.4 * Math.sin(now / 250);
-      ctx.fillStyle = `rgba(217,80,43,${a})`;
-      ctx.font = `700 14px ${FONT}`;
-      ctx.fillText('👈 Tocca il camion!', W * 0.4, 11);
-    } else if (this.truckCanLeave() && this.units.length === 0) {
-      const a = 0.65 + 0.35 * Math.sin(now / 300);
-      ctx.fillStyle = `rgba(91,58,41,${a})`;
-      ctx.font = `700 12px ${FONT}`;
-      const msg = '👈 Camion vuoto: tocca per mandarlo via';
-      const room = W * 0.62;
+    ctx.lineJoin = 'round';
+    const hint = (msg, color, size) => {
+      ctx.font = `700 ${size}px ${FONT}`;
+      const room = W * 0.6;
       const wide = ctx.measureText(msg).width;
-      if (wide > room) ctx.font = `700 ${Math.max(9, Math.floor(12 * room / wide))}px ${FONT}`;
-      ctx.fillText(msg, W * 0.36, 11);
+      if (wide > room) ctx.font = `700 ${Math.max(9, Math.floor(size * room / wide))}px ${FONT}`;
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(251,247,239,0.9)';
+      ctx.strokeText(msg, W * 0.38, 11);
+      ctx.fillStyle = color;
+      ctx.fillText(msg, W * 0.38, 11);
+    };
+    if (this.truckTappable(now) && r.sample.length === 0 && this.units.length === 0) {
+      hint('👈 Tocca il camion!', `rgba(217,80,43,${0.6 + 0.4 * Math.sin(now / 250)})`, 14);
+    } else if (this.truckCanLeave() && this.units.length === 0) {
+      hint('👈 Camion vuoto: tocca per mandarlo via', `rgba(91,58,41,${0.65 + 0.35 * Math.sin(now / 300)})`, 12);
     }
     ctx.textBaseline = 'alphabetic';
   }
 
-  // Pseudo-3D pile: `cols` wide, `depth` rows deep (back rows drawn up and to the right),
-  // and as many layers (crates) or decks (animals) as needed. The layout depends only on the
-  // truck's capacity (capped at PILE_VISIBLE_MAX), so the pile doesn't jump as it shrinks.
-  // Crates are filled front row first (bottom to top), so the farmer takes them from the back
-  // row first, top to bottom, and the front of the pile stays full until the end.
-  // Animals are filled back row first, so the front-most ones are led out first.
-  pileLayout(capacity, animal, bx, bw, floorY, maxH) {
-    const n = Math.max(1, Math.min(capacity, CONFIG.PILE_VISIBLE_MAX));
-    const cols = 3;
-    const depth = n <= 3 ? 1 : n <= 12 ? 2 : 3;
-    const layers = Math.max(1, Math.ceil(n / (cols * depth)));
-    const perRow = cols * layers;
-    let cw = (bw - 2) / (cols + (depth - 1) * 0.4);
-    let ch = animal ? cw * 0.95 : cw * 0.62;
-    let dx = cw * 0.4, dy = animal ? ch * 0.28 : ch * 0.5;
-    // Total height including the top faces of the top layer and the produce lying on top.
-    const full = layers * ch + depth * dy + (animal ? 0 : ch * 0.8);
-    const k = Math.min(1, maxH / full);
-    cw *= k; ch *= k; dx *= k; dy *= k;
-    const pos = (i) => {
-      const r = Math.floor(i / perRow), j = i % perRow;
-      const row = animal ? depth - 1 - r : r;   // 0 = front
-      const layer = Math.floor(j / cols), col = j % cols;
-      return { layer, row, col, x: bx + 1 + col * cw + row * dx, y: floorY - layer * ch - row * dy };
-    };
-    return { cap: n, cols, depth, layers, cw, ch, dx, dy, pos, height: layers * ch + (depth - 1) * dy };
-  }
-
-  // capacity and shown are counted in drawn items: boxes for crops, animals for livestock.
-  drawPile(ctx, f, capacity, shown, bx, bw, floorY, maxH) {
-    const L = this.pileLayout(capacity, f.animal, bx, bw, floorY, maxH);
-    const vis = Math.min(shown, L.cap);
-    const items = [];
-    const occupied = new Set();
-    for (let i = 0; i < vis; i++) {
-      const p = { i, ...L.pos(i) };
-      items.push(p);
-      occupied.add(`${p.layer},${p.row},${p.col}`);
+  // Detect bought upgrades and start their "upgrade moment" (only while no sheet covers the scene).
+  // Scanner and unloading apply at once; a new truck arrives with the next farmer.
+  checkUpgrades(now, lv) {
+    if (!this.shown) {
+      this.shown = { scanner: lv.scanner, belt: lv.belt, truck: this.round.truckLevel };
+      return;
     }
-    // Painter's order: back rows first, then bottom to top, then left to right.
-    items.sort((p, q) => q.row - p.row || p.layer - q.layer || p.col - q.col);
-    const right = bx + L.cols * L.cw + (L.depth - 1) * L.dx + 2;
-    const topY = floorY - L.height - (f.animal ? 4 : L.dy + L.ch * 0.8);
-
-    if (f.animal) {
-      // Multi-deck livestock trailer: back wall, animals, then slats and deck floors in front.
-      const top = floorY - L.height - 4;
-      ctx.fillStyle = C.wheat;
-      ctx.fillRect(bx, top, right - bx, floorY - top);
-      ctx.font = `${L.ch * 0.92}px ${FONT}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'alphabetic';
-      for (const p of items) ctx.fillText(f.unit, p.x + L.cw / 2, p.y - L.ch * 0.08);
-      ctx.strokeStyle = C.soil;
-      for (let d = 0; d <= L.layers; d++) {
-        const yy = floorY - d * L.ch;
-        ctx.lineWidth = 2.5;
-        ctx.beginPath(); ctx.moveTo(bx, yy); ctx.lineTo(right, yy); ctx.stroke();
-        if (d < L.layers) {
-          ctx.lineWidth = 1.2;
-          ctx.globalAlpha = 0.55;
-          ctx.beginPath(); ctx.moveTo(bx, yy - L.ch * 0.5); ctx.lineTo(right, yy - L.ch * 0.5); ctx.stroke();
-          ctx.globalAlpha = 1;
-        }
-      }
-      ctx.lineWidth = 2.5;
-      ctx.strokeRect(bx, top, right - bx, floorY - top);
-    } else {
-      // Open bed with low side walls, then the crates.
-      ctx.strokeStyle = C.soil; ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(bx, floorY); ctx.lineTo(bx, floorY - 10);
-      ctx.moveTo(bx + bw, floorY); ctx.lineTo(bx + bw, floorY - 10);
-      ctx.stroke();
-      for (const p of items) {
-        const onTop = !occupied.has(`${p.layer + 1},${p.row},${p.col}`);
-        this.drawBox(ctx, p.x, p.y, L.cw, L.ch, L.dx, L.dy, onTop ? f.unit : null);
+    if (this.app.overlayOpen && this.app.overlayOpen()) return;
+    for (const key of ['scanner', 'belt']) {
+      if (lv[key] !== this.shown[key]) {
+        if (lv[key] > this.shown[key]) this.fx[key] = now;
+        this.shown[key] = lv[key];
+        applyLiveLevels(this.round, lv);
+        this.updateInfo();
       }
     }
-
-    // What doesn't fit in the drawing is shown as a count.
-    if (shown > L.cap) {
-      const txt = `+${shown - L.cap}`;
-      ctx.font = `800 13px ${FONT}`;
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'middle';
-      const tx = Math.min(right + 2, bx + bw + 14), ty = Math.max(9, topY + 2);
-      ctx.lineWidth = 3.5; ctx.strokeStyle = C.cream; ctx.lineJoin = 'round';
-      ctx.strokeText(txt, tx, ty);
-      ctx.fillStyle = C.soil;
-      ctx.fillText(txt, tx, ty);
-      ctx.textBaseline = 'alphabetic';
+    if (this.round.truckLevel !== this.shown.truck && this.phase !== 'arriving') {
+      if (this.round.truckLevel > this.shown.truck) this.fx.truck = now;
+      this.shown.truck = this.round.truckLevel;
     }
-  }
-
-  // The farmer's load: boxes stacked in his arms (two columns for big loads), bottom at `bottomY`.
-  drawCarryStack(ctx, cx, bottomY, n, unit) {
-    const cols = n > 5 ? 2 : 1;
-    const rows = Math.ceil(n / cols);
-    const bh = Math.max(4, Math.min(16, (bottomY - 4) / (rows + 0.8)));
-    const bw = bh * 1.6;
-    for (let i = 0; i < n; i++) {
-      const c = i % cols, rr = Math.floor(i / cols);
-      const x = cx - (cols * bw) / 2 + c * bw;
-      const y = bottomY - rr * bh;
-      this.drawBox(ctx, x, y, bw - 1, bh - 1, bw * 0.2, bh * 0.25, rr === rows - 1 ? unit : null);
-    }
-  }
-
-  // One crate in pseudo-3D: front face, top face, right side. (x, y) = bottom-left of the front face.
-  drawBox(ctx, x, y, w, h, dx, dy, unit) {
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = C.soil;
-    ctx.fillStyle = '#C08A52'; // top
-    ctx.beginPath();
-    ctx.moveTo(x, y - h); ctx.lineTo(x + dx, y - h - dy); ctx.lineTo(x + w + dx, y - h - dy); ctx.lineTo(x + w, y - h);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#7E5530'; // side
-    ctx.beginPath();
-    ctx.moveTo(x + w, y); ctx.lineTo(x + w, y - h); ctx.lineTo(x + w + dx, y - h - dy); ctx.lineTo(x + w + dx, y - dy);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#A0703F'; // front
-    ctx.fillRect(x, y - h, w, h);
-    ctx.strokeRect(x, y - h, w, h);
-    ctx.beginPath(); ctx.moveTo(x, y - h / 2); ctx.lineTo(x + w, y - h / 2); ctx.stroke();
-    if (unit) {
-      const sz = Math.max(8, h * 0.95);
-      ctx.font = `${sz}px ${FONT}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'alphabetic';
-      ctx.fillText(unit, x + w / 2 + dx / 2, y - h - dy * 0.3);
-    }
-  }
-
-  drawTruck(ctx, W, H, ground, off, now) {
-    const r = this.round;
-    const f = r.farmer;
-    const x0 = W * 0.01 + off;
-    const x1 = W * this.geo().truckRear + off;
-    const wheelR = Math.max(7, H * 0.075);
-    const bodyB = ground - wheelR * 1.1;
-    const cabW = (x1 - x0) * 0.25;
-    const bedH = H * 0.36;
-    const tappable = this.truckTappable(now);
-    const pulse = (tappable && r.sample.length === 0) || this.truckCanLeave() ? 1 + 0.03 * Math.sin(now / 160) : 1;
-
-    ctx.save();
-    ctx.translate((x0 + x1) / 2, bodyB);
-    ctx.scale(pulse, pulse);
-    ctx.translate(-(x0 + x1) / 2, -bodyB);
-
-    // cab (left)
-    ctx.fillStyle = C.tomato;
-    ctx.beginPath();
-    ctx.moveTo(x0, bodyB); ctx.lineTo(x0, bodyB - bedH * 0.75);
-    ctx.lineTo(x0 + cabW * 0.35, bodyB - bedH * 1.05); ctx.lineTo(x0 + cabW, bodyB - bedH * 1.05);
-    ctx.lineTo(x0 + cabW, bodyB); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#CFE3E8';
-    ctx.beginPath();
-    ctx.moveTo(x0 + cabW * 0.2, bodyB - bedH * 0.72); ctx.lineTo(x0 + cabW * 0.42, bodyB - bedH * 0.95);
-    ctx.lineTo(x0 + cabW * 0.85, bodyB - bedH * 0.95); ctx.lineTo(x0 + cabW * 0.85, bodyB - bedH * 0.72);
-    ctx.closePath(); ctx.fill();
-
-    // bed
-    const bx = x0 + cabW + 2, bw = x1 - bx;
-    ctx.fillStyle = C.soil;
-    ctx.fillRect(bx, bodyB - 6, bw, 6);
-    // How many units are still in the truck: while the farmer walks to the truck,
-    // the unit being fetched is still on the pile (it disappears when it is picked up).
-    let shown = r.cratesLeft;
-    if (this.carry && now - this.carry.t0 < CONFIG.CARRY_MS * 0.35) shown += this.carry.boxes;
-    const per = f.animal ? r.unitsPerBox : 1;   // animals are drawn one by one
-    this.drawPile(ctx, f, r.cratesTotal * per, shown * per, bx, bw, bodyB - 6, bodyB - 8);
-    // wheels
-    ctx.fillStyle = '#2E2A26';
-    for (const wx of [x0 + cabW * 0.5, x1 - bw * 0.25]) {
-      ctx.beginPath(); ctx.arc(wx, bodyB + wheelR * 0.1, wheelR, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#9A9189';
-      ctx.beginPath(); ctx.arc(wx, bodyB + wheelR * 0.1, wheelR * 0.4, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#2E2A26';
-    }
-    ctx.restore();
   }
 }

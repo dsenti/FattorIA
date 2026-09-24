@@ -35,17 +35,25 @@ export const CONFIG = {
   FARMERS_PER_DAY: 5,
 
   // ---------------------------------------------------------------- upgrades
-  // Products (= data points) in one box. Fixed, not an upgrade.
-  // TODO(Dominik): 3 gives 9 data points with a level-0 truck; tune.
-  // For livestock farmers a "box" is a group of this many animals, so they get the same amount of data.
-  UNITS_PER_BOX: 3,
-  // Belt: boxes the farmer carries per trip (per tap on the truck), per level. It adds no data;
-  // it only unloads the truck faster.
+  // Products (= data points) per object on the truck. One object = one data point: a crate with
+  // one fruit or vegetable, or one animal. A level-0 truck holds 3 objects = 3 data points.
+  // TODO(Dominik): the early coins dropped with this change; retune if needed.
+  UNITS_PER_BOX: 1,
+  // Unloading ("Scarico", stored as "belt"): objects carried per trip (per tap on the truck), per
+  // level. It adds no data; it only unloads the truck faster.
   BELT_BOXES: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
   // Truck: boxes per farmer, per level (from TRUCK_BASE and TRUCK_FACTOR above).
   TRUCK_BASE,
   TRUCK_FACTOR,
   TRUCK_CRATES: Array.from({ length: 11 }, (_, n) => Math.round(TRUCK_BASE * TRUCK_FACTOR ** n)),
+  // Drawing only (the machines grow with their level). Scanner height = SCANNER_SCALE[level] *
+  // SCANNER_HEIGHT_FRACTION * scene height. Vehicle length = TRUCK_LENGTH[level] * scene width
+  // (the rear stays next to the belt, the front grows to the left); TRUCK_HEIGHT_SCALE scales
+  // wheels, bed height and cab.
+  SCANNER_SCALE: [0.72, 0.77, 0.82, 0.87, 0.93, 0.99, 1.05, 1.12, 1.19, 1.27, 1.38],
+  SCANNER_HEIGHT_FRACTION: 0.52,
+  TRUCK_LENGTH: [0.22, 0.25, 0.27, 0.29, 0.3, 0.31, 0.33, 0.34, 0.35, 0.36, 0.37],
+  TRUCK_HEIGHT_SCALE: [0.8, 0.84, 0.88, 0.92, 0.95, 1.0, 1.0, 1.04, 1.08, 1.12, 1.16],
   // Drawing only: at most this many boxes (or animals) are drawn in the truck; the rest is shown as "+N".
   PILE_VISIBLE_MAX: 36,
   // Scanner: standard deviation of the measurement noise on y (plot units), per level.

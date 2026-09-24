@@ -46,10 +46,8 @@ export function makeRound({ visitNo, lastFarmerId, levels }) {
   const best = leastSquares(harvest);
   const bestError = meanAbsError(harvest, best);
 
-  const scannerNoise = CONFIG.SCANNER_NOISE[levels.scanner] * (first ? CONFIG.FIRST_FARMER.scannerNoiseScale : 1);
-  const glitchProb = first && !CONFIG.FIRST_FARMER.glitches ? 0 : CONFIG.SCANNER_GLITCH[levels.scanner];
 
-  return {
+  const round = {
     farmer,
     visitNo,
     trueLine,
@@ -60,12 +58,21 @@ export function makeRound({ visitNo, lastFarmerId, levels }) {
     next: 0,
     cratesTotal: CONFIG.TRUCK_CRATES[levels.truck],
     cratesLeft: CONFIG.TRUCK_CRATES[levels.truck],
-    perTrip: CONFIG.BELT_BOXES[levels.belt],   // boxes carried per tap
+    truckLevel: levels.truck,                  // the vehicle is fixed for the whole visit
     unitsPerBox: CONFIG.UNITS_PER_BOX,
-    scannerNoise,
-    glitchProb,
+    first,
     sample: [],   // measured dots: { x, y, glitch, born }
   };
+  applyLiveLevels(round, levels);
+  return round;
+}
+
+// Scanner and unloading ("Scarico") upgrades apply at once, even during a visit.
+export function applyLiveLevels(round, levels) {
+  round.scannerLevel = levels.scanner;
+  round.scannerNoise = CONFIG.SCANNER_NOISE[levels.scanner] * (round.first ? CONFIG.FIRST_FARMER.scannerNoiseScale : 1);
+  round.glitchProb = round.first && !CONFIG.FIRST_FARMER.glitches ? 0 : CONFIG.SCANNER_GLITCH[levels.scanner];
+  round.perTrip = CONFIG.BELT_BOXES[levels.belt];   // boxes carried per tap
 }
 
 // Mirror values that fall outside the plot back inside (keeps the spread, avoids a pile-up on the edge).

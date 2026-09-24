@@ -115,7 +115,7 @@ test('belt changes boxes per trip, not the amount of data', () => {
     const r = makeRound({ visitNo: 3, lastFarmerId: null, levels: { scanner: 0, belt, truck: 0 } });
     assert.equal(r.perTrip, CONFIG.BELT_BOXES[belt]);
     assert.equal(r.unitsPerBox, CONFIG.UNITS_PER_BOX);
-    assert.equal(r.cratesTotal * r.unitsPerBox, 9, 'level-0 truck gives 9 data points');
+    assert.equal(r.cratesTotal * r.unitsPerBox, 3, 'level-0 truck gives 3 data points');
   }
 });
 
@@ -142,7 +142,7 @@ test('tuning report (sample-perfect player)', () => {
   const rows = [
     ['level 0 all, first farmer', { scanner: 0, belt: 0, truck: 0 }, 0],
     ['level 0 all, farmer 20', { scanner: 0, belt: 0, truck: 0 }, 20],
-    ['belt 10 only, farmer 20', { scanner: 0, belt: 10, truck: 0 }, 20],
+    ['unloading 10 only, farmer 20', { scanner: 0, belt: 10, truck: 0 }, 20],
     ['scanner 5 only, farmer 20', { scanner: 5, belt: 0, truck: 0 }, 20],
     ['scanner 10 only, farmer 20', { scanner: 10, belt: 0, truck: 0 }, 20],
     ['truck 3 only (10 boxes), farmer 20', { scanner: 0, belt: 0, truck: 3 }, 20],

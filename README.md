@@ -39,7 +39,13 @@ js/slider.js            big touch slider without numbers (pointer events)
 js/stats.js             least squares, mean absolute error, random helpers
 js/weighing/farmers.js  the 7 farmers: crop, axes, question, noise
 js/weighing/round.js    pure model: hidden line, harvest, scanner, glitches, scoring
-js/weighing/game.js     the minigame: canvas drawing, truck/belt/scanner animation, reveal
+js/weighing/game.js     the minigame: plot, scene loop, truck/unloading/scanner animation, reveal
+js/weighing/scanner.js  the scanner at levels 0-10 (homemade -> MEGA SCANNER), scan beam, upgrade sparkle
+js/weighing/vehicles.js the vehicle at truck levels 0-10 (motocarro -> camion del futuro)
+js/weighing/unloaders.js unloading at levels 0-10 (by hand, helpers, tools, robot; herding version for animals)
+js/weighing/pile.js     the pseudo-3D pile in the bed
+js/weighing/previews.js shop previews (current -> next level)
+js/weighing/draw.js     shared canvas helpers (palette, crate, stack, wheel)
 sw.js                   service worker (offline cache, VERSION constant)
 manifest.webmanifest    "add to home screen" metadata
 assets/                 icons
@@ -49,8 +55,9 @@ tests/run.mjs           node checks for the model and the name lists
 ## Tuning
 Everything is in `js/config.js`, with comments:
 - **Economy:** `levelCost` (level n costs n), `SCORE_THRESHOLDS` (error ratio → coins), `FARMERS_PER_DAY`.
-- **Data per box:** `UNITS_PER_BOX` (3; for livestock a box is a group of 3 animals).
-- **Upgrades, per level 0–10:** `BELT_BOXES` (boxes per trip, 1→11; faster, not more data), `TRUCK_BASE` × `TRUCK_FACTOR`^level → `TRUCK_CRATES` (3, 5, 7, 10, 15, 23, 34, 51, 77, 115, 173), `SCANNER_NOISE` (never zero), `SCANNER_GLITCH` (1/8 → 0), `GLITCH_OFFSET`. `PILE_VISIBLE_MAX` caps how many boxes are drawn (the rest shows as "+N").
+- **Data per object:** `UNITS_PER_BOX` (1: one crate or one animal = one data point).
+- **Upgrades, per level 0–10:** `BELT_BOXES` ("Scarico" in the shop, stored as `belt`: objects per trip, 1→11; faster, not more data), `TRUCK_BASE` × `TRUCK_FACTOR`^level → `TRUCK_CRATES` (3, 5, 7, 10, 15, 23, 34, 51, 77, 115, 173), `SCANNER_NOISE` (never zero), `SCANNER_GLITCH` (1/8 → 0), `GLITCH_OFFSET`. `PILE_VISIBLE_MAX` caps how many boxes are drawn (the rest shows as "+N").
+- **Machine sizes (drawing only):** `SCANNER_SCALE`, `SCANNER_HEIGHT_FRACTION`, `TRUCK_LENGTH`, `TRUCK_HEIGHT_SCALE`, per level.
 - **Harvest and difficulty:** `HARVEST_SIZE`, `NATURAL_NOISE_EASY/HARD`, `DIFFICULTY_RAMP_FARMERS`, `FIRST_FARMER`.
 - **Hidden true line:** `NEGATIVE_SLOPE_PROB`, `SLOPE_ABS_RANGE`, `LINE_MARGIN` (random sign and steepness each visit, always inside the plot).
 - **Sliders:** `SLOPE_ANGLE_RANGE`, `INTERCEPT_RANGE`, start position.

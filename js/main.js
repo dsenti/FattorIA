@@ -4,6 +4,9 @@ import { loadState, saveState, clearState, defaultState, averageCoins } from './
 import { nameChoices, formatName } from './names.js';
 import { submitScore, fetchBoard } from './leaderboard.js';
 import { WeighingGame } from './weighing/game.js';
+import { drawPreview } from './weighing/previews.js';
+import { VEHICLE_NAMES } from './weighing/vehicles.js';
+import { UNLOADER_NAMES } from './weighing/unloaders.js';
 
 let state = loadState();
 const $ = (sel) => document.querySelector(sel);
@@ -139,6 +142,7 @@ const game = new WeighingGame($('#screen-weigh'), {
     setTimeout(() => renderCoins(true), wait);
     pushScore();
   },
+  overlayOpen: () => !$('#sheet').hidden || !$('#modal').hidden,
   beforeNextFarmer: async () => {
     if (state.dayFarmers < CONFIG.FARMERS_PER_DAY) return;
     await daySummary();
@@ -150,7 +154,7 @@ async function daySummary() {
   const perfect = recent.filter((r) => r.c === 5).length;
   const avg = state.dayFarmers ? state.dayCoins / state.dayFarmers : 0;
   const tip = state.levels.scanner + state.levels.belt + state.levels.truck === 0
-    ? 'Consiglio: nel negozio 🛒 puoi migliorare scanner, nastro e camion.'
+    ? 'Consiglio: nel negozio 🛒 puoi migliorare scanner, scarico e camion.'
     : 'Dati migliori o più dati? Nel negozio 🛒 decidi tu.';
   const html =
     `<h2>🌅 Giornata finita!</h2><p>Giorno ${state.day}: ecco com'è andata.</p>` +
@@ -214,14 +218,15 @@ const SHOP = [
     },
   },
   {
-    key: 'belt', icon: '⚙️', name: 'Nastro',
-    desc: 'L\'agricoltore porta più cassette (o più animali) a ogni viaggio: scarichi il camion più in fretta. Non dà più dati, fa risparmiare tempo.',
-    effect: (lv) => `${CONFIG.BELT_BOXES[lv]} ${CONFIG.BELT_BOXES[lv] === 1 ? 'cassetta' : 'cassette'} per viaggio`,
+    // Stored as "belt" in the save file (the old name); shown as "Scarico" (unloading).
+    key: 'belt', icon: '🦾', name: 'Scarico',
+    desc: 'Chi scarica il camion: prima aiutanti, poi attrezzi e macchine. Più cassette (o più animali) a ogni viaggio: scarichi più in fretta. Non dà più dati, fa risparmiare tempo.',
+    effect: (lv) => `${UNLOADER_NAMES[lv]}: ${CONFIG.BELT_BOXES[lv]} ${CONFIG.BELT_BOXES[lv] === 1 ? 'cassetta' : 'cassette'} per viaggio`,
   },
   {
     key: 'truck', icon: '🚚', name: 'Camion',
-    desc: 'Più cassette nel camion: più dati <em>(data)</em> per ogni agricoltore.',
-    effect: (lv) => `${CONFIG.TRUCK_CRATES[lv]} cassette = ${CONFIG.TRUCK_CRATES[lv] * CONFIG.UNITS_PER_BOX} dati`,
+    desc: 'Un mezzo più grande porta più cassette: più dati <em>(data)</em> per ogni agricoltore.',
+    effect: (lv) => `${VEHICLE_NAMES[lv]}: ${CONFIG.TRUCK_CRATES[lv]} cassette = ${CONFIG.TRUCK_CRATES[lv] * CONFIG.UNITS_PER_BOX} dati`,
   },
 ];
 
@@ -230,7 +235,7 @@ function openShop(onClose) {
     const draw = () => {
       body.innerHTML =
         `<p class="sheet-note">Hai <b>${state.coins} 🪙</b>. Il livello <i>n</i> costa <i>n</i> monete. ` +
-        'Le migliorie valgono dal prossimo agricoltore.</p>';
+        'Scanner e scarico valgono subito; il mezzo nuovo arriva con il prossimo agricoltore.</p>';
       for (const it of SHOP) {
         const lv = state.levels[it.key];
         const maxed = lv >= CONFIG.MAX_LEVEL;
@@ -243,6 +248,9 @@ function openShop(onClose) {
           `<div class="shop-top"><span class="shop-icon">${it.icon}</span><div><div class="shop-name">${it.name}</div>` +
           `<div>Livello ${lv}/${CONFIG.MAX_LEVEL}</div></div></div>` +
           `<div class="pips">${pips}</div>` +
+          `<div class="preview-row"><canvas class="preview" data-key="${it.key}" data-lv="${lv}" aria-hidden="true"></canvas>` +
+          (maxed ? '' : `<span class="preview-arrow">➜</span><canvas class="preview" data-key="${it.key}" data-lv="${lv + 1}" aria-hidden="true"></canvas>`) +
+          '</div>' +
           `<div class="shop-desc">${it.desc}</div>` +
           `<div class="shop-effect">${it.effect(lv)}${next}</div>`;
         const btn = document.createElement('button');
@@ -265,6 +273,13 @@ function openShop(onClose) {
       }
     };
     draw();
+    // Animate the previews while the shop is open.
+    const tick = (now) => {
+      if ($('#sheet').hidden) return;
+      for (const c of body.querySelectorAll('canvas.preview')) drawPreview(c, c.dataset.key, Number(c.dataset.lv), now);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   }, onClose);
 }
 
