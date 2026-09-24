@@ -77,11 +77,14 @@ export const CONFIG = {
   NATURAL_NOISE_HARD: 0.07,
   // Number of farmers served until the difficulty reaches "hard".
   DIFFICULTY_RAMP_FARMERS: 15,
-  // Hidden true line of each visit (except the first farmer): random sign, size and intercept,
-  // so the slope can't be guessed from the axis labels (the numbers don't need to be realistic).
-  NEGATIVE_SLOPE_PROB: 0.5,
-  // |slope| is uniform in this range (plot units: 1 = the line rises the full plot height across the plot).
-  SLOPE_ABS_RANGE: [0.0, 0.84],
+  // Hidden true line of each visit (except the first farmer). In reality every relationship is
+  // positive (bigger -> heavier, more feed -> more milk). Each axis is drawn the normal way or
+  // reversed ("+" on the left / at the bottom) with this probability, independently, so the line
+  // on the plot falls in about half the rounds but always agrees with the axes.
+  AXIS_FLIP_PROB: 0.5,
+  // Steepness on the plot is uniform in this range (plot units: 1 = the line crosses the full plot
+  // height across the plot), plus a random height, so the line can't be guessed from the labels.
+  SLOPE_ABS_RANGE: [0.05, 0.84],
   // Both ends of the true line (x = 0 and x = 1) stay at least this far from the bottom/top of the plot.
   LINE_MARGIN: 0.08,
   // The very first farmer: easy, fixed line, no glitches, scanner noise scaled down.

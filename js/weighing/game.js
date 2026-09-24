@@ -111,6 +111,8 @@ export class WeighingGame {
       `<span class="chip">caratteristica <em>(feature)</em>: ${xLabel(f)}</span>` +
       `<span class="chip">obiettivo da prevedere <em>(target)</em>: ${yLabel(f)}</span>`;
     this.updateInfo();
+    const ax = this.round.axes;
+    if ((ax.flipX || ax.flipY) && this.app.onAxesFlipped) this.app.onAxesFlipped(ax);
   }
 
   // ------------------------------------------------------------ input
@@ -316,7 +318,8 @@ export class WeighingGame {
     const r = this.round;
     const f = r.farmer;
     ctx.clearRect(0, 0, W, H);
-    const L = 16, R = W - 12, T = 28, B = H - 26;
+    // Plot area; the axes sit just outside it, with a gutter on the left for the y-axis markers.
+    const L = 42, R = W - 16, T = 26, B = H - 32;
     const px = (x) => L + x * (R - L);
     const py = (y) => B - y * (B - T);
 
@@ -327,17 +330,7 @@ export class WeighingGame {
       ctx.beginPath(); ctx.moveTo(px(i / 5), T); ctx.lineTo(px(i / 5), B); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(L, py(i / 5)); ctx.lineTo(R, py(i / 5)); ctx.stroke();
     }
-    // axes with arrows
-    ctx.strokeStyle = C.soil; ctx.fillStyle = C.soil; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(L, T - 8); ctx.lineTo(L, B); ctx.lineTo(R + 4, B); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(L, T - 14); ctx.lineTo(L - 5, T - 5); ctx.lineTo(L + 5, T - 5); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(R + 10, B); ctx.lineTo(R + 1, B - 5); ctx.lineTo(R + 1, B + 5); ctx.fill();
-    ctx.font = `600 13px ${FONT}`;
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'left';
-    ctx.fillText(yLabel(f), L + 10, T - 12);
-    ctx.textAlign = 'right';
-    ctx.fillText(xLabel(f), R, B + 15);
+    this.drawAxes(ctx, { L, R, T, B, W }, f, r.axes || { flipX: false, flipY: false });
 
     const revealing = this.phase === 'reveal' || this.phase === 'result' || this.phase === 'leaving';
     const tr = revealing ? now - this.phaseT0 : 0;
@@ -410,6 +403,10 @@ export class WeighingGame {
 
     // intercept marker on the y axis
     if (line.a >= -0.02 && line.a <= 1.02) {
+      // dotted link to the vertical axis, which sits a little left of the plot
+      ctx.strokeStyle = 'rgba(217,80,43,0.6)'; ctx.lineWidth = 1.5; ctx.setLineDash([2, 3]);
+      ctx.beginPath(); ctx.moveTo(L - 16, py(line.a)); ctx.lineTo(px(0), py(line.a)); ctx.stroke();
+      ctx.setLineDash([]);
       ctx.fillStyle = C.tomato; ctx.strokeStyle = C.cream; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(px(0), py(line.a), 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
@@ -420,6 +417,60 @@ export class WeighingGame {
       ctx.textAlign = 'center';
       ctx.fillText('Ancora nessun dato: tocca il camion 🚚', (L + R) / 2, (T + B) / 2 - 30);
     }
+  }
+
+  // Axes without numbers: "−" and a small emoji at the low end, "+" and a big emoji at the high
+  // end, and an arrowhead pointing to "+". A reversed axis ("+" on the left / at the bottom) is
+  // drawn in tomato so it stands out.
+  drawAxes(ctx, { L, R, T, B }, f, axes) {
+    const ax = L - 16;            // x of the vertical axis
+    const ay = B + 10;            // y of the horizontal axis
+    const xIcon = f.xIcon || f.unit, yIcon = f.yIcon || f.unit;
+    const arrow = (x, y, dx, dy) => {   // arrowhead with its tip at (x, y), pointing along (dx, dy)
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - dx * 9 - dy * 5, y - dy * 9 - dx * 5);
+      ctx.lineTo(x - dx * 9 + dy * 5, y - dy * 9 + dx * 5);
+      ctx.closePath(); ctx.fill();
+    };
+    const sign = (txt, x, y) => { ctx.font = `800 15px ${FONT}`; ctx.fillText(txt, x, y); };
+    const icon = (big, ch, x, y) => { ctx.font = `${big ? 18 : 11}px ${FONT}`; ctx.fillText(ch, x, y); };
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 2;
+
+    // vertical axis
+    const yCol = axes.flipY ? C.tomato : C.soil;
+    ctx.strokeStyle = yCol; ctx.fillStyle = yCol;
+    ctx.beginPath(); ctx.moveTo(ax, T - 4); ctx.lineTo(ax, B + 2); ctx.stroke();
+    if (!axes.flipY) arrow(ax, T - 12, 0, -1); else arrow(ax, B + 8, 0, 1);
+    const gx = 12;                // gutter column for the markers
+    const topPlus = !axes.flipY;
+    sign(topPlus ? '+' : '−', gx, T - 6);
+    icon(topPlus, yIcon, gx, T + 12);
+    icon(!topPlus, yIcon, gx, B - 12);
+    sign(topPlus ? '−' : '+', gx, B + 6);
+
+    // horizontal axis
+    const xCol = axes.flipX ? C.tomato : C.soil;
+    ctx.strokeStyle = xCol; ctx.fillStyle = xCol;
+    ctx.beginPath(); ctx.moveTo(L - 2, ay); ctx.lineTo(R + 2, ay); ctx.stroke();
+    if (!axes.flipX) arrow(R + 10, ay, 1, 0); else arrow(L - 10, ay, -1, 0);
+    const row = ay + 13;
+    const rightPlus = !axes.flipX;
+    sign(rightPlus ? '−' : '+', L + 2, row);
+    icon(!rightPlus, xIcon, L + 18, row);
+    icon(rightPlus, xIcon, R - 14, row);
+    sign(rightPlus ? '+' : '−', R + 4, row);
+
+    // quantity names (unchanged): y at the top, x centred under the axis
+    ctx.fillStyle = C.soil;
+    ctx.font = `600 13px ${FONT}`;
+    ctx.textAlign = 'left';
+    ctx.fillText(yLabel(f), L + 2, T - 14);
+    ctx.textAlign = 'center';
+    ctx.fillText(xLabel(f), (L + R) / 2, row);
+    ctx.textBaseline = 'alphabetic';
   }
 
   drawScene(now) {

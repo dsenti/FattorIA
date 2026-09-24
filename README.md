@@ -59,7 +59,7 @@ Everything is in `js/config.js`, with comments:
 - **Upgrades, per level 0–10:** `BELT_BOXES` ("Scarico" in the shop, stored as `belt`: objects per trip, 1→11; faster, not more data), `TRUCK_BASE` × `TRUCK_FACTOR`^level → `TRUCK_CRATES` (3, 5, 7, 10, 15, 23, 34, 51, 77, 115, 173), `SCANNER_NOISE` (never zero), `SCANNER_GLITCH` (1/8 → 0), `GLITCH_OFFSET`. `PILE_VISIBLE_MAX` caps how many boxes are drawn (the rest shows as "+N").
 - **Machine sizes (drawing only):** `SCANNER_SCALE`, `SCANNER_HEIGHT_FRACTION`, `TRUCK_LENGTH`, `TRUCK_HEIGHT_SCALE`, per level.
 - **Harvest and difficulty:** `HARVEST_SIZE`, `NATURAL_NOISE_EASY/HARD`, `DIFFICULTY_RAMP_FARMERS`, `FIRST_FARMER`.
-- **Hidden true line:** `NEGATIVE_SLOPE_PROB`, `SLOPE_ABS_RANGE`, `LINE_MARGIN` (random sign and steepness each visit, always inside the plot).
+- **Hidden true line and axes:** `AXIS_FLIP_PROB` (each axis drawn normal or reversed, so the real relation stays positive but the line on the plot falls in about half the rounds), `SLOPE_ABS_RANGE`, `LINE_MARGIN` (random steepness and height, always inside the plot).
 - **Sliders:** `SLOPE_ANGLE_RANGE`, `INTERCEPT_RANGE`, start position.
 - **Timing:** `CARRY_MS` + `RETURN_MS` (the truck cooldown), `BELT_SPEED`, `TRIP_UNLOAD_MS`, `TRUCK_LEAVE_MS`, reveal durations.
 - **Leaderboard:** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `MIN_FARMERS_FOR_PRECISION`.

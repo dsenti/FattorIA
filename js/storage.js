@@ -30,6 +30,7 @@ export function defaultState() {
     dayCoins: 0,
     fits: [],              // last rounds: { f: farmer id, c: coins, r: error ratio }
     seenHelp: false,       // "how to play" shown once
+    seenFlip: false,       // "axis reversed" warning shown once
   };
 }
 
@@ -59,6 +60,7 @@ function sanitize(raw) {
     dayCoins: num(raw.dayCoins, 0),
     fits: Array.isArray(raw.fits) ? raw.fits.slice(-MAX_HISTORY) : [],
     seenHelp: raw.seenHelp === true,
+    seenFlip: raw.seenFlip === true,
   };
 }
 

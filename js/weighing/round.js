@@ -11,9 +11,23 @@ export function pickFarmer(visitNo, lastId) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// Hidden true line: y = a + b x. Sign, steepness and height are random, and both ends
-// (x = 0 and x = 1) stay inside the plot, so the whole line and point cloud are visible.
-function makeTrueLine(visitNo) {
+// Everything (dots, sliders, lines, scoring) works in plot space: x and y in 0..1 as drawn,
+// left to right and bottom to top. The farmer's real relationship is always positive; an axis
+// that is drawn reversed (flipX: "+" on the left, flipY: "+" at the bottom) mirrors it, so the
+// visible slope sign = flipX xor flipY. Data value <-> plot position: v = flip ? 1 - p : p.
+export function randomAxes(visitNo) {
+  if (visitNo === 0) return { flipX: false, flipY: false };
+  return { flipX: Math.random() < CONFIG.AXIS_FLIP_PROB, flipY: Math.random() < CONFIG.AXIS_FLIP_PROB };
+}
+
+// The real (data-space) slope of a plot-space line: positive means "more x -> more y".
+export function dataSlope(line, axes) {
+  return line.b * (axes.flipX ? -1 : 1) * (axes.flipY ? -1 : 1);
+}
+
+// Hidden true line on the plot: y = a + b x. Steepness and height are random, the sign follows
+// the axis directions, and both ends (x = 0 and x = 1) stay inside the plot.
+function makeTrueLine(visitNo, axes) {
   if (visitNo === 0) {
     const a = CONFIG.FIRST_FARMER.intercept;
     return { a, b: CONFIG.FIRST_FARMER.rightEnd - a };
@@ -21,7 +35,7 @@ function makeTrueLine(visitNo) {
   const m = CONFIG.LINE_MARGIN;
   const [s0, s1] = CONFIG.SLOPE_ABS_RANGE;
   const size = Math.min(rand(s0, s1), 1 - 2 * m);
-  const b = Math.random() < CONFIG.NEGATIVE_SLOPE_PROB ? -size : size;
+  const b = axes.flipX !== axes.flipY ? -size : size;
   // Height of the line in the middle of the plot, chosen so that both ends fit.
   const mid = rand(m + size / 2, 1 - m - size / 2);
   return { a: mid - b / 2, b };
@@ -31,7 +45,8 @@ export function makeRound({ visitNo, lastFarmerId, levels }) {
   const farmer = pickFarmer(visitNo, lastFarmerId);
   const first = visitNo === 0;
   const difficulty = first ? 0 : clamp(visitNo / CONFIG.DIFFICULTY_RAMP_FARMERS, 0, 1);
-  const trueLine = makeTrueLine(visitNo);
+  const axes = randomAxes(visitNo);
+  const trueLine = makeTrueLine(visitNo, axes);
   const naturalNoise = lerp(CONFIG.NATURAL_NOISE_EASY, CONFIG.NATURAL_NOISE_HARD, difficulty) * (first ? 1 : farmer.noise);
 
   const [x0, x1] = CONFIG.HARVEST_X_RANGE;
@@ -51,6 +66,7 @@ export function makeRound({ visitNo, lastFarmerId, levels }) {
     farmer,
     visitNo,
     trueLine,
+    axes,
     harvest,
     best,
     bestError,

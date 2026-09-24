@@ -143,6 +143,14 @@ const game = new WeighingGame($('#screen-weigh'), {
     pushScore();
   },
   overlayOpen: () => !$('#sheet').hidden || !$('#modal').hidden,
+  onAxesFlipped: (axes) => {
+    if (state.seenFlip) return;
+    state.seenFlip = true;
+    save();
+    const which = axes.flipX && axes.flipY ? 'entrambi gli assi sono al contrario'
+      : axes.flipX ? 'l\'asse orizzontale è al contrario' : 'l\'asse verticale è al contrario';
+    toast(`⚠️ Attenzione: ${which}! Guarda dove sono il − e il +.`, 4500);
+  },
   beforeNextFarmer: async () => {
     if (state.dayFarmers < CONFIG.FARMERS_PER_DAY) return;
     await daySummary();

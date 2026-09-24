@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { CONFIG } from '../js/config.js';
 import { EMOJIS, NOUNS, ADJECTIVES, formatName, nameChoices, isValidName } from '../js/names.js';
 import { FARMERS } from '../js/weighing/farmers.js';
-import { makeRound, takeUnit, measure, scoreLine, coinsForRatio, sliderToLine, startSliders } from '../js/weighing/round.js';
+import { makeRound, takeUnit, measure, scoreLine, coinsForRatio, sliderToLine, startSliders, dataSlope } from '../js/weighing/round.js';
 import { leastSquares } from '../js/stats.js';
 
 let passed = 0;
@@ -49,8 +49,9 @@ test('coins thresholds', () => {
   assert.equal(coinsForRatio(3.1), 0);
 });
 
-test('true lines: inside the plot, both signs, flat to steep, all farmers appear', () => {
+test('true lines: positive in reality, axis flips give the visible sign, inside the plot, all farmers', () => {
   const seen = new Set();
+  const combos = new Map();
   const lv = { scanner: 0, belt: 0, truck: 0 };
   let last = null, neg = 0, flat = 0, steep = 0, n = 0;
   for (let v = 0; v < 4000; v++) {
@@ -64,15 +65,24 @@ test('true lines: inside the plot, both signs, flat to steep, all farmers appear
     assert.ok(a >= m && a <= 1 - m && a + b >= m && a + b <= 1 - m, `line ends in plot: a=${a} b=${b}`);
     for (const p of r.harvest) assert.ok(p.x > 0 && p.x < 1 && p.y > 0 && p.y < 1, 'harvest dot in plot');
     assert.equal(r.harvest.length, CONFIG.HARVEST_SIZE);
-    if (visit === 0) continue;
+    // The real relation is always "more x -> more y", for every farmer.
+    assert.ok(dataSlope(r.trueLine, r.axes) > 0, `${r.farmer.id}: real relation positive`);
+    assert.ok(dataSlope(r.best, r.axes) > 0, `${r.farmer.id}: best line positive in data space`);
+    // Visible sign = flipX xor flipY.
+    assert.equal(b < 0, r.axes.flipX !== r.axes.flipY, 'visible slope sign matches the axis flips');
+    if (visit === 0) { assert.ok(!r.axes.flipX && !r.axes.flipY, 'first farmer: normal axes'); continue; }
+    const key = `${r.axes.flipX ? 'X-' : 'X+'} ${r.axes.flipY ? 'Y-' : 'Y+'}`;
+    combos.set(key, (combos.get(key) || 0) + 1);
     n++;
     if (b < 0) neg++;
     if (Math.abs(b) < 0.1) flat++;
     if (Math.abs(b) > 0.7) steep++;
   }
   assert.equal(seen.size, FARMERS.length);
-  assert.ok(Math.abs(neg / n - 0.5) < 0.05, `negative share ${neg / n}`);
-  assert.ok(flat / n > 0.05, `almost-flat share ${flat / n}`);
+  assert.equal(combos.size, 4, 'all 4 axis-direction combinations appear');
+  for (const [k, c] of combos) assert.ok(c / n > 0.2, `combo ${k} share ${c / n}`);
+  assert.ok(Math.abs(neg / n - 0.5) < 0.05, `falling-line share ${neg / n}`);
+  assert.ok(flat / n > 0.03, `almost-flat share ${flat / n}`);
   assert.ok(steep / n > 0.1, `steep share ${steep / n}`);
   const r0 = makeRound({ visitNo: 0, lastFarmerId: null, levels: lv });
   assert.equal(r0.farmer.id, 'mele');

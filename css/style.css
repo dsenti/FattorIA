@@ -271,7 +271,7 @@ canvas.preview { flex: 1; min-width: 0; height: 84px; background: #F4ECD8; borde
 .toast {
   position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%);
   background: var(--soil); color: var(--cream); padding: 10px 16px; border-radius: 12px;
-  font-size: 14px; z-index: 30; max-width: 90%; text-align: center;
+  font-size: 14px; z-index: 30; max-width: 90%; text-align: center; pointer-events: none;
 }
 
 /* ---------------------------------------------------------------- small / short screens */
