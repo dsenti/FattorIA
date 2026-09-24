@@ -3,14 +3,14 @@
 **Status:** DRAFT. Minigame 1 is designed; minigames 2 and 3 are waiting for Dominik's sketches. The game-dev agent builds from this file.
 
 ## Concept
-The game is a small farm valley in the Matese (working title *La Valle*, TODO(Dominik): name). The player runs a data lab that serves the valley's farmers. The main screen is a **map**. Each place on the map (the weighing station, the orchard, the barn, …) opens one **minigame**. Each minigame reinforces one lesson (L2–L4). Coins from the minigames buy upgrades, and as the course goes on, more places on the map unlock.
+The game is a small farm valley in the Matese called **FattorIA** (fattoria + IA). The player runs a data lab that serves the valley's farmers. The main screen is a **map**. Each place on the map (the weighing station, the orchard, the barn, …) opens one **minigame**. Each minigame reinforces one lesson (L2–L4). Coins from the minigames buy upgrades, and as the course goes on, more places on the map unlock.
 
 The minigames are small and quick: one round takes 1–3 minutes, so a student can play a few rounds at the end of a lesson or on the bus.
 
 ## Platform and hosting (decided)
 - **Phone first, in the browser.** Portrait orientation. It must also work on the school computers (the same layout, centred). Keep touch targets ≥ 44 px, put the controls in the bottom half where the thumb reaches, and use no hover-only interactions.
 - **No build step, no framework:** plain HTML, CSS and JavaScript (ES modules). Draw the minigames with `<canvas>` or SVG, and build the map and menus in HTML/SVG. Reasons: the minigames are simple, there is nothing to install or compile, and any Claude session or student can open the files and understand them. A game engine such as Phaser would add weight without adding anything we need.
-- **Hosting:** GitHub Pages, served straight from the `Game/` folder. To deploy, push. To run it locally, use `python3 -m http.server` in `Game/`.
+- **Hosting:** GitHub Pages at https://dsenti.github.io/FattorIA/ (public repo `dsenti/FattorIA`, pushed from `Game/` with `git subtree`). Every push deploys automatically. To run it locally, use `python3 -m http.server` in `Game/`.
 - **Offline:** once loaded, it should keep working without network access (a small service worker caches the files). The school Wi-Fi may be poor.
 - **Progress:** saved only in the phone's browser (`localStorage`): coins, upgrades, unlocked places. There are no accounts and no personal data. Add a "Ricomincia" (restart) button. The only thing that leaves the phone is the leaderboard entry (see below).
 - **Assets:** simple flat vector art in the course palette (`course/STYLE.md`: soil `#5B3A29`, olive `#6B7F2A`, wheat `#E9D8A6`, cream `#FBF7EF`, tomato `#D9502B`, sky `#4A8FA3`). Keep the total download small (target < 2 MB).
@@ -58,7 +58,7 @@ TODO(Dominik): check the list and add any Matese crops or animals the students w
 
 **Round flow**
 1. **A farmer arrives.** The truck drives in, and a speech bubble says what they want to know ("Voglio sapere quanto pesa una mela dal suo diametro").
-2. **Collect data.** Tap the truck. The farmer walks to it, lifts a crate and puts it on the conveyor belt (about 1 s animation). The fruit rolls through the **scanner**, and each fruit pops out as a dot on the scatter plot above. While the farmer is carrying a crate, the truck can't be tapped again. This cooldown makes getting data cost something, so you can't spam it. The truck holds a limited number of crates (6 at the start; see Upgrades). A crate counter shows how many are left. When the truck is empty, the data runs out. The farmer's whole harvest is larger than what fits in the truck, and the rest is never measured.
+2. **Collect data.** Tap the truck. The farmer walks to it, lifts a crate and puts it on the conveyor belt (about 1 s animation). The fruit rolls through the **scanner**, and each fruit pops out as a dot on the scatter plot above. While the farmer is carrying a crate, the truck can't be tapped again. This cooldown makes getting data cost something, so you can't spam it. The truck holds a limited number of crates (3 at the start; see Upgrades). A crate counter shows how many are left. When the truck is empty, the data runs out. The farmer's whole harvest is larger than what fits in the truck, and the rest is never measured.
 3. **Fit the line.** Two big sliders under the plot: **pendenza (slope)** and **intercetta (intercept)**. The line moves live. The sliders show no numbers. You can collect more crates and adjust the line in any order.
 4. **Lock it in.** Tap "Blocca la retta" (lock the line).
 5. **Reveal.** The whole harvest appears on the plot as faint dots, the best line (retta migliore) is drawn next to yours, and the vertical gaps from each dot to *your* line flash briefly. This is the errore. The farmer reacts (😐 / 🙂 / 😄), and the coins count up (0–5).

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#6B7F2A">
+  <meta name="description" content="FattorIA: il gioco del corso FATE-AI.">
+  <title>FattorIA · FATE-AI</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ============================================================ MAP -->
+  <section id="screen-map" class="screen">
+    <header class="topbar">
+      <div class="title">FattorIA</div>
+      <div class="coins" aria-label="Monete">🪙 <span class="coin-value">0</span></div>
+    </header>
+    <div class="map">
+      <svg class="map-art" viewBox="0 0 390 560" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#9CC7D2"/><stop offset="1" stop-color="#FBF7EF"/>
+          </linearGradient>
+        </defs>
+        <rect width="390" height="560" fill="url(#sky)"/>
+        <circle cx="318" cy="62" r="26" fill="#F4C95D" opacity="0.9"/>
+        <path d="M0 190 L60 110 L105 150 L165 70 L230 150 L275 105 L340 165 L390 120 L390 260 L0 260Z" fill="#8A9B5A"/>
+        <path d="M150 88 L165 70 L181 90 L172 86 L165 94 L158 86Z" fill="#FBF7EF"/>
+        <path d="M0 230 L70 170 L140 215 L210 160 L290 220 L350 185 L390 205 L390 300 L0 300Z" fill="#6B7F2A"/>
+        <path d="M0 290 Q120 250 200 280 T390 270 L390 560 L0 560Z" fill="#A9B66A"/>
+        <path d="M0 360 Q130 320 230 350 T390 340 L390 560 L0 560Z" fill="#C8C27A"/>
+        <path d="M0 430 Q150 400 260 425 T390 420 L390 560 L0 560Z" fill="#E9D8A6"/>
+        <path d="M250 270 C230 320 300 360 210 410 C150 445 190 500 120 560 L165 560 C230 505 200 455 250 420 C330 370 270 320 285 270Z" fill="#4A8FA3" opacity="0.85"/>
+        <g fill="#6B7F2A" opacity="0.8">
+          <circle cx="40" cy="330" r="10"/><circle cx="60" cy="336" r="8"/><circle cx="345" cy="315" r="10"/>
+          <circle cx="325" cy="470" r="9"/><circle cx="350" cy="480" r="11"/><circle cx="30" cy="500" r="9"/>
+        </g>
+        <g stroke="#5B3A29" stroke-opacity="0.25" stroke-width="2">
+          <path d="M20 470 L110 450 M20 490 L120 470 M25 510 L130 490"/>
+        </g>
+      </svg>
+      <div class="places">
+        <button class="place" id="place-weigh" style="left:30%;top:66%">
+          <span class="place-icon">⚖️</span>
+          <span class="place-name">Stazione di pesatura</span>
+        </button>
+        <button class="place locked" style="left:72%;top:47%" data-lesson="3" aria-disabled="true">
+          <span class="place-icon">🔒</span>
+          <span class="place-name">Il frutteto</span>
+          <span class="place-lock">Si sblocca nella lezione 3</span>
+        </button>
+        <button class="place locked" style="left:26%;top:40%" data-lesson="4" aria-disabled="true">
+          <span class="place-icon">🔒</span>
+          <span class="place-name">La stalla</span>
+          <span class="place-lock">Si sblocca nella lezione 4</span>
+        </button>
+      </div>
+    </div>
+    <div class="map-player" id="map-player"></div>
+    <nav class="bottombar">
+      <button class="btn" id="btn-shop">🛒 Negozio</button>
+      <button class="btn" id="btn-board">🏆 Classifica</button>
+      <button class="btn icon" id="btn-settings" aria-label="Impostazioni">⚙️</button>
+    </nav>
+  </section>
+
+  <!-- ============================================================ WEIGHING STATION -->
+  <section id="screen-weigh" class="screen" hidden>
+    <header class="topbar">
+      <button class="btn icon" id="w-back" aria-label="Torna alla mappa">🗺️</button>
+      <div class="title small">⚖️ Pesatura</div>
+      <div class="coins" aria-label="Monete">🪙 <span class="coin-value">0</span></div>
+      <button class="btn icon" id="w-help" aria-label="Come si gioca">❔</button>
+      <button class="btn icon" id="w-shop" aria-label="Negozio">🛒</button>
+    </header>
+    <div class="bubble">
+      <div class="bubble-face" id="w-face">👨‍🌾</div>
+      <div class="bubble-body">
+        <div class="bubble-who" id="w-who"></div>
+        <div class="bubble-text" id="w-text"></div>
+        <div class="bubble-sub" id="w-sub"></div>
+      </div>
+    </div>
+    <div class="plot-wrap"><canvas id="w-plot"></canvas></div>
+    <div class="scene-wrap"><canvas id="w-scene" aria-label="Camion, nastro e scanner. Tocca il camion per scaricare una cassetta."></canvas></div>
+    <div class="info-row"><span id="w-crates"></span><span id="w-count"></span></div>
+    <div class="bottom">
+      <div class="controls" id="w-controls">
+        <div class="slider-row">
+          <div class="slider-label">pendenza <em>(slope)</em></div>
+          <div class="slider-box">
+            <svg class="slider-end" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8 L21 17" /></svg>
+            <div id="w-slope"></div>
+            <svg class="slider-end" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21 L18 3" /></svg>
+          </div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-label">intercetta <em>(intercept)</em></div>
+          <div class="slider-box">
+            <svg class="slider-end" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 L12 20 M6 14 L12 20 L18 14" /></svg>
+            <div id="w-intercept"></div>
+            <svg class="slider-end" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20 L12 4 M6 10 L12 4 L18 10" /></svg>
+          </div>
+        </div>
+        <button class="btn primary big" id="w-lock" disabled>Blocca la retta 🔒</button>
+      </div>
+      <div class="result" id="w-result" hidden>
+        <div class="result-head">
+          <div class="result-title" id="w-res-title"></div>
+          <div class="result-coins" id="w-res-coins">+0 🪙</div>
+        </div>
+        <div class="result-label">Errore <em>(error)</em> medio sul raccolto intero:</div>
+        <div class="bar-row"><span class="bar-name"><i class="swatch me"></i>la tua retta</span><span class="bar"><span class="bar-fill me" id="w-bar-me"></span></span></div>
+        <div class="bar-row"><span class="bar-name"><i class="swatch best"></i>retta migliore <em>(line of best fit)</em></span><span class="bar"><span class="bar-fill best" id="w-bar-best"></span></span></div>
+        <div class="result-note" id="w-res-note"></div>
+        <button class="btn primary big" id="w-next">Prossimo agricoltore ➜</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ SHEETS AND MODALS -->
+  <div class="sheet" id="sheet" hidden>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <div class="sheet-head">
+        <h2 id="sheet-title"></h2>
+        <button class="btn icon" id="sheet-close" aria-label="Chiudi">✕</button>
+      </div>
+      <div class="sheet-body" id="sheet-body"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="modal" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true">
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-actions" id="modal-actions"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
