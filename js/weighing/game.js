@@ -86,6 +86,8 @@ export class WeighingGame {
     this.lastFarmerId = this.round.farmer.id;
     this.units = [];
     this.carry = null;
+    this.truckLeave = null;   // { t0 } while the empty truck drives away
+    this.truckGone = false;
     this.result = null;
     this.phase = 'arriving';
     this.phaseT0 = performance.now();
@@ -121,24 +123,32 @@ export class WeighingGame {
       now >= (this.cooldownUntil || 0);
   }
 
+  // The empty truck can be sent away with one more tap.
+  truckCanLeave() {
+    return this.phase === 'collect' && this.round.cratesLeft === 0 && !this.carry &&
+      !this.truckLeave && !this.truckGone;
+  }
+
   onSceneTap(e) {
     const r = this.el.scene.getBoundingClientRect();
     const x = (e.clientX - r.left) / r.width;
     // Generous hit area: the whole left part of the scene (truck + farmer).
     if (x > 0.46) return;
     const now = performance.now();
+    if (this.truckCanLeave()) { this.truckLeave = { t0: now }; return; }
     if (!this.truckTappable(now)) return;
-    this.round.cratesLeft--;
-    this.carry = { t0: now };
+    const boxes = Math.min(this.round.perTrip, this.round.cratesLeft);
+    this.round.cratesLeft -= boxes;
+    this.carry = { t0: now, boxes };
     this.cooldownUntil = now + CONFIG.CARRY_MS + CONFIG.RETURN_MS;
     this.updateInfo();
   }
 
   dropCrate(now) {
-    const n = this.round.perCrate;
+    const n = this.carry.boxes * this.round.unitsPerBox;
     const W = this.sceneW || 390;
     const spacing = 26 / W;                       // in scene-width units
-    const interval = spacing / CONFIG.BELT_SPEED * 1000;
+    const interval = Math.min(spacing / CONFIG.BELT_SPEED * 1000, CONFIG.TRIP_UNLOAD_MS / n);
     let t = Math.max(now, this.nextSpawnAt || 0);
     for (let i = 0; i < n; i++) {
       const idx = takeUnit(this.round);
@@ -199,9 +209,11 @@ export class WeighingGame {
         ? '⚠️ Lo scanner ha sbagliato una misura: è un valore anomalo <em>(outlier)</em>, cerchiato in rosso.'
         : `⚠️ Lo scanner ha sbagliato ${glitches} misure: sono valori anomali <em>(outlier)</em>, cerchiati in rosso.`;
     } else if (left > 0) {
-      const w = f.animal ? (left === 1 ? 'viaggio' : 'viaggi') : (left === 1 ? 'cassetta' : 'cassette');
-      note = `Nel camion ${left === 1 ? 'è rimasto' : 'sono rimasti'} ${left} ${w}: più dati <em>(data)</em>, retta più sicura.`;
-      if (!f.animal) note = note.replace('rimasto', 'rimasta').replace('rimasti', 'rimaste');
+      if (f.animal) {
+        note = `Nel camion sono rimasti ${left * this.round.unitsPerBox} animali: più dati <em>(data)</em>, retta più sicura.`;
+      } else {
+        note = `Nel camion ${left === 1 ? 'è rimasta 1 cassetta' : `sono rimaste ${left} cassette`}: più dati <em>(data)</em>, retta più sicura.`;
+      }
     } else {
       note = 'I puntini chiari sono il raccolto intero: la paga dipende da quelli, non solo dai tuoi dati.';
     }
@@ -235,9 +247,10 @@ export class WeighingGame {
     const r = this.round;
     if (!r) return;
     const f = r.farmer;
-    const word = f.animal ? (r.perCrate === 1 ? 'animale' : 'animali') + ' per viaggio' : `${f.unit} per cassetta`;
-    const left = f.animal ? `🚚 viaggi: ${r.cratesLeft}/${r.cratesTotal}` : `📦 cassette: ${r.cratesLeft}/${r.cratesTotal}`;
-    this.el.crates.textContent = `${left} · ${r.perCrate} ${word}`;
+    const k = r.unitsPerBox;
+    this.el.crates.textContent = f.animal
+      ? `🚚 ${f.unit} ${r.cratesLeft * k}/${r.cratesTotal * k} · ${r.perTrip * k} per viaggio`
+      : `📦 cassette: ${r.cratesLeft}/${r.cratesTotal} · ${r.perTrip} per viaggio`;
     this.el.count.innerHTML = `dati <em>(data)</em>: ${r.sample.length}`;
     this.el.lock.disabled = !(this.phase === 'collect' && this.canLock());
   }
@@ -347,18 +360,23 @@ export class WeighingGame {
         ctx.stroke();
       }
       ctx.fillStyle = C.harvest;
-      ctx.globalAlpha = 0.55 * aH;
+      ctx.globalAlpha = 0.5 * aH;
+      ctx.beginPath();
       for (const p of r.harvest) {
-        ctx.beginPath(); ctx.arc(px(p.x), py(p.y), 3, 0, Math.PI * 2); ctx.fill();
+        const X = px(p.x), Y = py(p.y);
+        ctx.moveTo(X + 2.6, Y);
+        ctx.arc(X, Y, 2.6, 0, Math.PI * 2);
       }
+      ctx.fill();
       ctx.globalAlpha = 1;
     }
 
-    // measured dots
+    // measured dots (smaller when there are many)
+    const dotR = r.sample.length > 150 ? 3.5 : r.sample.length > 60 ? 4.2 : 5;
     for (const d of r.sample) {
       const t = clamp((now - d.born) / 260, 0, 1);
       const s = t < 1 ? 1 + 0.6 * Math.sin(t * Math.PI) : 1;
-      const rad = 5 * s * (t < 0.15 ? t / 0.15 : 1);
+      const rad = dotR * s * (t < 0.15 ? t / 0.15 : 1);
       ctx.fillStyle = C.soil;
       ctx.beginPath(); ctx.arc(px(d.x), py(d.y), rad, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = C.cream; ctx.lineWidth = 1.2; ctx.stroke();
@@ -457,11 +475,15 @@ export class WeighingGame {
     ctx.textAlign = 'center';
     ctx.fillText('SCANNER', sx, ground - sh - 8);
 
-    // truck
+    // truck: drives in from the left, and drives back out to the left when sent away
     let tOff = 0;
     if (this.phase === 'arriving') tOff = -(1 - easeOut(clamp((now - this.phaseT0) / CONFIG.TRUCK_ARRIVE_MS, 0, 1))) * W * 0.5;
-    if (this.phase === 'leaving') tOff = 0;
-    this.drawTruck(ctx, W, H, ground, tOff, now);
+    if (this.truckLeave) {
+      const t = clamp((now - this.truckLeave.t0) / CONFIG.TRUCK_LEAVE_MS, 0, 1);
+      tOff = -(t * t * t) * W * 0.6;
+      if (t >= 1) { this.truckGone = true; this.truckLeave = null; }
+    }
+    if (!this.truckGone) this.drawTruck(ctx, W, H, ground, tOff, now);
 
     // farmer
     let fx = g.farmerIdle, carrying = false;
@@ -485,39 +507,179 @@ export class WeighingGame {
       ctx.fillText(f.face, fx * W, ground - 2 - bob);
       if (carrying) {
         if (f.animal) {
+          // The animals of this trip follow the farmer in a line.
+          const count = this.carry.boxes * r.unitsPerBox;
+          const drawn = Math.min(count, 3);
           ctx.font = `${us}px ${FONT}`;
-          ctx.fillText(f.unit, fx * W - fs * 0.8, ground - 2 - bob);
+          for (let i = 0; i < drawn; i++) {
+            const b2 = Math.abs(Math.sin(now / 90 + i)) * 2;
+            ctx.fillText(f.unit, fx * W - fs * 0.75 - i * us * 0.55, ground - 2 - b2);
+          }
+          if (count > drawn) {
+            ctx.font = `800 12px ${FONT}`;
+            ctx.lineWidth = 3; ctx.strokeStyle = C.cream; ctx.fillStyle = C.soil;
+            ctx.strokeText(`+${count - drawn}`, fx * W, ground - fs - 6);
+            ctx.fillText(`+${count - drawn}`, fx * W, ground - fs - 6);
+          }
         } else {
-          this.drawCrate(ctx, fx * W - 14, ground - fs - 18 - bob, 28, 18, f.unit);
+          this.drawCarryStack(ctx, fx * W, ground - fs * 0.85 - bob, this.carry.boxes, f.unit);
         }
       }
     }
 
     // hint
+    // hints (to the right of the pile, which can be tall)
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
     if (this.truckTappable(now) && r.sample.length === 0 && this.units.length === 0) {
       const a = 0.6 + 0.4 * Math.sin(now / 250);
       ctx.fillStyle = `rgba(217,80,43,${a})`;
-      ctx.font = `700 14px system-ui, sans-serif`;
+      ctx.font = `700 14px ${FONT}`;
+      ctx.fillText('👈 Tocca il camion!', W * 0.4, 11);
+    } else if (this.truckCanLeave() && this.units.length === 0) {
+      const a = 0.65 + 0.35 * Math.sin(now / 300);
+      ctx.fillStyle = `rgba(91,58,41,${a})`;
+      ctx.font = `700 12px ${FONT}`;
+      const msg = '👈 Camion vuoto: tocca per mandarlo via';
+      const room = W * 0.62;
+      const wide = ctx.measureText(msg).width;
+      if (wide > room) ctx.font = `700 ${Math.max(9, Math.floor(12 * room / wide))}px ${FONT}`;
+      ctx.fillText(msg, W * 0.36, 11);
+    }
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // Pseudo-3D pile: `cols` wide, `depth` rows deep (back rows drawn up and to the right),
+  // and as many layers (crates) or decks (animals) as needed. The layout depends only on the
+  // truck's capacity (capped at PILE_VISIBLE_MAX), so the pile doesn't jump as it shrinks.
+  // Crates are filled front row first (bottom to top), so the farmer takes them from the back
+  // row first, top to bottom, and the front of the pile stays full until the end.
+  // Animals are filled back row first, so the front-most ones are led out first.
+  pileLayout(capacity, animal, bx, bw, floorY, maxH) {
+    const n = Math.max(1, Math.min(capacity, CONFIG.PILE_VISIBLE_MAX));
+    const cols = 3;
+    const depth = n <= 3 ? 1 : n <= 12 ? 2 : 3;
+    const layers = Math.max(1, Math.ceil(n / (cols * depth)));
+    const perRow = cols * layers;
+    let cw = (bw - 2) / (cols + (depth - 1) * 0.4);
+    let ch = animal ? cw * 0.95 : cw * 0.62;
+    let dx = cw * 0.4, dy = animal ? ch * 0.28 : ch * 0.5;
+    // Total height including the top faces of the top layer and the produce lying on top.
+    const full = layers * ch + depth * dy + (animal ? 0 : ch * 0.8);
+    const k = Math.min(1, maxH / full);
+    cw *= k; ch *= k; dx *= k; dy *= k;
+    const pos = (i) => {
+      const r = Math.floor(i / perRow), j = i % perRow;
+      const row = animal ? depth - 1 - r : r;   // 0 = front
+      const layer = Math.floor(j / cols), col = j % cols;
+      return { layer, row, col, x: bx + 1 + col * cw + row * dx, y: floorY - layer * ch - row * dy };
+    };
+    return { cap: n, cols, depth, layers, cw, ch, dx, dy, pos, height: layers * ch + (depth - 1) * dy };
+  }
+
+  // capacity and shown are counted in drawn items: boxes for crops, animals for livestock.
+  drawPile(ctx, f, capacity, shown, bx, bw, floorY, maxH) {
+    const L = this.pileLayout(capacity, f.animal, bx, bw, floorY, maxH);
+    const vis = Math.min(shown, L.cap);
+    const items = [];
+    const occupied = new Set();
+    for (let i = 0; i < vis; i++) {
+      const p = { i, ...L.pos(i) };
+      items.push(p);
+      occupied.add(`${p.layer},${p.row},${p.col}`);
+    }
+    // Painter's order: back rows first, then bottom to top, then left to right.
+    items.sort((p, q) => q.row - p.row || p.layer - q.layer || p.col - q.col);
+    const right = bx + L.cols * L.cw + (L.depth - 1) * L.dx + 2;
+    const topY = floorY - L.height - (f.animal ? 4 : L.dy + L.ch * 0.8);
+
+    if (f.animal) {
+      // Multi-deck livestock trailer: back wall, animals, then slats and deck floors in front.
+      const top = floorY - L.height - 4;
+      ctx.fillStyle = C.wheat;
+      ctx.fillRect(bx, top, right - bx, floorY - top);
+      ctx.font = `${L.ch * 0.92}px ${FONT}`;
       ctx.textAlign = 'center';
-      ctx.fillText('👆 Tocca il camion!', W * 0.2, 16);
-    } else if (this.phase === 'collect' && r.cratesLeft === 0 && !this.carry) {
-      ctx.fillStyle = 'rgba(91,58,41,0.7)';
-      ctx.font = `600 12px system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText('Camion vuoto', W * 0.18, 16);
+      ctx.textBaseline = 'alphabetic';
+      for (const p of items) ctx.fillText(f.unit, p.x + L.cw / 2, p.y - L.ch * 0.08);
+      ctx.strokeStyle = C.soil;
+      for (let d = 0; d <= L.layers; d++) {
+        const yy = floorY - d * L.ch;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(bx, yy); ctx.lineTo(right, yy); ctx.stroke();
+        if (d < L.layers) {
+          ctx.lineWidth = 1.2;
+          ctx.globalAlpha = 0.55;
+          ctx.beginPath(); ctx.moveTo(bx, yy - L.ch * 0.5); ctx.lineTo(right, yy - L.ch * 0.5); ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      }
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(bx, top, right - bx, floorY - top);
+    } else {
+      // Open bed with low side walls, then the crates.
+      ctx.strokeStyle = C.soil; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(bx, floorY); ctx.lineTo(bx, floorY - 10);
+      ctx.moveTo(bx + bw, floorY); ctx.lineTo(bx + bw, floorY - 10);
+      ctx.stroke();
+      for (const p of items) {
+        const onTop = !occupied.has(`${p.layer + 1},${p.row},${p.col}`);
+        this.drawBox(ctx, p.x, p.y, L.cw, L.ch, L.dx, L.dy, onTop ? f.unit : null);
+      }
+    }
+
+    // What doesn't fit in the drawing is shown as a count.
+    if (shown > L.cap) {
+      const txt = `+${shown - L.cap}`;
+      ctx.font = `800 13px ${FONT}`;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      const tx = Math.min(right + 2, bx + bw + 14), ty = Math.max(9, topY + 2);
+      ctx.lineWidth = 3.5; ctx.strokeStyle = C.cream; ctx.lineJoin = 'round';
+      ctx.strokeText(txt, tx, ty);
+      ctx.fillStyle = C.soil;
+      ctx.fillText(txt, tx, ty);
+      ctx.textBaseline = 'alphabetic';
     }
   }
 
-  drawCrate(ctx, x, y, w, h, unit) {
-    ctx.fillStyle = '#A0703F';
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = C.soil; ctx.lineWidth = 1.5;
-    ctx.strokeRect(x, y, w, h);
-    ctx.beginPath(); ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2); ctx.stroke();
+  // The farmer's load: boxes stacked in his arms (two columns for big loads), bottom at `bottomY`.
+  drawCarryStack(ctx, cx, bottomY, n, unit) {
+    const cols = n > 5 ? 2 : 1;
+    const rows = Math.ceil(n / cols);
+    const bh = Math.max(4, Math.min(16, (bottomY - 4) / (rows + 0.8)));
+    const bw = bh * 1.6;
+    for (let i = 0; i < n; i++) {
+      const c = i % cols, rr = Math.floor(i / cols);
+      const x = cx - (cols * bw) / 2 + c * bw;
+      const y = bottomY - rr * bh;
+      this.drawBox(ctx, x, y, bw - 1, bh - 1, bw * 0.2, bh * 0.25, rr === rows - 1 ? unit : null);
+    }
+  }
+
+  // One crate in pseudo-3D: front face, top face, right side. (x, y) = bottom-left of the front face.
+  drawBox(ctx, x, y, w, h, dx, dy, unit) {
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = C.soil;
+    ctx.fillStyle = '#C08A52'; // top
+    ctx.beginPath();
+    ctx.moveTo(x, y - h); ctx.lineTo(x + dx, y - h - dy); ctx.lineTo(x + w + dx, y - h - dy); ctx.lineTo(x + w, y - h);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#7E5530'; // side
+    ctx.beginPath();
+    ctx.moveTo(x + w, y); ctx.lineTo(x + w, y - h); ctx.lineTo(x + w + dx, y - h - dy); ctx.lineTo(x + w + dx, y - dy);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#A0703F'; // front
+    ctx.fillRect(x, y - h, w, h);
+    ctx.strokeRect(x, y - h, w, h);
+    ctx.beginPath(); ctx.moveTo(x, y - h / 2); ctx.lineTo(x + w, y - h / 2); ctx.stroke();
     if (unit) {
-      ctx.font = `${h * 0.8}px ${FONT}`;
+      const sz = Math.max(8, h * 0.95);
+      ctx.font = `${sz}px ${FONT}`;
       ctx.textAlign = 'center';
-      ctx.fillText(unit, x + w / 2, y + 2);
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(unit, x + w / 2 + dx / 2, y - h - dy * 0.3);
     }
   }
 
@@ -528,10 +690,10 @@ export class WeighingGame {
     const x1 = W * this.geo().truckRear + off;
     const wheelR = Math.max(7, H * 0.075);
     const bodyB = ground - wheelR * 1.1;
-    const cabW = (x1 - x0) * 0.3;
+    const cabW = (x1 - x0) * 0.25;
     const bedH = H * 0.36;
     const tappable = this.truckTappable(now);
-    const pulse = tappable && r.sample.length === 0 ? 1 + 0.03 * Math.sin(now / 160) : 1;
+    const pulse = (tappable && r.sample.length === 0) || this.truckCanLeave() ? 1 + 0.03 * Math.sin(now / 160) : 1;
 
     ctx.save();
     ctx.translate((x0 + x1) / 2, bodyB);
@@ -554,30 +716,12 @@ export class WeighingGame {
     const bx = x0 + cabW + 2, bw = x1 - bx;
     ctx.fillStyle = C.soil;
     ctx.fillRect(bx, bodyB - 6, bw, 6);
-    if (f.animal) {
-      // livestock trailer with slats
-      ctx.fillStyle = C.wheat;
-      ctx.fillRect(bx, bodyB - bedH, bw, bedH - 6);
-      const shown = Math.min(r.cratesLeft, 3);
-      ctx.font = `${Math.min(22, bedH * 0.55)}px ${FONT}`;
-      ctx.textAlign = 'center';
-      for (let i = 0; i < shown; i++) ctx.fillText(f.unit, bx + bw * (0.22 + i * 0.28), bodyB - 10);
-      ctx.strokeStyle = C.soil; ctx.lineWidth = 2;
-      for (let i = 0; i <= 3; i++) {
-        const yy = bodyB - bedH + (i * (bedH - 6)) / 3;
-        ctx.beginPath(); ctx.moveTo(bx, yy); ctx.lineTo(bx + bw, yy); ctx.stroke();
-      }
-      ctx.strokeRect(bx, bodyB - bedH, bw, bedH - 6);
-    } else {
-      // open bed with stacked crates
-      ctx.strokeStyle = C.soil; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(bx, bodyB - 6); ctx.lineTo(bx, bodyB - bedH * 0.45); ctx.moveTo(bx + bw, bodyB - 6); ctx.lineTo(bx + bw, bodyB - bedH * 0.45); ctx.stroke();
-      const cols = 4, cw = (bw - 6) / cols, ch = Math.min(cw * 0.62, bedH * 0.3);
-      for (let i = 0; i < r.cratesLeft; i++) {
-        const col = i % cols, row = Math.floor(i / cols);
-        this.drawCrate(ctx, bx + 3 + col * cw, bodyB - 6 - (row + 1) * ch, cw - 2, ch - 1, row === Math.floor((r.cratesLeft - 1) / cols) ? f.unit : null);
-      }
-    }
+    // How many units are still in the truck: while the farmer walks to the truck,
+    // the unit being fetched is still on the pile (it disappears when it is picked up).
+    let shown = r.cratesLeft;
+    if (this.carry && now - this.carry.t0 < CONFIG.CARRY_MS * 0.35) shown += this.carry.boxes;
+    const per = f.animal ? r.unitsPerBox : 1;   // animals are drawn one by one
+    this.drawPile(ctx, f, r.cratesTotal * per, shown * per, bx, bw, bodyB - 6, bodyB - 8);
     // wheels
     ctx.fillStyle = '#2E2A26';
     for (const wx of [x0 + cabW * 0.5, x1 - bw * 0.25]) {

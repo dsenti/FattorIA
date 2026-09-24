@@ -49,16 +49,21 @@ tests/run.mjs           node checks for the model and the name lists
 ## Tuning
 Everything is in `js/config.js`, with comments:
 - **Economy:** `levelCost` (level n costs n), `SCORE_THRESHOLDS` (error ratio → coins), `FARMERS_PER_DAY`.
-- **Upgrades, per level 0–10:** `BELT_UNITS` (1→11), `TRUCK_CRATES` (3→13), `SCANNER_NOISE` (never zero), `SCANNER_GLITCH` (1/8 → 0), `GLITCH_OFFSET`.
-- **Harvest and difficulty:** `HARVEST_SIZE`, `NATURAL_NOISE_EASY/HARD`, `DIFFICULTY_RAMP_FARMERS`, `TRICKY_LINE_PROB`, `FIRST_FARMER`.
+- **Data per box:** `UNITS_PER_BOX` (3; for livestock a box is a group of 3 animals).
+- **Upgrades, per level 0–10:** `BELT_BOXES` (boxes per trip, 1→11; faster, not more data), `TRUCK_BASE` × `TRUCK_FACTOR`^level → `TRUCK_CRATES` (3, 5, 7, 10, 15, 23, 34, 51, 77, 115, 173), `SCANNER_NOISE` (never zero), `SCANNER_GLITCH` (1/8 → 0), `GLITCH_OFFSET`. `PILE_VISIBLE_MAX` caps how many boxes are drawn (the rest shows as "+N").
+- **Harvest and difficulty:** `HARVEST_SIZE`, `NATURAL_NOISE_EASY/HARD`, `DIFFICULTY_RAMP_FARMERS`, `FIRST_FARMER`.
+- **Hidden true line:** `NEGATIVE_SLOPE_PROB`, `SLOPE_ABS_RANGE`, `LINE_MARGIN` (random sign and steepness each visit, always inside the plot).
 - **Sliders:** `SLOPE_ANGLE_RANGE`, `INTERCEPT_RANGE`, start position.
-- **Timing:** `CARRY_MS` + `RETURN_MS` (the truck cooldown), `BELT_SPEED`, reveal durations.
+- **Timing:** `CARRY_MS` + `RETURN_MS` (the truck cooldown), `BELT_SPEED`, `TRIP_UNLOAD_MS`, `TRUCK_LEAVE_MS`, reveal durations.
 - **Leaderboard:** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `MIN_FARMERS_FOR_PRECISION`.
 
 Farmers (names, questions, per-farmer noise) are in `js/weighing/farmers.js`.
 
 ## How the scoring works
 Plot units are normalised (0–1 on both axes; the axes show no numbers). Each farmer has a hidden true line and a harvest of `HARVEST_SIZE` units spread around it. The truck carries a random subset. The scanner adds noise, and sometimes a glitch (an outlier), to each measured unit. On "Blocca la retta", the game computes the mean absolute error of the player's line and of the least-squares line, both on the **whole harvest** (without scanner noise). The ratio of the two goes through `SCORE_THRESHOLDS`.
+
+## Debugging
+Open the game with `?debug` (e.g. `http://localhost:8000/?debug`) to get `window.fattoriaDebug` in the console: `fattoriaDebug.game.round` (hidden line, harvest, sample), `fattoriaDebug.game.newRound()`, `fattoriaDebug.getState().levels.truck = 10`.
 
 ## Reset during testing
 In-game: ⚙️ → Ricomincia. Or in the browser console: `localStorage.clear()`. To drop the offline cache: DevTools → Application → Service workers → Unregister.

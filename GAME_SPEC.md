@@ -43,7 +43,7 @@ TODO(Dominik): sketch it. The proposal is one illustrated valley (mountains, riv
 
 **Story.** Farmers from the valley drive up to your station, one after another, each with a truck full of their harvest. Each farmer wants a rule to predict one thing from another, for example "how heavy is an apple of this size?" You measure a sample of their crop and draw the straight line that describes it. The better your line fits their **whole** harvest, the more they pay you.
 
-**Farmers and their data.** Each farmer brings one kind of unit, and each has its own hidden true line and noise. The numbers don't need to be realistic, and **the axes have no numbers**: they show only the quantity with a small icon (e.g. "lunghezza 🥕" → "peso 🥕"). Every unit goes through the scanner, which measures x and y.
+**Farmers and their data.** Each farmer brings one kind of unit. Each visit has its own hidden true line, with a random slope (about half negative, from almost flat to steep, so students can't guess it from the axis labels) and a random intercept, and its own noise. Only the first farmer has a fixed easy line. The numbers don't need to be realistic, and **the axes have no numbers**: they show only the quantity with a small icon (e.g. "lunghezza 🥕" → "peso 🥕"). Every unit goes through the scanner, which measures x and y.
 | Farmer | Unit on the truck | x (caratteristica) | y (obiettivo) |
 |---|---|---|---|
 | Frutticoltore (fruit grower) | mela annurca (Annurca apple) | grandezza (size) | peso (weight) |
@@ -58,7 +58,7 @@ TODO(Dominik): check the list and add any Matese crops or animals the students w
 
 **Round flow**
 1. **A farmer arrives.** The truck drives in, and a speech bubble says what they want to know ("Voglio sapere quanto pesa una mela dal suo diametro").
-2. **Collect data.** Tap the truck. The farmer walks to it, lifts a crate and puts it on the conveyor belt (about 1 s animation). The fruit rolls through the **scanner**, and each fruit pops out as a dot on the scatter plot above. While the farmer is carrying a crate, the truck can't be tapped again. This cooldown makes getting data cost something, so you can't spam it. The truck holds a limited number of crates (3 at the start; see Upgrades). A crate counter shows how many are left. When the truck is empty, the data runs out. The farmer's whole harvest is larger than what fits in the truck, and the rest is never measured.
+2. **Collect data.** Tap the truck. The farmer walks to it, lifts crates from the pile in the truck bed (back row first, top to bottom, then the next row forward) and puts them on the conveyor belt (about 1 s animation). The fruit rolls through the **scanner**, and each fruit pops out as a dot on the scatter plot above. While the farmer is carrying a crate, the truck can't be tapped again. This cooldown makes getting data cost something, so you can't spam it. The truck holds a limited number of crates, stacked in 3D (3 at the start; see Upgrades), and each crate holds a fixed number of units (`UNITS_PER_BOX` = 3, TODO(Dominik): tune). A crate counter shows how many are left. When the truck is empty, the data runs out: tapping the empty truck makes it drive away until the next farmer. The farmer's whole harvest is larger than what fits in the truck, and the rest is never measured.
 3. **Fit the line.** Two big sliders under the plot: **pendenza (slope)** and **intercetta (intercept)**. The line moves live. The sliders show no numbers. You can collect more crates and adjust the line in any order.
 4. **Lock it in.** Tap "Blocca la retta" (lock the line).
 5. **Reveal.** The whole harvest appears on the plot as faint dots, the best line (retta migliore) is drawn next to yours, and the vertical gaps from each dot to *your* line flash briefly. This is the errore. The farmer reacts (😐 / 🙂 / 😄), and the coins count up (0–5).
@@ -66,12 +66,12 @@ TODO(Dominik): check the list and add any Matese crops or animals the students w
 
 **Scoring.** Compare the average error of the player's line on the whole harvest with the average error of the best line on the whole harvest (ratio = player's error ÷ best error). The farmer pays **0–5 coins**, and 5 is a perfect fit. Starting thresholds (to tune): ratio ≤ 1.05 → 5, ≤ 1.2 → 4, ≤ 1.5 → 3, ≤ 2 → 2, ≤ 3 → 1, otherwise 0. Scoring uses the whole harvest, not only the sample, so a line that hugs a small, unlucky sample earns less. In L2, the UI calls this "il raccolto intero" (the whole harvest). After L3 the reveal screen also names it: "addestramento" for the measured sample and "test" for the whole harvest (see CONCEPTS: training vs test is introduced in L3).
 
-**Upgrades (the shop).** There is one scanner, one belt and one truck. Each starts at level 0 and has **10 levels**. **Buying level *n* costs *n* coins**, so each track costs 55 coins in total, 165 for all three, which is roughly 35–50 farmers. The three tracks compete for the same coins, so the player keeps choosing between **better data** and **more data**:
+**Upgrades (the shop).** There is one scanner, one belt and one truck. Each starts at level 0 and has **10 levels**. **Buying level *n* costs *n* coins**, so each track costs 55 coins in total, 165 for all three, which is roughly 35–50 farmers. The tracks compete for the same coins, so the player keeps choosing between **better data** (scanner) and **more data** (truck). The belt only saves time:
 | Upgrade | Effect from level 0 to level 10 (starting values, to tune) | Teaches |
 |---|---|---|
 | Scanner | less noise (the dots sit closer to the true line) and fewer outliers. At level 0 about 1 dot in 8 is a glitch; at level 10 there are none. Some noise always remains | qualità dei dati, valore anomalo |
-| Nastro (belt) | units per tap: 1 → 11 | more data → more reliable line |
-| Camion (truck) | crates per truck: 3 → 13 | more data |
+| Camion (truck) | crates per truck: 3, ×1.5 per level, rounded (3, 5, 7, 10, 15, 23, 34, 51, 77, 115, 173) | more data → more reliable line |
+| Nastro (belt) | crates the farmer carries per trip: 1 → 11. The amount of data stays the same; the truck just empties faster | (speed) |
 
 **Outliers.** At low scanner levels, the scanner glitches and produces dots far from the others (a stone in the crate, a double reading). They look like normal dots. If the player follows them with the line, they earn less. Upgrading the scanner removes them gradually. There is **no outlier-detection tool** in the first version (see Extensions).
 

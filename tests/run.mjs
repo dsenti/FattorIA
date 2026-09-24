@@ -10,10 +10,12 @@ let passed = 0;
 const test = (name, fn) => { fn(); passed++; console.log('ok  ', name); };
 
 test('per-level arrays have 11 entries', () => {
-  for (const k of ['BELT_UNITS', 'TRUCK_CRATES', 'SCANNER_NOISE', 'SCANNER_GLITCH']) assert.equal(CONFIG[k].length, CONFIG.MAX_LEVEL + 1, k);
+  for (const k of ['BELT_BOXES', 'TRUCK_CRATES', 'SCANNER_NOISE', 'SCANNER_GLITCH']) assert.equal(CONFIG[k].length, CONFIG.MAX_LEVEL + 1, k);
   assert.ok(CONFIG.SCANNER_NOISE.every((v) => v > 0), 'scanner noise never zero');
   assert.equal(CONFIG.SCANNER_GLITCH[10], 0);
-  assert.ok(CONFIG.HARVEST_SIZE > CONFIG.BELT_UNITS[10] * CONFIG.TRUCK_CRATES[10], 'harvest bigger than max sample');
+  assert.ok(CONFIG.HARVEST_SIZE > CONFIG.UNITS_PER_BOX * CONFIG.TRUCK_CRATES[10], 'harvest bigger than max sample');
+  assert.deepEqual(CONFIG.TRUCK_CRATES, [3, 5, 7, 10, 15, 23, 34, 51, 77, 115, 173]);
+  assert.deepEqual(CONFIG.BELT_BOXES, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 });
 
 test('shop costs: each track 55, total 165', () => {
@@ -47,35 +49,74 @@ test('coins thresholds', () => {
   assert.equal(coinsForRatio(3.1), 0);
 });
 
-test('true lines always inside the plot, all farmers appear', () => {
+test('true lines: inside the plot, both signs, flat to steep, all farmers appear', () => {
   const seen = new Set();
   const lv = { scanner: 0, belt: 0, truck: 0 };
-  let last = null;
-  for (let v = 0; v < 3000; v++) {
-    const r = makeRound({ visitNo: v % 40, lastFarmerId: last, levels: lv });
-    if (v % 40 !== 0) assert.notEqual(r.farmer.id, last, 'no farmer twice in a row');
+  let last = null, neg = 0, flat = 0, steep = 0, n = 0;
+  for (let v = 0; v < 4000; v++) {
+    const visit = v % 40;
+    const r = makeRound({ visitNo: visit, lastFarmerId: last, levels: lv });
+    if (visit !== 0) assert.notEqual(r.farmer.id, last, 'no farmer twice in a row');
     last = r.farmer.id;
     seen.add(r.farmer.id);
     const { a, b } = r.trueLine;
-    assert.ok(a >= 0 && a <= 1 && a + b >= 0 && a + b <= 1, `line ends in plot: ${a} ${b}`);
-    assert.ok(b >= 0.09, 'visible positive slope');
+    const m = CONFIG.LINE_MARGIN - 1e-9;
+    assert.ok(a >= m && a <= 1 - m && a + b >= m && a + b <= 1 - m, `line ends in plot: a=${a} b=${b}`);
+    for (const p of r.harvest) assert.ok(p.x > 0 && p.x < 1 && p.y > 0 && p.y < 1, 'harvest dot in plot');
     assert.equal(r.harvest.length, CONFIG.HARVEST_SIZE);
+    if (visit === 0) continue;
+    n++;
+    if (b < 0) neg++;
+    if (Math.abs(b) < 0.1) flat++;
+    if (Math.abs(b) > 0.7) steep++;
   }
   assert.equal(seen.size, FARMERS.length);
+  assert.ok(Math.abs(neg / n - 0.5) < 0.05, `negative share ${neg / n}`);
+  assert.ok(flat / n > 0.05, `almost-flat share ${flat / n}`);
+  assert.ok(steep / n > 0.1, `steep share ${steep / n}`);
   const r0 = makeRound({ visitNo: 0, lastFarmerId: null, levels: lv });
   assert.equal(r0.farmer.id, 'mele');
   assert.equal(r0.glitchProb, 0);
+  assert.ok(r0.trueLine.b > 0, 'first farmer: fixed easy positive line');
 });
 
-test('best line scores 5, flat start line scores low', () => {
-  const lv = { scanner: 0, belt: 0, truck: 0 };
-  for (let i = 0; i < 200; i++) {
-    const r = makeRound({ visitNo: 5, lastFarmerId: null, levels: lv });
-    assert.equal(scoreLine(r, r.best).coins, 5);
-  }
+test('sliders reach every true line; start is flat, in the middle', () => {
   const s0 = startSliders();
+  assert.ok(Math.abs(s0.slope - 0.5) < 1e-9);
   const flat = sliderToLine(s0.slope, s0.intercept);
   assert.ok(Math.abs(flat.b) < 1e-9 && Math.abs(flat.a - CONFIG.START_INTERCEPT) < 1e-9);
+  const lo = sliderToLine(0, 0), hi = sliderToLine(1, 1);
+  const maxB = CONFIG.SLOPE_ABS_RANGE[1];
+  assert.ok(lo.b < -maxB - 0.1 && hi.b > maxB + 0.1, 'slope range covers both signs with slack');
+  assert.ok(lo.a < CONFIG.LINE_MARGIN - 0.1 && hi.a > 1 - CONFIG.LINE_MARGIN + 0.1, 'intercept range with slack');
+});
+
+test('scoring: best line pays 5 for any slope; ratios sane for flat and negative lines', () => {
+  const lv = { scanner: 0, belt: 0, truck: 0 };
+  let flatSeen = 0, negSeen = 0;
+  for (let i = 0; i < 600; i++) {
+    const r = makeRound({ visitNo: 7, lastFarmerId: null, levels: lv });
+    assert.equal(scoreLine(r, r.best).coins, 5);
+    assert.ok(r.bestError > 0.01, `best error not tiny: ${r.bestError}`);
+    // Shifting the line up makes it worse, monotonically, whatever the slope.
+    const s1 = scoreLine(r, { a: r.best.a + 0.05, b: r.best.b }).ratio;
+    const s2 = scoreLine(r, { a: r.best.a + 0.15, b: r.best.b }).ratio;
+    assert.ok(s1 > 1 && s2 > s1 && Number.isFinite(s2));
+    // The mirrored line (same middle, opposite slope) is clearly bad unless the line is nearly flat.
+    if (Math.abs(r.trueLine.b) > 0.4) assert.ok(scoreLine(r, { a: r.best.a + r.best.b, b: -r.best.b }).coins <= 1);
+    if (Math.abs(r.trueLine.b) < 0.1) flatSeen++;
+    if (r.trueLine.b < 0) negSeen++;
+  }
+  assert.ok(flatSeen > 0 && negSeen > 0);
+});
+
+test('belt changes boxes per trip, not the amount of data', () => {
+  for (const belt of [0, 10]) {
+    const r = makeRound({ visitNo: 3, lastFarmerId: null, levels: { scanner: 0, belt, truck: 0 } });
+    assert.equal(r.perTrip, CONFIG.BELT_BOXES[belt]);
+    assert.equal(r.unitsPerBox, CONFIG.UNITS_PER_BOX);
+    assert.equal(r.cratesTotal * r.unitsPerBox, 9, 'level-0 truck gives 9 data points');
+  }
 });
 
 test('glitch rate at scanner level 0 is about 1/8', () => {
@@ -91,7 +132,8 @@ function simulate(levels, visitNo, n = 800) {
   for (let i = 0; i < n; i++) {
     const r = makeRound({ visitNo, lastFarmerId: null, levels });
     const pts = [];
-    for (let c = 0; c < r.cratesTotal * r.perCrate; c++) pts.push(measure(r, takeUnit(r)));
+    // The belt only changes how many taps this takes, not how many dots there are.
+    for (let c = 0; c < r.cratesTotal * r.unitsPerBox; c++) pts.push(measure(r, takeUnit(r)));
     coins += scoreLine(r, leastSquares(pts)).coins;
   }
   return coins / n;
@@ -100,11 +142,17 @@ test('tuning report (sample-perfect player)', () => {
   const rows = [
     ['level 0 all, first farmer', { scanner: 0, belt: 0, truck: 0 }, 0],
     ['level 0 all, farmer 20', { scanner: 0, belt: 0, truck: 0 }, 20],
+    ['belt 10 only, farmer 20', { scanner: 0, belt: 10, truck: 0 }, 20],
+    ['scanner 5 only, farmer 20', { scanner: 5, belt: 0, truck: 0 }, 20],
     ['scanner 10 only, farmer 20', { scanner: 10, belt: 0, truck: 0 }, 20],
-    ['belt+truck 10, farmer 20', { scanner: 0, belt: 10, truck: 10 }, 20],
+    ['truck 3 only (10 boxes), farmer 20', { scanner: 0, belt: 0, truck: 3 }, 20],
+    ['truck 5 only (23 boxes), farmer 20', { scanner: 0, belt: 0, truck: 5 }, 20],
+    ['truck 10 only, farmer 20', { scanner: 0, belt: 0, truck: 10 }, 20],
+    ['scanner 5 + truck 5, farmer 20', { scanner: 5, belt: 0, truck: 5 }, 20],
     ['level 5 all, farmer 20', { scanner: 5, belt: 5, truck: 5 }, 20],
     ['level 10 all, farmer 20', { scanner: 10, belt: 10, truck: 10 }, 20],
   ];
+
   for (const [name, lv, v] of rows) console.log(`      avg coins ${simulate(lv, v).toFixed(2)}  ${name}`);
 });
 

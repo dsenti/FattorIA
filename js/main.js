@@ -206,7 +206,7 @@ function showHelp() {
 const SHOP = [
   {
     key: 'scanner', icon: '📡', name: 'Scanner',
-    desc: 'Misure più precise e meno valori anomali <em>(outlier)</em>: migliore qualità dei dati <em>(data quality)</em>.',
+    desc: 'Misure con meno rumore e meno valori anomali <em>(outlier)</em>: migliore qualità dei dati <em>(data quality)</em>.',
     effect: (lv) => {
       const p = CONFIG.SCANNER_GLITCH[lv];
       const glitch = p > 0 ? `sbaglia di grosso circa 1 misura su ${Math.round(1 / p)}` : 'non sbaglia più di grosso';
@@ -215,13 +215,13 @@ const SHOP = [
   },
   {
     key: 'belt', icon: '⚙️', name: 'Nastro',
-    desc: 'Più pezzi per ogni cassetta (o più animali per viaggio): più dati <em>(data)</em> a ogni tocco.',
-    effect: (lv) => `${CONFIG.BELT_UNITS[lv]} per cassetta`,
+    desc: 'L\'agricoltore porta più cassette (o più animali) a ogni viaggio: scarichi il camion più in fretta. Non dà più dati, fa risparmiare tempo.',
+    effect: (lv) => `${CONFIG.BELT_BOXES[lv]} ${CONFIG.BELT_BOXES[lv] === 1 ? 'cassetta' : 'cassette'} per viaggio`,
   },
   {
     key: 'truck', icon: '🚚', name: 'Camion',
-    desc: 'Più cassette (o più viaggi) per ogni agricoltore: più dati in tutto.',
-    effect: (lv) => `${CONFIG.TRUCK_CRATES[lv]} cassette per agricoltore`,
+    desc: 'Più cassette nel camion: più dati <em>(data)</em> per ogni agricoltore.',
+    effect: (lv) => `${CONFIG.TRUCK_CRATES[lv]} cassette = ${CONFIG.TRUCK_CRATES[lv] * CONFIG.UNITS_PER_BOX} dati`,
   },
 ];
 
@@ -363,6 +363,9 @@ async function boot() {
   pushScore();
 }
 boot();
+
+// Debug handle for play-testing from the browser console: open the game with ?debug
+if (new URLSearchParams(location.search).has('debug')) window.fattoriaDebug = { game, getState: () => state };
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', () => {

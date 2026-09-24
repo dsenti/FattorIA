@@ -2,6 +2,11 @@
 // Plot coordinates are normalised: x and y both run from 0 (left/bottom) to 1 (right/top).
 // Arrays indexed by level have 11 entries: level 0 ... level 10.
 
+// Truck capacity: TRUCK_BASE boxes at level 0, times TRUCK_FACTOR per level (rounded).
+// 3, 5, 7, 10, 15, 23, 34, 51, 77, 115, 173
+const TRUCK_BASE = 3;
+const TRUCK_FACTOR = 1.5;
+
 export const CONFIG = {
   // Bump when the saved-state format changes in an incompatible way.
   STORAGE_KEY: 'fateai-valle-v1',
@@ -30,10 +35,19 @@ export const CONFIG = {
   FARMERS_PER_DAY: 5,
 
   // ---------------------------------------------------------------- upgrades
-  // Belt: units (crates' content / animals) per tap on the truck, per level.
-  BELT_UNITS: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-  // Truck: crates (or trips for animals) per farmer, per level.
-  TRUCK_CRATES: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+  // Products (= data points) in one box. Fixed, not an upgrade.
+  // TODO(Dominik): 3 gives 9 data points with a level-0 truck; tune.
+  // For livestock farmers a "box" is a group of this many animals, so they get the same amount of data.
+  UNITS_PER_BOX: 3,
+  // Belt: boxes the farmer carries per trip (per tap on the truck), per level. It adds no data;
+  // it only unloads the truck faster.
+  BELT_BOXES: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  // Truck: boxes per farmer, per level (from TRUCK_BASE and TRUCK_FACTOR above).
+  TRUCK_BASE,
+  TRUCK_FACTOR,
+  TRUCK_CRATES: Array.from({ length: 11 }, (_, n) => Math.round(TRUCK_BASE * TRUCK_FACTOR ** n)),
+  // Drawing only: at most this many boxes (or animals) are drawn in the truck; the rest is shown as "+N".
+  PILE_VISIBLE_MAX: 36,
   // Scanner: standard deviation of the measurement noise on y (plot units), per level.
   // Never zero: some noise always remains.
   SCANNER_NOISE: [0.10, 0.09, 0.08, 0.07, 0.06, 0.05, 0.043, 0.036, 0.03, 0.025, 0.02],
@@ -45,8 +59,8 @@ export const CONFIG = {
   GLITCH_OFFSET: [0.22, 0.45],
 
   // ---------------------------------------------------------------- harvest
-  // Number of units in the farmer's whole harvest (larger than the max sample 13 x 11).
-  HARVEST_SIZE: 200,
+  // Number of units in the farmer's whole harvest (larger than the max sample 173 x 3 = 519).
+  HARVEST_SIZE: 1000,
   // x values of the harvest are uniform in this range.
   HARVEST_X_RANGE: [0.06, 0.94],
   // Natural spread of the harvest around the hidden true line (plot units).
@@ -55,28 +69,38 @@ export const CONFIG = {
   NATURAL_NOISE_HARD: 0.07,
   // Number of farmers served until the difficulty reaches "hard".
   DIFFICULTY_RAMP_FARMERS: 15,
-  // Probability of a "tricky" line (very small intercept + steep, or very shallow) at full difficulty.
-  TRICKY_LINE_PROB: 0.5,
+  // Hidden true line of each visit (except the first farmer): random sign, size and intercept,
+  // so the slope can't be guessed from the axis labels (the numbers don't need to be realistic).
+  NEGATIVE_SLOPE_PROB: 0.5,
+  // |slope| is uniform in this range (plot units: 1 = the line rises the full plot height across the plot).
+  SLOPE_ABS_RANGE: [0.0, 0.84],
+  // Both ends of the true line (x = 0 and x = 1) stay at least this far from the bottom/top of the plot.
+  LINE_MARGIN: 0.08,
   // The very first farmer: easy, fixed line, no glitches, scanner noise scaled down.
   FIRST_FARMER: { intercept: 0.2, rightEnd: 0.8, scannerNoiseScale: 0.3, glitches: false },
 
   // ---------------------------------------------------------------- sliders
-  // Slope slider maps linearly to the line's angle (in plot units), in degrees.
-  SLOPE_ANGLE_RANGE: [-35, 70],
-  // Intercept slider range (value of the line at the left edge, x = 0).
-  INTERCEPT_RANGE: [-0.3, 1.1],
+  // Slope slider maps linearly to the line's angle (in plot units), in degrees. Symmetric, so the
+  // middle of the slider is a flat line. tan(50 deg) = 1.19 covers the steepest true line (0.84).
+  SLOPE_ANGLE_RANGE: [-50, 50],
+  // Intercept slider range (value of the line at the left edge, x = 0). True intercepts are in 0.08..0.92.
+  INTERCEPT_RANGE: [-0.25, 1.25],
   // Starting position of the player's line for every farmer.
   START_ANGLE: 0,
   START_INTERCEPT: 0.5,
 
   // ---------------------------------------------------------------- timing (ms)
   TRUCK_ARRIVE_MS: 900,
+  // The empty truck drives away when tapped.
+  TRUCK_LEAVE_MS: 900,
   // Farmer walks to the truck and carries a crate to the belt. The truck can't be tapped meanwhile.
   CARRY_MS: 1000,
   // Farmer walks back from the belt; the truck becomes tappable again after this.
   RETURN_MS: 350,
   // Belt speed as a fraction of the scene width per second.
   BELT_SPEED: 0.38,
+  // All products of one trip are put on the belt within this time (they bunch up on big trips).
+  TRIP_UNLOAD_MS: 1200,
   // Reveal animation.
   REVEAL_HARVEST_MS: 600,
   REVEAL_RESIDUALS_MS: 1600,

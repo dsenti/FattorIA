@@ -11,33 +11,27 @@ export function pickFarmer(visitNo, lastId) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// Hidden true line: y = a + b x, with both ends (x = 0 and x = 1) inside the plot.
-function makeTrueLine(visitNo, difficulty) {
+// Hidden true line: y = a + b x. Sign, steepness and height are random, and both ends
+// (x = 0 and x = 1) stay inside the plot, so the whole line and point cloud are visible.
+function makeTrueLine(visitNo) {
   if (visitNo === 0) {
     const a = CONFIG.FIRST_FARMER.intercept;
     return { a, b: CONFIG.FIRST_FARMER.rightEnd - a };
   }
-  let a, end;
-  if (Math.random() < CONFIG.TRICKY_LINE_PROB * difficulty) {
-    if (Math.random() < 0.5) {
-      a = rand(0.0, 0.08);          // tiny intercept, steep slope
-      end = rand(0.85, 0.97);
-    } else {
-      a = rand(0.3, 0.6);           // shallow slope
-      end = a + rand(0.1, 0.22);
-    }
-  } else {
-    a = rand(0.05, 0.5);
-    end = Math.min(0.95, a + rand(0.3, 0.75));
-  }
-  return { a, b: end - a };
+  const m = CONFIG.LINE_MARGIN;
+  const [s0, s1] = CONFIG.SLOPE_ABS_RANGE;
+  const size = Math.min(rand(s0, s1), 1 - 2 * m);
+  const b = Math.random() < CONFIG.NEGATIVE_SLOPE_PROB ? -size : size;
+  // Height of the line in the middle of the plot, chosen so that both ends fit.
+  const mid = rand(m + size / 2, 1 - m - size / 2);
+  return { a: mid - b / 2, b };
 }
 
 export function makeRound({ visitNo, lastFarmerId, levels }) {
   const farmer = pickFarmer(visitNo, lastFarmerId);
   const first = visitNo === 0;
   const difficulty = first ? 0 : clamp(visitNo / CONFIG.DIFFICULTY_RAMP_FARMERS, 0, 1);
-  const trueLine = makeTrueLine(visitNo, difficulty);
+  const trueLine = makeTrueLine(visitNo);
   const naturalNoise = lerp(CONFIG.NATURAL_NOISE_EASY, CONFIG.NATURAL_NOISE_HARD, difficulty) * (first ? 1 : farmer.noise);
 
   const [x0, x1] = CONFIG.HARVEST_X_RANGE;
@@ -66,7 +60,8 @@ export function makeRound({ visitNo, lastFarmerId, levels }) {
     next: 0,
     cratesTotal: CONFIG.TRUCK_CRATES[levels.truck],
     cratesLeft: CONFIG.TRUCK_CRATES[levels.truck],
-    perCrate: CONFIG.BELT_UNITS[levels.belt],
+    perTrip: CONFIG.BELT_BOXES[levels.belt],   // boxes carried per tap
+    unitsPerBox: CONFIG.UNITS_PER_BOX,
     scannerNoise,
     glitchProb,
     sample: [],   // measured dots: { x, y, glitch, born }
