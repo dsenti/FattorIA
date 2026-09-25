@@ -1,6 +1,6 @@
 # Game spec
 
-**Status:** DRAFT. Minigame 1 is designed; minigames 2 and 3 are waiting for Dominik's sketches. The game-dev agent builds from this file.
+**Status:** DRAFT. Minigames 1 and 2 are built; minigame 3 is waiting for Dominik's sketch. The game-dev agent builds from this file.
 
 ## Concept
 The game is a small farm valley in the Matese called **FattorIA** (fattoria + IA). The player runs a data lab that serves the valley's farmers. The main screen is a **map**. Each place on the map (the weighing station, the orchard, the barn, …) opens one **minigame**. Each minigame reinforces one lesson (L2–L4). Coins from the minigames buy upgrades, and as the course goes on, more places on the map unlock.
@@ -170,6 +170,19 @@ TODO(Dominik): prices, once it has been play-tested.
 - TODO(Dominik): overfitting (L3). A later extension could give a level with a tiny training batch where a wrong tree also scores 100% on training but fails the test. This would deliberately break the "one correct tree" rule for that level only.
 - TODO(Dominik): an endless mode with randomly generated trees after the fixed levels?
 
+**As built (first version; deviations from the text above)**
+- **15 levels** in `js/sorting/levels.js`, following the progression above; level 6 also has a potato gate (2 gates), so size is not the only question. Levels 10–15 have 4, 4, 5, 6, 7 and 9 gates, depth 4–5, with shared trucks and crossing pipes. The deep levels use "grade" trucks (mercato / prima scelta, succo, passata, mangime per le galline) whose rule differs per product, e.g. apples go to the market by size and pears by weight. TODO(Dominik): check that these rules make agricultural sense.
+- **Uniqueness** is tested exhaustively over all 13 questions on every gate (not only the unlocked ones): a factorised count for all levels, and a literal one-by-one brute force for the levels with up to 6 gates.
+- **Labels are shown on the training batch:** under every training item a small tag shows its truck symbol (its etichetta). The grade trucks can't be guessed from the item alone, and a real training set is labelled too. The test batch has no tags.
+- **Extra sensor "Calibro" (size gauge)** for "È grande?". Sensor prices, in level order: naso 15 (level 3), rilevatore di vermi 25 (level 5), calibro 30 (level 6), bilancia 40 (level 7), sensore di vita 50 (level 9).
+- **Weight can't be seen**, apart from wrinkles on big-but-light (dried) fruit. Tapping an item shows every feature as a question icon with ✓/✗; features whose sensor isn't bought show a lock.
+- **Up to 6 trucks** (level 14). The per-row limit is enforced for gates (≤ 5 per row); level 15 has one row with 2 gates and 4 pipe mouths. The tests check spacing at 344–468 px instead, and that no pipe passes through a gate.
+- **Wrong items:** without the lente, a small red dot marks the guilty gate (the first gate after which the item's truck can no longer be reached), and tapping a wrong item draws its path in red and frames the right truck. The lente adds a red frame with the number of errors on the gate and a slow replay of the tapped item.
+- **Hints** can be bought in the shop (kept in stock) or bought and used at once from the gate sheet; the price rises with every hint bought (3, 6, 9, …).
+- **Pay:** a test batch contains only the training kinds, in a new mix, so the one correct tree always scores 100% and the first delivery pays the full 5 + 2 × level. The coins also count for the "Più ricchi" leaderboard, but not as farmers served.
+- **Shop:** once Lo smistamento is open, the shop has two tabs, "Pesatura" and "Smistamento".
+- **No emoji** anywhere on the Lo smistamento screen, including its top bar (map, help, shop and coin icons are SVG). The debug button reads "DEBUG +100" there.
+
 ## Minigame 3
 TODO(Dominik): sketch coming.
 
@@ -178,5 +191,5 @@ TODO(Dominik): sketch coming.
 | Minigame | Lesson | Concepts | Status |
 |---|---|---|---|
 | 1. La stazione di pesatura | L2 | regressione lineare, errore, valore anomalo, qualità dei dati | designed |
-| 2. Lo smistamento | L3 | classificazione, etichetta, albero di decisione, addestramento vs test, accuratezza | designed |
+| 2. Lo smistamento | L3 | classificazione, etichetta, albero di decisione, addestramento vs test, accuratezza | built (first version) |
 | 3. | | | waiting for sketch |
