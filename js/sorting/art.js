@@ -157,8 +157,13 @@ const QICON = {
     `<g fill="none" stroke="${P.olive}" stroke-width="1.6" stroke-linecap="round"><path d="M13 3q2 2 0 4q-2 2 0 4M20 2q2 2 0 4q-2 2 0 4M27 3q2 2 0 4q-2 2 0 4"/></g>`,
   verme: `<path d="M5 27C9 17 15 32 20 23C24 15 29 27 33 18" fill="none" stroke="${P.worm}" stroke-width="5" stroke-linecap="round"/>` +
     `<circle cx="33.5" cy="17" r="3.6" fill="${P.worm}"/><circle cx="34.6" cy="16" r="1" fill="${P.ink}"/><path d="M9 21l1 3M14 25l1-3M24 18l1 3" stroke="#B85A4E" stroke-width="1.2"/>`,
-  vivo: `<path d="M20 34C8 25 4 19 4 13.5C4 8.5 8 5.5 12 5.5C15.5 5.5 18.5 8 20 11C21.5 8 24.5 5.5 28 5.5C32 5.5 36 8.5 36 13.5C36 19 32 25 20 34Z" fill="${P.tomato}" ${S}/>` +
-    '<path d="M7 18H14L16.5 13L20 23L23 16L25 18H33" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  // "È un animale da solo?": a beetle standing alone on bare ground, next to a crossed-out fruit
+  vivo: `<path d="M2 33Q20 30 38 33V38H2Z" fill="#8C5E3C" ${S}/><g fill="#6E4A2C"><circle cx="8" cy="35.5" r=".9"/><circle cx="30" cy="35.8" r="1"/></g>` +
+    `<g stroke="${P.ink}" stroke-width="1.4" stroke-linecap="round"><path d="M9 27l-2 5M14 28v4.5M19 27l2 5M6 20l-3-3M6 18.5l-1-4"/></g>` +
+    `<circle cx="7" cy="21" r="3.6" fill="${P.ink}"/><path d="M5 26A9 8 0 0 1 23 26Z" fill="${P.olive}" ${S}/><path d="M14 18.2V26" stroke="${P.ink}" stroke-width="1.2"/>` +
+    `<g fill="${P.ink}"><circle cx="10.5" cy="22.5" r="1.3"/><circle cx="17.5" cy="22.5" r="1.3"/></g>` +
+    `<g transform="translate(22 1) scale(.42)"><path d="${SHAPE.mela}" fill="#D9502B" ${S}/><path d="M20 11Q20 6 22 3" fill="none" stroke="${P.soil}" stroke-width="2.4"/></g>` +
+    `<path d="M23 3L38 18" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M23 3L38 18" stroke="${P.ink}" stroke-width="2.6" stroke-linecap="round"/>`,
 };
 
 export function questionArt(qid) {

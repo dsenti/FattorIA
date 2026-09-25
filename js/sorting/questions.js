@@ -53,7 +53,7 @@ export const SENSORS = [
   { id: 'vermi', name: 'Rilevatore di vermi', en: 'worm detector', q: 'verme', desc: 'Guarda anche dentro: trova i vermi, nei frutti e da soli.' },
   { id: 'bilancia', name: 'Bilancia', en: 'scale', q: 'pesante', desc: 'Pesa ogni pezzo: separa i grandi (pesanti) dai piccoli.' },
   { id: 'forma', name: 'Occhio delle forme', en: 'shape camera', q: 'strano', desc: 'Una telecamera che riconosce le forme strane: carote gemelle, patate bitorzolute.' },
-  { id: 'vita', name: 'Sensore di vita', en: 'life sensor', q: 'vivo', desc: 'Sente il battito: capisce se un pezzo è un animale vivo.' },
+  { id: 'vita', name: 'Sensore di vita', en: 'life sensor', q: 'vivo', desc: 'Riconosce gli animali da soli: api, farfalle, coccinelle, lumache e vermi senza frutta né verdura. Una mela con una lumaca sopra non conta.' },
 ];
 export const SENSOR_BY_ID = Object.fromEntries(SENSORS.map((s) => [s.id, s]));
 
@@ -76,7 +76,8 @@ export const QUESTIONS = [
   { id: 'verme', group: 'verme', sensor: 'vermi', text: 'C\'è un verme?', f: (it) => it.worm },
   { id: 'pesante', group: 'peso', sensor: 'bilancia', text: 'È pesante?', f: (it) => it.heavy },
   { id: 'strano', group: 'forma', sensor: 'forma', text: 'Ha una forma strana?', f: (it) => it.odd },
-  { id: 'vivo', group: 'vivo', sensor: 'vita', text: 'È un animale vivo?', f: (it) => it.alive },
+  // True only for lone animals; produce with a worm or a snail on it answers no.
+  { id: 'vivo', group: 'vivo', sensor: 'vita', text: 'È un animale da solo?', f: (it) => it.alive },
 ];
 export const Q = Object.fromEntries(QUESTIONS.map((q) => [q.id, q]));
 export const QUESTION_IDS = QUESTIONS.map((q) => q.id);
