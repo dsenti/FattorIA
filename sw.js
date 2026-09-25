@@ -32,6 +32,7 @@ const FILES = [
   'js/sorting/art.js',
   'js/sorting/game.js',
   'js/sorting/shop.js',
+  'js/sorting/trucks.js',
   'assets/icon.svg',
   'assets/icon-192.png',
   'assets/icon-512.png',

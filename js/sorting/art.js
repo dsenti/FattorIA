@@ -4,7 +4,7 @@ import { itemKey } from './questions.js';
 
 export const P = {
   soil: '#5B3A29', olive: '#6B7F2A', wheat: '#E9D8A6', cream: '#FBF7EF', tomato: '#D9502B', sky: '#4A8FA3',
-  ink: '#3A2519', leaf: '#6B7F2A', worm: '#D9776A', gold: '#F4C95D', mud: '#6E4A30',
+  ink: '#3A2519', leaf: '#6B7F2A', worm: '#CC2F24', wormDark: '#7E1A14', gold: '#F4C95D', mud: '#6E4A30',
 };
 
 // Fill colours per item type and colour token (shades of the palette).
@@ -35,9 +35,20 @@ const ODD = {
 };
 // Height where the caked soil starts on each kind of produce ("sporco").
 const MUD_LINE = { mela: 25, pera: 27, patata: 21, pomodoro: 26, carota: 23 };
+// Where the rot patches sit on each kind of produce (x, y, radius).
+const ROT_SPOTS = {
+  mela: [[24, 23, 6.5], [14.5, 27, 4.6], [18, 17.5, 3.6], [26.5, 30.5, 3]],
+  pera: [[24, 28, 6], [14, 30, 4.4], [19, 20, 3.2]],
+  patata: [[24, 21, 6.2], [14, 24, 4.6], [19, 15, 3.4], [28, 27, 3]],
+  pomodoro: [[24, 24, 6.4], [13.5, 27, 4.6], [18, 19, 3.4]],
+  carota: [[20, 16, 5.2], [22, 24, 4], [19, 31, 3]],
+};
 const WORM_HOLE = { mela: [27, 21], pera: [26, 27], patata: [27, 19], pomodoro: [27, 22], carota: [22, 19] };
 
 const S = `stroke="${P.soil}" stroke-width="1.5" stroke-linejoin="round"`;
+// Soft rot patch: dark centre, feathered edge with a pale mould halo. Same id everywhere (identical).
+const ROT_GRAD = '<radialGradient id="rotg"><stop offset="0" stop-color="#3A2618" stop-opacity=".95"/><stop offset=".42" stop-color="#4A3322" stop-opacity=".85"/>' +
+  '<stop offset=".7" stop-color="#D2CCA2" stop-opacity=".6"/><stop offset="1" stop-color="#D2CCA2" stop-opacity="0"/></radialGradient>';
 const outline = (it) => (it.odd ? ODD : SHAPE)[it.t];
 
 function produceBody(it, fill) {
@@ -74,10 +85,10 @@ function animalBody(it) {
       `<path d="M20 21C13 22 8 27 10 32C12 36 18 31 20 24Z" fill="${f}"/><path d="M20 21C27 22 32 27 30 32C28 36 22 31 20 24Z" fill="${f}"/></g>` +
       `<g fill="#fff" opacity=".6"><circle cx="11" cy="12" r="2.4"/><circle cx="29" cy="12" r="2.4"/></g><rect x="18.6" y="12" width="2.8" height="17" rx="1.4" fill="${P.ink}"/>` +
       `<path d="M19.5 12.5L16 5M20.5 12.5L24 5" stroke="${P.ink}" stroke-width="1.2" stroke-linecap="round"/>`;
-    case 'verme': return `<path d="M5 30C9 20 15 34 20 25C24 17 29 29 34 20" fill="none" stroke="${P.soil}" stroke-width="7.4" stroke-linecap="round" opacity=".35"/>` +
+    case 'verme': return `<path d="M5 30C9 20 15 34 20 25C24 17 29 29 34 20" fill="none" stroke="${P.wormDark}" stroke-width="8" stroke-linecap="round"/>` +
       `<path d="M5 30C9 20 15 34 20 25C24 17 29 29 34 20" fill="none" stroke="${P.worm}" stroke-width="6" stroke-linecap="round"/>` +
-      `<g stroke="#B85A4E" stroke-width="1.1"><path d="M8.5 24.5l2 2.5M13 28.6l1.6-2.6M22.3 21.6l2.3 1.8M26.8 24l1.5-2.6"/></g>` +
-      `<circle cx="34.2" cy="19.6" r="3.6" fill="${P.worm}"/><circle cx="35.3" cy="18.4" r="1" fill="${P.ink}"/>`;
+      `<g stroke="${P.wormDark}" stroke-width="1.2"><path d="M8.5 24.5l2 2.5M13 28.6l1.6-2.6M22.3 21.6l2.3 1.8M26.8 24l1.5-2.6"/></g>` +
+      `<circle cx="34.2" cy="19.6" r="3.6" fill="${P.worm}" stroke="${P.wormDark}" stroke-width="1"/><circle cx="35.3" cy="18.4" r="1" fill="#fff"/>`;
     default: return '';
   }
 }
@@ -92,8 +103,10 @@ export function itemArt(it) {
   const d = outline(it);
   if (it.rot) {
     // rot: dark soft spots with a pale ring of mould
-    s += `<path d="${d}" fill="${P.soil}" opacity=".18"/><g fill="#3F2A1C" stroke="#D7D3B0" stroke-width="1.1" opacity=".92">` +
-      '<circle cx="24" cy="23" r="4"/><circle cx="15" cy="27" r="2.7"/><circle cx="18" cy="18" r="2"/><circle cx="26" cy="30" r="1.6"/></g>';
+    // rot: soft, blurry-edged dark patches fading into a pale mould halo (radial gradients: cheap)
+    const rid = `rot-${it.t}-${+it.odd}`;
+    s += `${ROT_GRAD}<clipPath id="${rid}"><path d="${d}"/></clipPath><path d="${d}" fill="${P.soil}" opacity=".16"/><g fill="url(#rotg)" clip-path="url(#${rid})">` +
+      ROT_SPOTS[it.t].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join('') + '</g>';
   }
   if (it.dirty) {
     // soil: a caked, wavy layer of earth on the lower part (clipped to the outline), crumbs falling off
@@ -107,8 +120,9 @@ export function itemArt(it) {
   }
   if (it.worm) {
     const [x, y] = WORM_HOLE[it.t];
-    s += `<circle cx="${x}" cy="${y}" r="2.8" fill="${P.ink}"/><path d="M${x} ${y}C${x + 4} ${y - 4} ${x + 6} ${y + 1} ${x + 9} ${y - 3}" fill="none" stroke="${P.worm}" stroke-width="3.4" stroke-linecap="round"/>` +
-      `<circle cx="${x + 9.3}" cy="${y - 3.4}" r="2.3" fill="${P.worm}"/><circle cx="${x + 10}" cy="${y - 4}" r=".7" fill="${P.ink}"/>`;
+    const w = `M${x} ${y}C${x + 4} ${y - 4} ${x + 6} ${y + 1} ${x + 9} ${y - 3}`;
+    s += `<circle cx="${x}" cy="${y}" r="2.8" fill="${P.ink}"/><path d="${w}" fill="none" stroke="${P.wormDark}" stroke-width="4.8" stroke-linecap="round"/><path d="${w}" fill="none" stroke="${P.worm}" stroke-width="3.2" stroke-linecap="round"/>` +
+      `<circle cx="${x + 9.3}" cy="${y - 3.4}" r="2.4" fill="${P.worm}" stroke="${P.wormDark}" stroke-width=".8"/><circle cx="${x + 10}" cy="${y - 4}" r=".7" fill="#fff"/>`;
   }
   const body = it.big ? s : `<g transform="translate(20 21) scale(.72) translate(-20 -21)">${s}</g>`;
   // the snail sits on the produce, the same size whatever the produce's size
@@ -128,19 +142,18 @@ const silhouette = (t) => {
   if (t === 'carota') return `<path d="M16 10L11 1M20 9L20 0M24 10L29 2" stroke="${P.soil}" stroke-width="3" stroke-linecap="round"/><path d="${SHAPE.carota}" fill="${P.soil}"/><g fill="none" stroke="${P.cream}" stroke-width="1.1" stroke-linecap="round" opacity=".6"><path d="M14 15h4M22 19h4M16 24h3"/></g>`;
   return '';
 };
+const HEART = (x, y, k) => `<path transform="translate(${x} ${y}) scale(${k})" d="M8 14C2 10 0 7 0 4.5C0 2 2 0 4 0C5.8 0 7.2 1.2 8 2.7C8.8 1.2 10.2 0 12 0C14 0 16 2 16 4.5C16 7 14 10 8 14Z" fill="${P.tomato}" ${S}/>`;
 const QICON = {
   sporco: `<clipPath id="q-mud"><circle cx="20" cy="18" r="13"/></clipPath><circle cx="20" cy="18" r="13" fill="${P.wheat}" ${S}/>` +
     '<g clip-path="url(#q-mud)"><path d="M0 19q3.3-3.5 6.6 0t6.6 0t6.6 0t6.6 0t6.6 0t6.6 0V40H0Z" fill="#6E4A2C"/>' +
     '<g fill="#B2926A"><circle cx="12" cy="24" r="1.2"/><circle cx="20" cy="27" r="1"/><circle cx="27" cy="23" r="1.2"/><circle cx="16" cy="29" r=".9"/></g></g>' +
     `<circle cx="20" cy="18" r="13" fill="none" ${S}/><g fill="#6E4A2C"><circle cx="12" cy="36" r="1.8"/><circle cx="20" cy="38" r="1.4"/><circle cx="28" cy="35.5" r="1.7"/></g>`,
-  lumaca: `<path d="M3 34C3 30 9 29 15 29L33 29C37 29 38 33 35 34Z" fill="${P.soil}"/><path d="M33 29L35 20M30 29L29 21" stroke="${P.soil}" stroke-width="1.8" stroke-linecap="round"/>` +
-    `<circle cx="35" cy="20" r="2" fill="${P.soil}"/><circle cx="29" cy="21" r="2" fill="${P.soil}"/><circle cx="19" cy="20" r="11" fill="${P.soil}"/>` +
-    `<path d="M19 20m0-6a6 6 0 1 1-6 6a4 4 0 1 1 4 4a2 2 0 1 1-2-2" fill="none" stroke="${P.cream}" stroke-width="1.6" opacity=".75"/>`,
+  lumaca: animalBody({ t: 'lumaca', c: 'marrone' }),
   strano: `<path d="${ODD.patata}" fill="${P.wheat}" ${S}/><path d="M13 20q2-3 4 0t4 0" fill="none" stroke="${P.soil}" stroke-width="1.6" stroke-linecap="round"/>` +
-    `<path d="M24 18q1.5-2 3 0M26 25q1.5-2 3 0" fill="none" stroke="${P.soil}" stroke-width="1.4" stroke-linecap="round"/><path d="M3 8l4 3M37 8l-4 3M20 2v4" stroke="${P.tomato}" stroke-width="2" stroke-linecap="round"/>`,
+    `<path d="M24 18q1.5-2 3 0M26 25q1.5-2 3 0" fill="none" stroke="${P.soil}" stroke-width="1.4" stroke-linecap="round"/>` + HEART(29, 3, 0.55),
   pesante: `<path d="M20 9V33M12 35H28" stroke="${P.soil}" stroke-width="2.2" stroke-linecap="round"/><path d="M6 20L34 11" stroke="${P.soil}" stroke-width="2.4" stroke-linecap="round"/>` +
     `<path d="M6 20L3 28H11ZM34 11L31 19H37Z" fill="${P.wheat}" ${S}/><rect x="3.5" y="21" width="7" height="6.5" rx="1" fill="${P.soil}"/><circle cx="20" cy="15.5" r="2" fill="${P.soil}"/>`,
-  marcio: `<circle cx="20" cy="24" r="12" fill="${P.wheat}" ${S}/><g fill="${P.soil}"><circle cx="24" cy="24" r="4"/><circle cx="14" cy="28" r="2.6"/><circle cx="16" cy="19" r="2"/></g>` +
+  marcio: `${ROT_GRAD}<circle cx="20" cy="24" r="12" fill="${P.wheat}" ${S}/><g fill="url(#rotg)"><circle cx="24" cy="24" r="6.5"/><circle cx="14" cy="28" r="4.4"/><circle cx="16" cy="19" r="3.4"/></g>` +
     `<g fill="none" stroke="${P.olive}" stroke-width="1.6" stroke-linecap="round"><path d="M13 3q2 2 0 4q-2 2 0 4M20 2q2 2 0 4q-2 2 0 4M27 3q2 2 0 4q-2 2 0 4"/></g>`,
   verme: `<path d="M5 27C9 17 15 32 20 23C24 15 29 27 33 18" fill="none" stroke="${P.worm}" stroke-width="5" stroke-linecap="round"/>` +
     `<circle cx="33.5" cy="17" r="3.6" fill="${P.worm}"/><circle cx="34.6" cy="16" r="1" fill="${P.ink}"/><path d="M9 21l1 3M14 25l1-3M24 18l1 3" stroke="#B85A4E" stroke-width="1.2"/>`,
@@ -157,18 +170,26 @@ export function questionArt(qid) {
 // ------------------------------------------------------------------ truck symbols (etichette)
 const produce = (t, c, extra = {}) => itemArt({ t, c, big: true, heavy: true, ...extra });
 const at = (x, y, s, inner) => `<g transform="translate(${x} ${y}) scale(${s})">${inner}</g>`;
-// A balance with one pan down (heavy) or up (light), a fruit on that pan.
-const scale = (heavy) => {
+const drawIt = (x) => produce(x.t, x.c, { dirty: !!x.dirty, odd: !!x.odd });
+// A balance with one pan down (heavy) or up (light); the level's produce sits on that pan.
+const scale = (heavy, show) => {
   const beam = heavy ? 'M5 18L35 10' : 'M5 10L35 18';
   const lp = heavy ? 18 : 10, rp = heavy ? 10 : 18;
+  const k = heavy ? 0.5 : 0.3;
+  const items = show.map((x, n) => at(heavy ? -3 + n * 9 : 1 + n * 5, heavy ? lp - 12 - n * 2 : lp - 6 - n, k, drawIt(x))).join('');
   return `<path d="M20 12V36M13 37H27" stroke="${P.soil}" stroke-width="2.2" stroke-linecap="round"/><path d="${beam}" stroke="${P.soil}" stroke-width="2.4" stroke-linecap="round"/>` +
-    `<path d="M5 ${lp}L1 ${lp + 8}H11ZM35 ${rp}L31 ${rp + 8}H39Z" fill="${P.wheat}" ${S}/><circle cx="20" cy="14" r="2" fill="${P.soil}"/>` +
-    (heavy ? at(-4, lp - 13, 0.55, produce('mela', 'rosso')) : at(1, lp - 6, 0.3, produce('mela', 'rosso')));
+    `<path d="M5 ${lp}L1 ${lp + 8}H11ZM35 ${rp}L31 ${rp + 8}H39Z" fill="${P.wheat}" ${S}/><circle cx="20" cy="14" r="2" fill="${P.soil}"/>` + items;
 };
+// One, two or three samples of the produce that goes in.
+const group = (show) => {
+  if (show.length === 1) return drawIt(show[0]);
+  if (show.length === 2) return at(-5, -3, 0.8, drawIt(show[0])) + at(12, 8, 0.72, drawIt(show[1]));
+  return at(-4, -3, 0.62, drawIt(show[0])) + at(15, -2, 0.6, drawIt(show[1])) + at(5, 14, 0.64, drawIt(show[2]));
+};
+const heartBig = `<path d="M31 22C25 18 23 15 23 12.5C23 10 25 8.5 27 8.5C28.8 8.5 30.2 9.7 31 11.2C31.8 9.7 33.2 8.5 35 8.5C37 8.5 39 10 39 12.5C39 15 37 18 31 22Z" fill="${P.tomato}" ${S}/>`;
 const SYM = {
   rosse: () => produce('mela', 'rosso'),
   verdi: () => produce('mela', 'verde'),
-  mele: () => at(-5, -3, 0.8, produce('mela', 'rosso')) + at(12, 8, 0.72, produce('mela', 'verde')),
   patate: () => produce('patata', 'marrone'),
   carote: () => produce('carota', 'arancione'),
   pomodori: () => produce('pomodoro', 'rosso'),
@@ -190,22 +211,35 @@ const SYM = {
     `<path d="M2 15Q5 19 8 15Q11 19 14 15Q17 19 20 15Q23 19 26 15Q29 19 32 15Q35 19 38 15" fill="${P.tomato}" ${S}/>` +
     `<rect x="4" y="26" width="32" height="7" rx="1.5" fill="#C99A5B" ${S}/>` +
     `<g ${S}><circle cx="11" cy="24" r="3.4" fill="#D9502B"/><circle cx="17.5" cy="24" r="3.4" fill="#9DB23E"/><circle cx="24" cy="24" r="3.4" fill="#EC8A2E"/><circle cx="30" cy="24" r="3.4" fill="#E9BE4C"/></g>`,
-  // washing: a tap pouring water onto a potato, with bubbles
-  lavaggio: () => `<path d="M6 7H22Q27 7 27 12V14H23V12Q23 11 22 11H6Z" fill="#9FB3B8" ${S}/><rect x="10" y="3" width="6" height="4" rx="1" fill="#9FB3B8" ${S}/>` +
-    `<g fill="${P.sky}"><path d="M25 16Q27 19 25 21Q23 19 25 16Z"/><path d="M22 20Q24 23 22 25Q20 23 22 20Z"/><path d="M28 21Q30 24 28 26Q26 24 28 21Z"/></g>` +
-    at(6, 16, 0.62, produce('patata', 'giallo')) +
-    `<g fill="#fff" stroke="${P.sky}" stroke-width="1.1"><circle cx="9" cy="30" r="2.6"/><circle cx="34" cy="31" r="3"/><circle cx="32" cy="24.5" r="1.6"/><circle cx="6" cy="24" r="1.6"/></g>`,
-  // ugly but good: a twin carrot with a heart
-  brutti: () => at(-2, 3, 0.9, produce('carota', 'arancione', { odd: true })) +
-    `<path d="M31 22C25 18 23 15 23 12.5C23 10 25 8.5 27 8.5C28.8 8.5 30.2 9.7 31 11.2C31.8 9.7 33.2 8.5 35 8.5C37 8.5 39 10 39 12.5C39 15 37 18 31 22Z" fill="${P.tomato}" ${S}/>`,
-  grandi: () => scale(true),
-  piccole: () => scale(false),
 };
-export const truckSymbolArt = (sym) => (SYM[sym] ? SYM[sym]() : '');
+const DEFAULT_SHOW = {
+  lavaggio: [{ t: 'patata', c: 'giallo', dirty: true }], brutti: [{ t: 'carota', c: 'arancione', odd: true }],
+  grandi: [{ t: 'mela', c: 'rosso' }], piccole: [{ t: 'mela', c: 'rosso' }], mele: [{ t: 'mela', c: 'rosso' }, { t: 'mela', c: 'verde' }],
+};
+// The symbol of a truck from its spec (see trucks.js): exactly the produce that goes in.
+export function truckSpecArt(spec) {
+  const show = spec.show.length ? spec.show : (DEFAULT_SHOW[spec.truck] || []);
+  switch (spec.kind) {
+    case 'produce': return group(show);
+    case 'scale': return scale(spec.truck === 'grandi', show);
+    // washing: a tap pouring water onto a dirty item, with bubbles
+    case 'wash': return `<path d="M6 7H22Q27 7 27 12V14H23V12Q23 11 22 11H6Z" fill="#9FB3B8" ${S}/><rect x="10" y="3" width="6" height="4" rx="1" fill="#9FB3B8" ${S}/>` +
+      `<g fill="${P.sky}"><path d="M25 16Q27 19 25 21Q23 19 25 16Z"/><path d="M22 20Q24 23 22 25Q20 23 22 20Z"/><path d="M28 21Q30 24 28 26Q26 24 28 21Z"/></g>` +
+      at(5, 13, 0.68, drawIt(show[0])) +
+      `<g fill="#fff" stroke="${P.sky}" stroke-width="1.1"><circle cx="34" cy="31" r="3"/><circle cx="32" cy="24.5" r="1.6"/><circle cx="5" cy="22" r="1.6"/></g>`;
+    // ugly but good: a misshapen item with a heart
+    case 'odd': return at(-2, 3, 0.9, drawIt(show[0])) + heartBig;
+    default: return SYM[spec.truck] ? SYM[spec.truck]() : '';
+  }
+}
+// Symbol without a level (e.g. docs, gallery): the default samples.
+const KIND_OF = { grandi: 'scale', piccole: 'scale', lavaggio: 'wash', brutti: 'odd', mele: 'produce' };
+export const truckSymbolArt = (sym) => truckSpecArt({ truck: sym, kind: KIND_OF[sym] || 'fixed', show: [] });
 
 // A truck in a slot `w` px wide, centred at x = 0, with its bed top at y = 0 (the pipe ends there).
+// symInner: the symbol markup (40 x 40) painted on its side.
 // Returns { svg, bedW, height }.
-export function truckArt(sym, w) {
+export function truckArt(symInner, w) {
   const tw = Math.min(w - 6, 76);
   const bedW = Math.round(tw * 0.66), cabW = tw - bedW - 2;
   const x0 = -tw / 2;
@@ -214,7 +248,7 @@ export function truckArt(sym, w) {
   const svg =
     `<rect x="${x0}" y="0" width="${bedW}" height="${bedH}" rx="3" fill="${P.wheat}" stroke="${P.soil}" stroke-width="2"/>` +
     `<rect x="${x0 + (bedW - panel) / 2}" y="2" width="${panel}" height="${panel}" rx="4" fill="#fff" stroke="${P.soil}" stroke-width="1"/>` +
-    `<svg x="${x0 + (bedW - panel) / 2 + 1}" y="3" width="${panel - 2}" height="${panel - 2}" viewBox="0 0 40 40">${truckSymbolArt(sym)}</svg>` +
+    `<svg x="${x0 + (bedW - panel) / 2 + 1}" y="3" width="${panel - 2}" height="${panel - 2}" viewBox="0 0 40 40">${symInner}</svg>` +
     `<path d="M${x0 + bedW + 2} ${bedH}V8Q${x0 + bedW + 2} 5 ${x0 + bedW + 5} 5H${x0 + tw - 5}Q${x0 + tw} 5 ${x0 + tw} 12V${bedH}Z" fill="${P.sky}" stroke="${P.soil}" stroke-width="2" stroke-linejoin="round"/>` +
     `<rect x="${x0 + bedW + 5}" y="8" width="${Math.max(4, cabW - 8)}" height="8" rx="1.5" fill="#CFE6EC"/>` +
     `<rect x="${x0 - 1}" y="${bedH}" width="${tw + 2}" height="5" rx="2" fill="${P.soil}"/>` +
@@ -227,6 +261,7 @@ export function truckArt(sym, w) {
 export const ICON = {
   yes: `<path d="M9 21L17 29L31 12" fill="none" stroke="${P.olive}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`,
   no: `<path d="M11 11L29 29M29 11L11 29" fill="none" stroke="${P.soil}" stroke-width="5" stroke-linecap="round"/>`,
+  noRed: `<path d="M11 11L29 29M29 11L11 29" fill="none" stroke="${P.tomato}" stroke-width="5" stroke-linecap="round"/>`,
   coin: `<circle cx="20" cy="20" r="16" fill="${P.gold}" stroke="#B8892B" stroke-width="2.5"/><circle cx="20" cy="20" r="10.5" fill="none" stroke="#B8892B" stroke-width="2"/><path d="M20 13V27" stroke="#B8892B" stroke-width="2.5" stroke-linecap="round"/>`,
   lock: `<rect x="9" y="18" width="22" height="17" rx="3" fill="${P.soil}"/><path d="M13 18V13A7 7 0 0 1 27 13V18" fill="none" stroke="${P.soil}" stroke-width="3.5"/><circle cx="20" cy="26" r="2.6" fill="${P.wheat}"/>`,
   map: `<path d="M5 9L14 6L26 10L35 7V31L26 34L14 30L5 33Z" fill="${P.cream}" stroke="${P.cream}" stroke-width="2" stroke-linejoin="round"/><path d="M14 6V30M26 10V34" stroke="${P.olive}" stroke-width="2"/>`,

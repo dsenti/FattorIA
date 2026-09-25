@@ -7,23 +7,27 @@ import { LEVELS, TRUCKS } from './levels.js';
 import { QUESTIONS, Q, SENSOR_BY_ID, questionUnlocked } from './questions.js';
 import { COMPILED, levelStatus, startLevel, hintCost } from './progress.js';
 import { layoutTree, runBatch, trainingBatch, testBatch, solutionOf, treeDepth } from './tree.js';
-import { P, questionArt, truckArt, truckSymbolArt, ICON, svg40, itemArt, itemSymbolId, ensureItemSymbols } from './art.js';
+import { P, questionArt, truckArt, truckSpecArt, ICON, svg40, itemArt, itemSymbolId, ensureItemSymbols } from './art.js';
+import { truckSpec, PIPE_COLOUR } from './trucks.js';
 
 const GS = 23;           // half size of a gate square
 const ROW_H = 76;        // vertical distance between tree rows
 const MANIFOLD = 70;     // height of the zone where pipes bend (and cross) towards the trucks
 const CELL_W = 42;       // hopper grid cell
 const PILE = 15;         // item size in a truck pile
+const METAL = '#B7C4C8'; // the connectors between gates
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const coinSvg = (size = 16) => svg40(ICON.coin, size, 'coin-ic');
 export const yesSvg = (size = 16) => svg40(ICON.yes, size, 'yn-ic');
 export const noSvg = (size = 16) => svg40(ICON.no, size, 'yn-ic');
+// the red cross used on the ✗ (no) branches
+export const noRedSvg = (size = 16) => svg40(ICON.noRed, size, 'yn-ic');
 
 export function helpHTML() {
   return '<h2>Lo smistamento</h2>' +
     '<p>Il raccolto arriva tutto mescolato. Una macchina lo divide nei camion: è una <b>classificazione</b> <em>(classification)</em>, ogni pezzo va nella sua classe.</p>' +
-    `<p>La macchina è un <b>albero di decisione</b> <em>(decision tree)</em>: ogni cancello fa una domanda con risposta sì o no. ${yesSvg()} sì: il pezzo va a destra. ${noSvg()} no: va a sinistra. In fondo un tubo lo porta a un camion.</p>` +
+    `<p>La macchina è un <b>albero di decisione</b> <em>(decision tree)</em>: ogni cancello fa una domanda con risposta sì o no. ${yesSvg()} sì: il pezzo va a destra. ${noRedSvg()} no: va a sinistra. In fondo un tubo lo porta a un camion.</p>` +
     '<ol>' +
     '<li>In alto c\'è il <b>lotto di addestramento</b> <em>(training)</em>. Sotto ogni pezzo c\'è la sua <b>etichetta</b> <em>(label)</em>: il camion giusto. Tocca un pezzo per vedere le sue caratteristiche <em>(features)</em>.</li>' +
     '<li>Tocca un cancello <b>?</b> e scegli una domanda.</li>' +
@@ -60,6 +64,10 @@ export class SortingGame {
     const stopFollow = () => { this.follow = false; };
     for (const ev of ['pointerdown', 'wheel', 'touchstart']) this.el.scroll.addEventListener(ev, stopFollow, { passive: true });
     this.el.card.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) this.closeCard(); });
+    // tapping anywhere outside the item card closes it (a tap on another item then opens that one)
+    document.addEventListener('pointerdown', (e) => {
+      if (!this.el.card.hidden && !this.el.card.contains(e.target)) this.closeCard();
+    }, true);
     window.addEventListener('resize', () => { if (this.active && this.phase !== 'run' && this.phase !== 'leaving') this.render(); });
   }
 
@@ -103,6 +111,8 @@ export class SortingGame {
     const saved = s.boards[lv.id];
     this.board = saved && saved.length === this.c.gates.length ? saved.slice() : new Array(this.c.gates.length).fill(null);
     this.training = trainingBatch(lv, li + 1);
+    // what each truck's symbol shows in this level (built from the items that go in)
+    this.specs = Object.fromEntries(lv.trucks.map((id) => [id, truckSpec(id, lv.items)]));
     this.batch = this.training;
     this.mode = 'train';
     this.run = null;
@@ -267,7 +277,7 @@ export class SortingGame {
     const T = lv.trucks.length;
     const slotW = (W - 12) / T;
     const truckAt = Object.fromEntries(lv.trucks.map((id, k) => [id, 6 + (k + 0.5) * slotW]));
-    const ta = truckArt('rosse', slotW);
+    const ta = truckArt('', slotW);
     const perPile = Math.max(2, Math.floor((ta.bedW - 4) / PILE));
     const counts = {};
     if (this.run) for (const r of this.run.results) counts[r.truck] = (counts[r.truck] || 0) + 1;
@@ -294,8 +304,8 @@ export class SortingGame {
 
     let s = `<defs id="s-defs">`;
     for (const q of QUESTIONS) s += `<symbol id="q-${q.id}" viewBox="0 0 40 40">${questionArt(q.id)}</symbol>`;
-    for (const id of new Set(lv.trucks)) s += `<symbol id="tr-${TRUCKS[id].sym}" viewBox="0 0 40 40">${truckSymbolArt(TRUCKS[id].sym)}</symbol>`;
-    s += `<symbol id="ic-yes" viewBox="0 0 40 40">${ICON.yes}</symbol><symbol id="ic-no" viewBox="0 0 40 40">${ICON.no}</symbol><symbol id="ic-hint" viewBox="0 0 40 40">${ICON.hint}</symbol>`;
+    for (const id of lv.trucks) s += `<symbol id="tr-${id}" viewBox="0 0 40 40">${truckSpecArt(this.specs[id])}</symbol>`;
+    s += `<symbol id="ic-yes" viewBox="0 0 40 40">${ICON.yes}</symbol><symbol id="ic-no" viewBox="0 0 40 40">${ICON.noRed}</symbol><symbol id="ic-hint" viewBox="0 0 40 40">${ICON.hint}</symbol>`;
     s += '</defs>';
     // hopper and funnel
     const rx = c.root.x;
@@ -306,7 +316,9 @@ export class SortingGame {
     s += '<g class="s-pipes">';
     for (const leaf of c.leaves) {
       const d = pipePath(leaf, g);
-      s += `<path d="${d}" fill="none" stroke="${P.soil}" stroke-width="11" stroke-linecap="round" opacity=".8"/><path d="${d}" fill="none" stroke="#A9C2C8" stroke-width="7" stroke-linecap="round"/>`;
+      // tinted like its truck's symbol, so crossing pipes can be told apart
+      s += `<path d="${d}" fill="none" stroke="${P.soil}" stroke-width="11" stroke-linecap="round" opacity=".85"/><path d="${d}" fill="none" stroke="${PIPE_COLOUR[leaf.truck] || METAL}" stroke-width="7" stroke-linecap="round"/>` +
+        `<path d="${d}" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".35" transform="translate(-1.6 0)"/>`;
     }
     s += '</g>';
     // branches with the no/yes markers
@@ -316,16 +328,19 @@ export class SortingGame {
         const ch = gate[side];
         const x0 = gate.x + (side === 'yes' ? 13 : -13), y0 = gate.y + GS;
         const x1 = ch.x, y1 = ch.kind === 'gate' ? ch.y - GS : ch.y - 8;
-        s += `<path d="M${x0} ${y0}L${x1} ${y1}" stroke="${P.soil}" stroke-width="3" stroke-linecap="round" opacity=".55"/>`;
+        // a metal pipe, like the downpipes
+        s += `<path d="M${x0} ${y0}L${x1} ${y1}" stroke="${P.soil}" stroke-width="10" stroke-linecap="round" opacity=".85"/>` +
+          `<path d="M${x0} ${y0}L${x1} ${y1}" stroke="${METAL}" stroke-width="6" stroke-linecap="round"/>` +
+          `<path d="M${x0 - 1.4} ${y0}L${x1 - 1.4} ${y1}" stroke="#fff" stroke-width="1.4" stroke-linecap="round" opacity=".45"/>`;
         const mx = x0 + (x1 - x0) * 0.42, my = y0 + (y1 - y0) * 0.42;
-        s += `<circle cx="${mx}" cy="${my}" r="9" fill="${P.cream}" stroke="${side === 'yes' ? P.olive : P.soil}" stroke-width="1.5"/>` +
+        s += `<circle cx="${mx}" cy="${my}" r="9.5" fill="${P.cream}" stroke="${side === 'yes' ? P.olive : P.tomato}" stroke-width="2"/>` +
           `<use href="#ic-${side}" x="${mx - 6.5}" y="${my - 6.5}" width="13" height="13"/>`;
       }
     }
     s += '</g>';
     // leaves (pipe mouths)
     for (const leaf of c.leaves) {
-      s += `<path d="M${leaf.x - 12} ${leaf.y - 9}H${leaf.x + 12}L${leaf.x + 6} ${leaf.y + 2}H${leaf.x - 6}Z" fill="#A9C2C8" stroke="${P.soil}" stroke-width="1.8" stroke-linejoin="round"/>`;
+      s += `<path d="M${leaf.x - 12} ${leaf.y - 9}H${leaf.x + 12}L${leaf.x + 6} ${leaf.y + 2}H${leaf.x - 6}Z" fill="${PIPE_COLOUR[leaf.truck] || METAL}" stroke="${P.soil}" stroke-width="1.8" stroke-linejoin="round"/>`;
     }
     // gates
     for (const gate of c.gates) {
@@ -341,13 +356,13 @@ export class SortingGame {
         (wrongN && !lente ? `<circle cx="${-GS + 3}" cy="${-GS + 3}" r="5" fill="${P.tomato}"/>` : '') +
         (wrongN && lente ? `<g transform="translate(${-GS - 2} ${-GS - 4})"><circle r="10" fill="${P.tomato}"/><text class="badge" y="4.5" text-anchor="middle">${wrongN}</text></g>` : '') +
         `<g class="f-yes"><circle cx="${GS + 5}" cy="${-GS + 2}" r="11" fill="${P.cream}" stroke="${P.olive}" stroke-width="2"/><use href="#ic-yes" x="${GS - 3}" y="${-GS - 6}" width="16" height="16"/></g>` +
-        `<g class="f-no"><circle cx="${-GS - 5}" cy="${-GS + 2}" r="11" fill="${P.cream}" stroke="${P.soil}" stroke-width="2"/><use href="#ic-no" x="${-GS - 13}" y="${-GS - 6}" width="16" height="16"/></g>` +
+        `<g class="f-no"><circle cx="${-GS - 5}" cy="${-GS + 2}" r="11" fill="${P.cream}" stroke="${P.tomato}" stroke-width="2"/><use href="#ic-no" x="${-GS - 13}" y="${-GS - 6}" width="16" height="16"/></g>` +
         '</g>';
     }
     // trucks
     for (const id of lv.trucks) {
       const x = truckAt[id];
-      const t = truckArt(TRUCKS[id].sym, slotW);
+      const t = truckArt(truckSpecArt(this.specs[id]), slotW);
       // truck and its load in one group, so "Avanti" can drive them off together
       s += `<g class="s-tg" data-tg="${id}"><g class="s-truck" data-truck="${id}" transform="translate(${x} ${g.bedTop})" aria-label="${esc(TRUCKS[id].name)}">${t.svg}</g><g class="s-tp" data-tp="${id}"></g></g>`;
     }
@@ -369,7 +384,7 @@ export class SortingGame {
         `<rect x="${-CELL_W / 2}" y="-19" width="${CELL_W}" height="${cellH - 2}" fill="transparent"/>` +
         `<circle class="ring" r="17" fill="none" stroke="${P.tomato}" stroke-width="3"/>` +
         `<use href="#${itemSymbolId(it)}" x="-16" y="-16" width="32" height="32" transform="rotate(${it.spin})"/>` +
-        (tags ? `<rect x="-12" y="18" width="24" height="18" rx="5" fill="#fff" stroke="${P.wheat}" stroke-width="1.5"/><use href="#tr-${TRUCKS[it.label].sym}" x="-8" y="19" width="16" height="16"/>` : '') +
+        (tags ? `<rect x="-12" y="18" width="24" height="18" rx="5" fill="#fff" stroke="${P.wheat}" stroke-width="1.5"/><use href="#tr-${it.label}" x="-8" y="19" width="16" height="16"/>` : '') +
         '</g>';
     });
     this.el.svg.querySelector('#s-hopper').innerHTML = h;
@@ -595,8 +610,8 @@ export class SortingGame {
         svg40(questionArt(q.id), 30) + (known ? (ans ? yesSvg(15) : noSvg(15)) : svg40(ICON.lock, 15)) + '</span>';
     }
     const label = true
-      ? `<div class="s-label"><span>Etichetta <em>(label)</em>:</span> ${svg40(truckSymbolArt(TRUCKS[it.label].sym), 30, 'lbl')}` +
-        (res && !res.ok ? ` <span class="s-wrong">finito qui: ${svg40(truckSymbolArt(TRUCKS[res.truck].sym), 30, 'lbl')}</span>` : '') + '</div>'
+      ? `<div class="s-label"><span>Etichetta <em>(label)</em>:</span> ${svg40(truckSpecArt(this.specs[it.label]), 30, 'lbl')}` +
+        (res && !res.ok ? ` <span class="s-wrong">finito qui: ${svg40(truckSpecArt(this.specs[res.truck]), 30, 'lbl')}</span>` : '') + '</div>'
       : '';
     this.el.card.innerHTML =
       '<button class="btn icon s-card-x" data-close aria-label="Chiudi">' + svg40(ICON.no, 22) + '</button>' +
@@ -680,7 +695,7 @@ export class SortingGame {
     const cur = this.board[gi];
     this.app.openSheet('Che cosa chiede il cancello?', (body) => {
       const st = this.app.getState();
-      let html = `<p class="sheet-note">Scegli una domanda. ${yesSvg(15)} sì: il pezzo va a destra. ${noSvg(15)} no: va a sinistra.</p><div class="s-palette">`;
+      let html = `<p class="sheet-note">Scegli una domanda. ${yesSvg(15)} sì: il pezzo va a destra. ${noRedSvg(15)} no: va a sinistra.</p><div class="s-palette">`;
       const locked = [];
       for (const q of QUESTIONS) {
         if (!questionUnlocked(q.id, s.sensors)) { locked.push(q); continue; }

@@ -11,6 +11,7 @@ import { LEVELS, TRUCKS } from '../js/sorting/levels.js';
 import { QUESTIONS, QUESTION_IDS, SENSORS, parseItem, itemKey, questionUnlocked } from '../js/sorting/questions.js';
 import { compile, solutionOf, trainingBatch, testBatch, runBatch, countSolutions, bruteForce, layoutTree, treeDepth, rng, route } from '../js/sorting/tree.js';
 import { levelStatus, requiredSensors, startLevel } from '../js/sorting/progress.js';
+import { truckSpec, PIPE_COLOUR } from '../js/sorting/trucks.js';
 import { defaultSort, sanitizeSort } from '../js/storage.js';
 
 let passed = 0;
@@ -443,6 +444,52 @@ test('smistamento: wrong items always have a gate to blame; accuracy counts', ()
   });
 });
 
+test('smistamento: every truck symbol shows only what goes into that truck', () => {
+  for (const lv of LEVELS) {
+    for (const id of lv.trucks) {
+      const spec = truckSpec(id, lv.items);
+      const routed = lv.items.filter(([, l]) => l === id).map(([str]) => parseItem(str));
+      const produce = routed.filter((it) => !it.alive);
+      if (['produce', 'scale', 'wash', 'odd'].includes(spec.kind)) assert.ok(spec.show.length > 0, `${lv.id}/${id}: symbol shows something`);
+      for (const x of spec.show) {
+        const match = produce.filter((it) => it.t === x.t && it.c === x.c && (!x.dirty || it.dirty) && (!x.odd || it.odd));
+        assert.ok(match.length > 0, `${lv.id}/${id}: symbol shows ${x.t} ${x.c}${x.dirty ? ' sporco' : ''}${x.odd ? ' strano' : ''}, but none goes in`);
+      }
+      if (spec.kind === 'produce') {
+        // single-type trucks: every type that goes in is shown, with its colours (up to 3)
+        const types = new Set(produce.map((it) => it.t));
+        for (const t of types) assert.ok(spec.show.some((x) => x.t === t), `${lv.id}/${id}: ${t} goes in but isn't shown`);
+        const colours = new Set(produce.map((it) => it.c));
+        assert.ok(spec.show.length === Math.min(3, colours.size), `${lv.id}/${id}: shows ${spec.show.length} of ${colours.size} colours`);
+      }
+      if (spec.kind === 'scale') {
+        const types = new Set(produce.map((it) => it.t));
+        assert.ok(spec.show.length === Math.min(2, types.size), `${lv.id}/${id}: scale shows the level's produce types`);
+        for (const it of produce) assert.equal(it.heavy, id === 'grandi', `${lv.id}/${id}: ${it.t} weight fits the scale`);
+      }
+      if (spec.kind === 'fixed') assert.equal(spec.show.length, 0);
+    }
+  }
+});
+
+test('smistamento: pipe colours differ within every level; lone animals look like their colour', () => {
+  const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const dist = (a, b) => Math.hypot(...rgb(a).map((v, i) => v - rgb(b)[i]));
+  for (const lv of LEVELS) {
+    for (const t of lv.trucks) assert.ok(PIPE_COLOUR[t], `${t}: pipe colour`);
+    for (const a of lv.trucks) for (const b of lv.trucks) {
+      if (a < b) assert.ok(dist(PIPE_COLOUR[a], PIPE_COLOUR[b]) > 45, `${lv.id}: pipes ${a} and ${b} too similar`);
+    }
+  }
+  // the drawings: a bee is yellow, a ladybird and a lone worm are red; butterflies and snails are
+  // drawn in their own colour, so any colour is fine for them
+  const DRAWN = { ape: 'giallo', coccinella: 'rosso', verme: 'rosso' };
+  for (const lv of LEVELS) for (const [str] of lv.items) {
+    const it = parseItem(str);
+    if (DRAWN[it.t]) assert.equal(it.c, DRAWN[it.t], `${lv.id}: ${str} must be ${DRAWN[it.t]}`);
+  }
+});
+
 test('smistamento: layout fits 360 px without horizontal scrolling', () => {
   for (const W of [344, 360, 468]) {
     LEVELS.forEach((lv) => {
@@ -524,7 +571,7 @@ test('smistamento: saves migrate (no "sort"; older levels; calibro refund) and a
 test('smistamento: no emoji in minigame 2; no L3 words in minigame 1; no "bias"', () => {
   const emoji = /\p{Extended_Pictographic}/u;
   const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
-  for (const f of ['js/sorting/questions.js', 'js/sorting/levels.js', 'js/sorting/tree.js', 'js/sorting/progress.js', 'js/sorting/art.js', 'js/sorting/game.js', 'js/sorting/shop.js']) {
+  for (const f of ['js/sorting/trucks.js', 'js/sorting/questions.js', 'js/sorting/levels.js', 'js/sorting/tree.js', 'js/sorting/progress.js', 'js/sorting/art.js', 'js/sorting/game.js', 'js/sorting/shop.js']) {
     const src = read(f);
     const m = src.match(emoji);
     assert.ok(!m, `${f}: emoji ${m && m[0]}`);
