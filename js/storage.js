@@ -24,7 +24,7 @@ export function defaultState() {
     coins: 0,              // coins in the wallet
     totalEarned: 0,        // all coins ever earned (leaderboard "Più ricchi")
     farmersServed: 0,      // number of finished rounds
-    levels: { scanner: 0, belt: 0, truck: 0 },
+    levels: { scanner: 0, belt: 0, truck: 0, fitter: 0 },
     day: 1,
     dayFarmers: 0,
     dayCoins: 0,
@@ -54,6 +54,7 @@ function sanitize(raw) {
       scanner: clampLevel(raw.levels?.scanner),
       belt: clampLevel(raw.levels?.belt),
       truck: clampLevel(raw.levels?.truck),
+      fitter: raw.levels?.fitter === 1 ? 1 : 0,
     },
     day: Math.max(1, num(raw.day, 1)),
     dayFarmers: num(raw.dayFarmers, 0),

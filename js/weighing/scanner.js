@@ -252,6 +252,48 @@ export function drawScanner(ctx, o) {
   ctx.restore();
 }
 
+// The "Adattatore automatico": a small computer with a screen and a light, mounted on top of the
+// scanner's bar. o as for drawScanner, plus fitting (0..1 progress while it works, or null).
+export function drawFitter(ctx, o) {
+  const { cx, ground, H, level: L, now } = o;
+  const { u, w } = scannerMetrics(L, H);
+  let pop = upgradePop(o.scannerUpgradeAge) * upgradePop(o.upgradeAge);
+  if (L === 10) pop *= 1 + 0.012 * Math.sin(now / 300);
+  // Keep a readable minimum size on the small low-level scanners.
+  // ...but never taller than the room left above the scanner (the big scanners nearly touch the top).
+  const room = ground - 100 * u * pop - 1;           // px between the scene top and the scanner bar
+  // It may sink into the bar by up to 16 units when the room is short.
+  const s = Math.max(0.35, Math.min(Math.max(1, 0.55 / (u / (H / 130))), (room + 16 * u * pop) / (31 * u * pop)));
+  const sink = Math.max(0, 31 * s - room / (u * pop));
+  ctx.save();
+  ctx.translate(cx, ground);
+  ctx.scale(u * pop, u * pop);
+  if (L === 0) ctx.rotate(-0.04);
+  ctx.translate(-w * 0.12, -100 + sink);
+  ctx.scale(s, s);
+  // stand and case
+  ctx.fillStyle = C.ink; ctx.fillRect(-2, -4, 4, 4);
+  ctx.fillStyle = C.cream; rrect(ctx, -15, -24, 30, 20, 3); ctx.fill();
+  ctx.strokeStyle = C.olive; ctx.lineWidth = 1.6; rrect(ctx, -15, -24, 30, 20, 3); ctx.stroke();
+  // screen: dots and a line that settles into place while fitting
+  ctx.fillStyle = C.ink; rrect(ctx, -12, -21.5, 20, 14, 1.5); ctx.fill();
+  ctx.fillStyle = C.wheat;
+  for (const [x, y] of [[-9, -10], [-6, -12.5], [-3, -12], [0, -15], [3, -16.5], [5.5, -19]]) { ctx.beginPath(); ctx.arc(x, y, 0.9, 0, 7); ctx.fill(); }
+  const f = o.fitting;
+  const wob = f == null ? 0 : (1 - f) * Math.sin(now / 60) * 3;
+  ctx.strokeStyle = f == null ? C.tomato : '#9BC53D'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-11, -9 + wob); ctx.lineTo(7, -19.5 - wob); ctx.stroke();
+  // status light and a tiny antenna
+  const on = f != null ? Math.floor(now / 120) % 2 === 0 : Math.floor(now / 900) % 2 === 0;
+  ctx.fillStyle = on ? '#9BC53D' : 'rgba(155,197,61,0.35)';
+  ctx.beginPath(); ctx.arc(11.5, -18, 1.8, 0, 7); ctx.fill();
+  ctx.fillStyle = C.soil; ctx.fillRect(10.5, -12, 2, 5);
+  ctx.strokeStyle = C.ink; ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.moveTo(12, -24); ctx.lineTo(14, -30); ctx.stroke();
+  ctx.fillStyle = C.tomato; ctx.beginPath(); ctx.arc(14, -30.5, 1.1, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
 // The scan flash. It gets thinner, crisper and more complex with the level.
 export function drawScannerBeam(ctx, o) {
   const { cx, ground, H, level: L, now } = o;

@@ -194,6 +194,8 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .slider.disabled { opacity: 0.4; cursor: default; }
 
 .controls .btn.big { margin-top: 4px; }
+.lock-row { display: flex; gap: 8px; }
+.lock-row .btn.big { flex: 1; min-width: 0; padding: 0 8px; font-size: 17px; }
 
 .result { display: flex; flex-direction: column; gap: 5px; }
 .result-head { display: flex; justify-content: space-between; align-items: center; }

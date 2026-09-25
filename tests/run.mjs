@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { CONFIG } from '../js/config.js';
 import { EMOJIS, NOUNS, ADJECTIVES, formatName, nameChoices, isValidName } from '../js/names.js';
 import { FARMERS } from '../js/weighing/farmers.js';
-import { makeRound, takeUnit, measure, scoreLine, coinsForRatio, sliderToLine, startSliders, dataSlope } from '../js/weighing/round.js';
+import { makeRound, takeUnit, measure, scoreLine, coinsForRatio, sliderToLine, startSliders, dataSlope, autoFit, lineToSliders } from '../js/weighing/round.js';
 import { leastSquares } from '../js/stats.js';
 
 let passed = 0;
@@ -142,6 +142,54 @@ test('belt changes boxes per trip, not the amount of data', () => {
   }
 });
 
+// Collect the whole truck into round.sample, like the game does.
+function collectAll(r) {
+  for (let c = 0; c < r.cratesTotal * r.unitsPerBox; c++) {
+    const idx = takeUnit(r);
+    if (idx < 0) break;
+    r.sample.push(measure(r, idx));
+  }
+}
+// What the fit button does: auto-fit, then through the sliders (clamped), then score.
+function fitterCoins(r) {
+  const s = lineToSliders(autoFit(r));
+  return scoreLine(r, sliderToLine(s.slope, s.intercept));
+}
+
+test('auto-fitter: least squares on the measured points only, never the harvest', () => {
+  const lv = { scanner: 3, belt: 0, truck: 3, fitter: 1 };
+  for (let i = 0; i < 300; i++) {
+    const r = makeRound({ visitNo: 8, lastFarmerId: null, levels: lv });
+    assert.equal(autoFit(r), null, 'no fit without points');
+    r.sample.push(measure(r, takeUnit(r)));
+    assert.equal(autoFit(r), null, 'no fit with one point');
+    collectAll(r);
+    const fit = autoFit(r), ls = leastSquares(r.sample);
+    assert.ok(Math.abs(fit.a - ls.a) < 1e-12 && Math.abs(fit.b - ls.b) < 1e-12, 'equals least squares on the sample');
+    // Replacing the whole harvest must not change the fit.
+    const saved = r.harvest;
+    r.harvest = saved.map((p) => ({ x: p.x, y: 1 - p.y }));
+    const fit2 = autoFit(r);
+    assert.ok(fit2.a === fit.a && fit2.b === fit.b, 'the harvest is never used');
+    r.harvest = saved;
+    // The slider round trip keeps the line (when it is inside the slider ranges).
+    const s = lineToSliders(fit), back = sliderToLine(s.slope, s.intercept);
+    if (s.slope > 0 && s.slope < 1 && s.intercept > 0 && s.intercept < 1) assert.ok(Math.abs(back.a - fit.a) < 1e-9 && Math.abs(back.b - fit.b) < 1e-9);
+  }
+});
+
+test('auto-fitter with everything maxed scores 10 most of the time', () => {
+  const lv = { scanner: 10, belt: 10, truck: 10, fitter: 1 };
+  let tens = 0; const N = 400;
+  for (let i = 0; i < N; i++) {
+    const r = makeRound({ visitNo: 20, lastFarmerId: null, levels: lv });
+    collectAll(r);
+    if (fitterCoins(r).coins === 10) tens++;
+  }
+  console.log(`      auto-fitter, all maxed: ${((100 * tens) / N).toFixed(0)}% of farmers pay 10`);
+  assert.ok(tens / N > 0.5, `share of 10s: ${tens / N}`);
+});
+
 test('glitch rate at scanner level 0 is about 1/8', () => {
   const r = makeRound({ visitNo: 5, lastFarmerId: null, levels: { scanner: 0, belt: 0, truck: 0 } });
   let g = 0; const N = 40000;
@@ -177,6 +225,13 @@ test('tuning report (sample-perfect player)', () => {
   ];
 
   for (const [name, lv, v] of rows) console.log(`      avg coins ${simulate(lv, v).toFixed(2)}  ${name}`);
+  let sum = 0; const n = 800;
+  for (let i = 0; i < n; i++) {
+    const r = makeRound({ visitNo: 20, lastFarmerId: null, levels: { scanner: 10, belt: 10, truck: 10, fitter: 1 } });
+    collectAll(r);
+    sum += fitterCoins(r).coins;
+  }
+  console.log(`      avg coins ${(sum / n).toFixed(2)}  all 10 + fitter (through the sliders), farmer 20`);
 });
 
 console.log(`\n${passed} checks passed`);

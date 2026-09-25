@@ -63,6 +63,12 @@ export const CONFIG = {
   TRUCK_BASE,
   TRUCK_FACTOR,
   TRUCK_CRATES: Array.from({ length: 11 }, (_, n) => Math.round(TRUCK_BASE * TRUCK_FACTOR ** n)),
+  // "Adattatore automatico" (auto-fitter): one level, bought once. A computer on the scanner
+  // that finds the least-squares line of the points measured so far (never the whole harvest),
+  // moves both sliders there in FITTER_ANIM_MS and locks the line.
+  FITTER_COST: 100,
+  FITTER_ANIM_MS: 1200,
+
   // Drawing only (the machines grow with their level). Scanner height = SCANNER_SCALE[level] *
   // SCANNER_HEIGHT_FRACTION * scene height. Vehicle length = TRUCK_LENGTH[level] * scene width
   // (the rear stays next to the belt, the front grows to the left); TRUCK_HEIGHT_SCALE scales
@@ -85,8 +91,10 @@ export const CONFIG = {
   GLITCH_OFFSET: [0.22, 0.45],
 
   // ---------------------------------------------------------------- harvest
-  // Number of units in the farmer's whole harvest (larger than the max sample 173 x 3 = 519).
-  HARVEST_SIZE: 1000,
+  // Number of units in the farmer's whole harvest. Must stay larger than the biggest truck (173).
+  // 240 (instead of 1000) so that with everything maxed the measured sample is most of the harvest
+  // and the auto-fitter pays 10 in about 2 of 3 visits; with a bigger harvest that drops to ~1 in 3.
+  HARVEST_SIZE: 240,
   // x values of the harvest are uniform in this range.
   HARVEST_X_RANGE: [0.06, 0.94],
   // Natural spread of the harvest around the hidden true line (plot units).

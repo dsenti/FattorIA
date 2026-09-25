@@ -4,10 +4,10 @@
 import { CONFIG } from '../config.js';
 import { Slider } from '../slider.js';
 import { xLabel, yLabel } from './farmers.js';
-import { makeRound, takeUnit, measure, scoreLine, sliderToLine, startSliders, applyLiveLevels } from './round.js';
+import { makeRound, takeUnit, measure, scoreLine, sliderToLine, startSliders, applyLiveLevels, autoFit, lineToSliders } from './round.js';
 import { clamp } from '../stats.js';
 import { C, FONT } from './draw.js';
-import { drawScanner, drawScannerBeam, drawUpgradeFx, upgradePop, scannerMetrics } from './scanner.js';
+import { drawScanner, drawScannerBeam, drawFitter, drawUpgradeFx, upgradePop, scannerMetrics } from './scanner.js';
 import { drawVehicle, VEHICLE_NAMES } from './vehicles.js';
 import { drawUnloader, UNLOADER_NAMES, HERDER_NAMES } from './unloaders.js';
 import { drawPile } from './pile.js';
@@ -39,7 +39,7 @@ export class WeighingGame {
       plot: $('w-plot'), scene: $('w-scene'),
       face: $('w-face'), who: $('w-who'), text: $('w-text'), sub: $('w-sub'),
       crates: $('w-crates'), count: $('w-count'),
-      controls: $('w-controls'), lock: $('w-lock'),
+      controls: $('w-controls'), lock: $('w-lock'), fit: $('w-fit'),
       result: $('w-result'), resTitle: $('w-res-title'), resCoins: $('w-res-coins'),
       barMe: $('w-bar-me'), barBest: $('w-bar-best'), resNote: $('w-res-note'), next: $('w-next'),
     };
@@ -48,6 +48,15 @@ export class WeighingGame {
     this.intercept = new Slider($('w-intercept'), { value: s0.intercept, label: 'intercetta', onInput: () => this.onSlider() });
 
     this.el.lock.addEventListener('click', () => this.lock());
+    if (!this.el.fit) {
+      // An older cached index.html (e.g. right after a deploy) may not have the button yet.
+      const b = document.createElement('button');
+      b.className = 'btn olive big'; b.id = 'w-fit'; b.hidden = true; b.disabled = true;
+      b.textContent = '🤖 Trova la retta';
+      this.el.lock.parentNode.insertBefore(b, this.el.lock);
+      this.el.fit = b;
+    }
+    this.el.fit.addEventListener('click', () => this.startAutoFit());
     this.el.next.addEventListener('click', () => this.nextFarmer());
     this.el.scene.addEventListener('pointerdown', (e) => this.onSceneTap(e));
 
@@ -91,6 +100,7 @@ export class WeighingGame {
     this.units = [];
     this.carry = null;
     this.truckLeave = null;   // { t0 } while the empty truck drives away
+    this.fitting = null;      // { t0, from, to } while the auto-fitter moves the sliders
     this.truckGone = false;
     this.result = null;
     this.phase = 'arriving';
@@ -172,6 +182,34 @@ export class WeighingGame {
       t += interval;
     }
     this.nextSpawnAt = t;
+  }
+
+  // "🤖 Trova la retta": move both sliders to the least-squares line of the measured points,
+  // then lock. Only with the fitter bought and at least 2 measured points.
+  startAutoFit() {
+    if (!this.app.getState().levels.fitter || this.fitting || this.phase !== 'collect' || !this.canLock()) return;
+    const fit = autoFit(this.round);
+    if (!fit) return;
+    const to = lineToSliders(fit);
+    this.fitting = { t0: performance.now(), from: { slope: this.slope.value, intercept: this.intercept.value }, to };
+    this.slope.setEnabled(false);
+    this.intercept.setEnabled(false);
+    this.updateInfo();
+  }
+
+  stepAutoFit(now) {
+    const f = this.fitting;
+    if (!f) return;
+    const t = clamp((now - f.t0) / CONFIG.FITTER_ANIM_MS, 0, 1);
+    const e = easeInOut(t);
+    this.slope.set(f.from.slope + (f.to.slope - f.from.slope) * e, false);
+    this.intercept.set(f.from.intercept + (f.to.intercept - f.from.intercept) * e, false);
+    if (t >= 1) {
+      this.slope.set(f.to.slope, false);
+      this.intercept.set(f.to.intercept, false);
+      this.fitting = null;
+      this.lock();
+    }
   }
 
   lock() {
@@ -274,7 +312,10 @@ export class WeighingGame {
       ? `🚚 ${f.unit} ${r.cratesLeft * k}/${r.cratesTotal * k} · ${r.unloadAll ? 'tutti in un colpo' : `${r.perTrip * k} per viaggio`}`
       : `📦 cassette: ${r.cratesLeft}/${r.cratesTotal} · ${r.unloadAll ? 'tutte in un colpo' : `${r.perTrip} per viaggio`}`;
     this.el.count.innerHTML = `dati <em>(data)</em>: ${r.sample.length}`;
-    this.el.lock.disabled = !(this.phase === 'collect' && this.canLock());
+    this.el.lock.disabled = !(this.phase === 'collect' && this.canLock()) || !!this.fitting;
+    const hasFitter = !!this.app.getState().levels.fitter;
+    this.el.fit.hidden = !hasFitter;
+    this.el.fit.disabled = this.el.lock.disabled;
   }
 
   // ------------------------------------------------------------ simulation + drawing
@@ -329,6 +370,7 @@ export class WeighingGame {
     if (this.units.length && this.units.every((u) => u.gone)) this.units = [];
     if (changed) this.updateInfo();
 
+    this.stepAutoFit(now);
     if (this.phase === 'reveal') {
       const total = CONFIG.REVEAL_HARVEST_MS + CONFIG.REVEAL_RESIDUALS_MS + 200;
       if (now - this.phaseT0 >= total) this.showResult();
@@ -541,6 +583,12 @@ export class WeighingGame {
       ctx.fillText(f.unit, u.x * W, by - 1 - bob);
     }
     drawScannerBeam(ctx, sc);
+    if (lv.fitter) {
+      drawFitter(ctx, {
+        ...sc, scannerUpgradeAge: sc.upgradeAge, upgradeAge: now - (this.fx.fitter ?? -1e9),
+        fitting: this.fitting ? clamp((now - this.fitting.t0) / CONFIG.FITTER_ANIM_MS, 0, 1) : null,
+      });
+    }
 
     // vehicle: drives in from the left, and drives back out to the left when sent away
     let tOff = 0;
@@ -610,6 +658,7 @@ export class WeighingGame {
 
     // upgrade moments: sparkles and a label
     drawUpgradeFx(ctx, sc.cx, ground - scannerMetrics(lv.scanner, H).heightPx * 0.6, now - (this.fx.scanner ?? -1e9), `Scanner ${lv.scanner}!`);
+    drawUpgradeFx(ctx, sc.cx, ground - scannerMetrics(lv.scanner, H).heightPx - 8, now - (this.fx.fitter ?? -1e9), 'Adattatore automatico!');
     drawUpgradeFx(ctx, idleX, ground - H * 0.45, now - (this.fx.belt ?? -1e9), UNLOADER_LABEL(f.animal, lv.belt));
     if (!this.truckGone) drawUpgradeFx(ctx, g.truckRear * W * 0.55, H * 0.3, now - (this.fx.truck ?? -1e9), `${VEHICLE_NAMES[r.truckLevel]}!`);
 
@@ -639,11 +688,11 @@ export class WeighingGame {
   // Scanner and unloading apply at once; a new truck arrives with the next farmer.
   checkUpgrades(now, lv) {
     if (!this.shown) {
-      this.shown = { scanner: lv.scanner, belt: lv.belt, truck: this.round.truckLevel };
+      this.shown = { scanner: lv.scanner, belt: lv.belt, fitter: lv.fitter, truck: this.round.truckLevel };
       return;
     }
     if (this.app.overlayOpen && this.app.overlayOpen()) return;
-    for (const key of ['scanner', 'belt']) {
+    for (const key of ['scanner', 'belt', 'fitter']) {
       if (lv[key] !== this.shown[key]) {
         if (lv[key] > this.shown[key]) this.fx[key] = now;
         this.shown[key] = lv[key];

@@ -240,6 +240,12 @@ const SHOP = [
     desc: 'Un mezzo più grande porta più cassette: più dati <em>(data)</em> per ogni agricoltore.',
     effect: (lv) => `${VEHICLE_NAMES[lv]}: ${CONFIG.TRUCK_CRATES[lv]} cassette = ${CONFIG.TRUCK_CRATES[lv] * CONFIG.UNITS_PER_BOX} dati`,
   },
+  {
+    // One level only, bought once. Mounted on top of the scanner.
+    key: 'fitter', icon: '🤖', name: 'Adattatore automatico', maxLevel: 1, cost: () => CONFIG.FITTER_COST,
+    desc: 'Si monta sopra lo scanner. Il computer trova da solo la retta migliore per i punti che hai misurato tu, poi la blocca. Il raccolto intero non lo vede neanche lui.',
+    effect: (lv) => (lv ? 'Installato: premi 🤖 Trova la retta' : 'Non installato'),
+  },
 ];
 
 function openShop(onClose) {
@@ -249,16 +255,17 @@ function openShop(onClose) {
         `<p class="sheet-note">Hai <b>${state.coins} 🪙</b>. Il livello <i>n</i> costa <i>n</i> monete. ` +
         'Scanner e scarico valgono subito; il mezzo nuovo arriva con il prossimo agricoltore.</p>';
       for (const it of SHOP) {
-        const lv = state.levels[it.key];
-        const maxed = lv >= CONFIG.MAX_LEVEL;
-        const cost = maxed ? 0 : CONFIG.levelCost(lv + 1);
+        const lv = state.levels[it.key] || 0;
+        const maxLv = it.maxLevel || CONFIG.MAX_LEVEL;
+        const maxed = lv >= maxLv;
+        const cost = maxed ? 0 : it.cost ? it.cost(lv + 1) : CONFIG.levelCost(lv + 1);
         const box = document.createElement('div');
         box.className = 'shop-item';
-        const pips = Array.from({ length: CONFIG.MAX_LEVEL }, (_, i) => `<span class="pip ${i < lv ? 'on' : ''}"></span>`).join('');
+        const pips = Array.from({ length: maxLv }, (_, i) => `<span class="pip ${i < lv ? 'on' : ''}"></span>`).join('');
         const next = maxed ? '' : ` → <b>${it.effect(lv + 1)}</b>`;
         box.innerHTML =
           `<div class="shop-top"><span class="shop-icon">${it.icon}</span><div><div class="shop-name">${it.name}</div>` +
-          `<div>Livello ${lv}/${CONFIG.MAX_LEVEL}</div></div></div>` +
+          `<div>${maxLv === 1 ? (lv ? 'Comprato' : 'Un solo acquisto') : `Livello ${lv}/${maxLv}`}</div></div></div>` +
           `<div class="pips">${pips}</div>` +
           `<div class="preview-row"><canvas class="preview" data-key="${it.key}" data-lv="${lv}" aria-hidden="true"></canvas>` +
           (maxed ? '' : `<span class="preview-arrow">➜</span><canvas class="preview" data-key="${it.key}" data-lv="${lv + 1}" aria-hidden="true"></canvas>`) +
@@ -267,14 +274,14 @@ function openShop(onClose) {
           `<div class="shop-effect">${it.effect(lv)}${next}</div>`;
         const btn = document.createElement('button');
         btn.className = 'btn primary';
-        if (maxed) { btn.textContent = 'Livello massimo ✔'; btn.disabled = true; }
+        if (maxed) { btn.textContent = maxLv === 1 ? 'Comprato ✔' : 'Livello massimo ✔'; btn.disabled = true; }
         else {
-          btn.textContent = `Compra livello ${lv + 1} · ${cost} 🪙`;
+          btn.textContent = maxLv === 1 ? `Compra · ${cost} 🪙` : `Compra livello ${lv + 1} · ${cost} 🪙`;
           btn.disabled = state.coins < cost;
           btn.addEventListener('click', () => {
-            if (state.coins < cost || state.levels[it.key] >= CONFIG.MAX_LEVEL) return;
+            if (state.coins < cost || (state.levels[it.key] || 0) >= maxLv) return;
             state.coins -= cost;
-            state.levels[it.key] += 1;
+            state.levels[it.key] = (state.levels[it.key] || 0) + 1;
             save();
             renderCoins(false);
             draw();
@@ -288,7 +295,7 @@ function openShop(onClose) {
     // Animate the previews while the shop is open.
     const tick = (now) => {
       if ($('#sheet').hidden) return;
-      for (const c of body.querySelectorAll('canvas.preview')) drawPreview(c, c.dataset.key, Number(c.dataset.lv), now);
+      for (const c of body.querySelectorAll('canvas.preview')) drawPreview(c, c.dataset.key, Number(c.dataset.lv), now, { scannerLevel: state.levels.scanner });
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);

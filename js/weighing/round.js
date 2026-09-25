@@ -136,6 +136,24 @@ export function scoreLine(round, playerLine) {
   return { playerError, bestError: round.bestError, ratio, coins: coinsForRatio(ratio) };
 }
 
+// The auto-fitter: least squares on the points measured so far, never on the whole harvest.
+// Returns null with fewer than 2 points.
+export function autoFit(round) {
+  if (round.sample.length < 2) return null;
+  return leastSquares(round.sample);
+}
+
+// Line -> slider positions (0..1), clamped to the slider ranges.
+export function lineToSliders(line) {
+  const [g0, g1] = CONFIG.SLOPE_ANGLE_RANGE;
+  const [i0, i1] = CONFIG.INTERCEPT_RANGE;
+  const angle = (Math.atan(line.b) * 180) / Math.PI;
+  return {
+    slope: clamp((angle - g0) / (g1 - g0), 0, 1),
+    intercept: clamp((line.a - i0) / (i1 - i0), 0, 1),
+  };
+}
+
 // Slider positions (0..1) <-> line.
 export function sliderToLine(tSlope, tIntercept) {
   const [g0, g1] = CONFIG.SLOPE_ANGLE_RANGE;

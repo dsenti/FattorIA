@@ -72,6 +72,7 @@ TODO(Dominik): check the list and add any Matese crops or animals the students w
 | Scanner | less noise (the dots sit closer to the true line) and fewer outliers. At level 0 about 1 dot in 8 is a glitch; at level 10 there are none. The noise halves from level 0 to level 5 and keeps falling after that; at level 10 there is practically none (the measured dots sit on the true values within a hair). Each scanned object is still a real, varied object, so the dots still spread around the line | qualità dei dati, valore anomalo |
 | Camion (truck) | crates per truck: 3, ×1.5 per level, rounded (3, 5, 7, 10, 15, 23, 34, 51, 77, 115, 173) | more data → more reliable line |
 | Scarico (unloading) | objects carried per trip: 1 → 11. First more people (the farmer, then with his son Ciro, then with nonna Titina), then tools (carrello, carriola, transpallet, muletto, trattore con pala, sollevatore telescopico, robot arm, autonomous robot). The data stays the same; the truck just empties faster. At level 10 one tap empties the whole truck: the robot shuttles in one continuous animation of about 2.5 s, whatever the truck size | (speed) |
+| Adattatore automatico (auto-fitter) | one level, bought once for 100 coins, available from the start. A small computer mounted on top of the scanner. It adds the button "🤖 Trova la retta" next to Blocca: the computer moves both sliders to the least-squares line of **the points measured so far** (never the whole harvest) and locks it. Needs ≥ 2 points; the manual sliders stay usable before tapping it. A maxed player taps the truck once and the fitter once | regressione lineare: a computer finds the retta migliore from the data |
 
 **Outliers.** At low scanner levels, the scanner glitches and produces dots far from the others (a stone in the crate, a double reading). They look like normal dots. If the player follows them with the line, they earn less. Upgrading the scanner removes them gradually. There is **no outlier-detection tool** in the first version (see Extensions).
 
@@ -91,7 +92,7 @@ TODO(Dominik): check the list and add any Matese crops or animals the students w
 
 **Extensions (later, after the base minigame works)**
 Both unlock once the scanner, belt and truck are all at level 10:
-1. **Demo: regressione.** A short guided demo with plenty of clean data: the computer finds the best line by itself, so students see that "a machine learns the trend from data".
+1. **Demo: regressione.** Partly replaced by the *Adattatore automatico* upgrade (see Upgrades): the computer already finds the best line of the measured points by itself, so students see that "a machine learns the trend from data". A guided demo could still show it step by step. TODO(Dominik): keep the demo or drop it?
 2. **Demo: valori anomali.** The scanner can be switched back to "broken" mode. Glitch dots appear, and the player taps them to remove them and sees the best line jump back into place.
 
 TODO(Dominik): details once the base minigame is play-tested.
