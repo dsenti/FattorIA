@@ -4,127 +4,202 @@ import { itemKey } from './questions.js';
 
 export const P = {
   soil: '#5B3A29', olive: '#6B7F2A', wheat: '#E9D8A6', cream: '#FBF7EF', tomato: '#D9502B', sky: '#4A8FA3',
-  ink: '#3A2519', leaf: '#6B7F2A', worm: '#E58E78', gold: '#F4C95D',
+  ink: '#3A2519', leaf: '#6B7F2A', worm: '#D9776A', gold: '#F4C95D', mud: '#6E4A30',
 };
 
 // Fill colours per item type and colour token (shades of the palette).
 const FILL = {
-  mela: { rosso: '#D9502B', verde: '#9DB23E', giallo: '#E9BE4C', marrone: '#9C6B43' },
-  pera: { rosso: '#C9573A', verde: '#A9B94A', giallo: '#E4C455', marrone: '#A97B4B' },
-  patata: { rosso: '#B5503E', verde: '#98A45A', giallo: '#DDBE72', marrone: '#B08556' },
-  pomodoro: { rosso: '#DB4A2A', verde: '#86A33A', giallo: '#EAB83E', marrone: '#8F5A3A' },
-  lumaca: { rosso: '#C9573A', verde: '#8FA53A', giallo: '#E2B84E', marrone: '#9C6B43' },
-  coccinella: { rosso: '#D9402B', verde: '#8FA53A', giallo: '#E9B949', marrone: '#8F5A3A' },
+  mela: { rosso: '#D9502B', verde: '#9DB23E', giallo: '#E9BE4C', arancione: '#E8893A', marrone: '#9C6B43' },
+  pera: { rosso: '#C9573A', verde: '#A9B94A', giallo: '#E4C455', arancione: '#E0913F', marrone: '#A97B4B' },
+  patata: { rosso: '#B5503E', verde: '#98A45A', giallo: '#DDBE72', arancione: '#D29555', marrone: '#B08556' },
+  pomodoro: { rosso: '#DB4A2A', verde: '#86A33A', giallo: '#EAB83E', arancione: '#E8812F', marrone: '#8F5A3A' },
+  carota: { rosso: '#C9452E', verde: '#9DB23E', giallo: '#E9BB45', arancione: '#EC8A2E', marrone: '#9C6B43' },
+  animal: { rosso: '#D9402B', verde: '#8FA53A', giallo: '#EBBE3C', arancione: '#EC8A2E', marrone: '#9C6B43' },
 };
-export const DROP = { rosso: '#D9502B', verde: '#8FA53A', giallo: '#E9B949', marrone: '#8C5E3C' };
+export const PAINT = { rosso: '#D9502B', verde: '#8FA53A', giallo: '#E9B949', arancione: '#EC8A2E', marrone: '#8C5E3C' };
 
+// Body outlines: normal and misshapen ("strano") for each kind of produce.
 const SHAPE = {
   mela: 'M20 11C24 7 33 8 34 18C35 28 28 36 20 34C12 36 5 28 6 18C7 8 16 7 20 11Z',
   pera: 'M20 7C24 7 25 12 25 15C26 19 32 22 32 28C32 34 26 37 20 37C14 37 8 34 8 28C8 22 14 19 15 15C15 12 16 7 20 7Z',
   patata: 'M6 21C5 13 13 9 22 10C31 11 36 16 35 23C34 30 26 33 17 32C10 31 6 27 6 21Z',
   pomodoro: 'M20 12C29 11 35 16 35 23C35 31 28 35 20 35C12 35 5 31 5 23C5 16 11 11 20 12Z',
+  carota: 'M12 10C16 8 24 8 28 10C29 18 24 29 20 38C16 29 11 18 12 10Z',
 };
-const S = `stroke="${P.soil}" stroke-width="1.5" stroke-linejoin="round"`;
+const ODD = {
+  mela: 'M20 11C24 7 33 8 35 15C39 18 37 29 29 33C24 36 20 35 15 35C6 34 3 25 7 18C4 12 13 6 20 11Z',
+  pera: 'M25 6C29 7 28 12 27 15C28 20 34 23 32 29C31 35 24 37 18 36C11 35 6 31 9 25C10 20 17 19 19 15C20 11 21 5 25 6Z',
+  patata: 'M6 21C4 15 9 12 12 13C12 8 18 7 21 10C25 7 32 10 31 15C36 15 38 23 33 26C35 31 27 35 22 31C18 35 10 34 10 29C5 29 4 24 6 21Z',
+  pomodoro: 'M20 12C29 11 35 16 35 22C38 24 37 30 32 30C31 34 26 36 20 35C12 35 5 31 5 23C3 19 6 13 11 14C13 12 16 12 20 12Z',
+  carota: 'M11 10C15 8 25 8 29 10C30 16 28 21 25 24C25 30 24 34 23 38C21 34 21 29 20 26C19 29 19 34 17 38C16 34 15 30 15 24C12 21 10 16 11 10Z',
+};
+// Height where the caked soil starts on each kind of produce ("sporco").
+const MUD_LINE = { mela: 25, pera: 27, patata: 21, pomodoro: 26, carota: 23 };
+const WORM_HOLE = { mela: [27, 21], pera: [26, 27], patata: [27, 19], pomodoro: [27, 22], carota: [22, 19] };
 
-function body(it, fill) {
+const S = `stroke="${P.soil}" stroke-width="1.5" stroke-linejoin="round"`;
+const outline = (it) => (it.odd ? ODD : SHAPE)[it.t];
+
+function produceBody(it, fill) {
+  const d = outline(it);
   switch (it.t) {
-    case 'mela': return `<path d="${SHAPE.mela}" fill="${fill}" ${S}/><path d="M20 11Q20 6 22 3" fill="none" stroke="${P.soil}" stroke-width="2" stroke-linecap="round"/>` +
+    case 'mela': return `<path d="${d}" fill="${fill}" ${S}/><path d="M20 11Q20 6 22 3" fill="none" stroke="${P.soil}" stroke-width="2" stroke-linecap="round"/>` +
       `<path d="M21 7Q27 2 31 5Q26 9 21 7Z" fill="${P.leaf}"/><ellipse cx="13" cy="19" rx="2.6" ry="5" fill="#fff" opacity=".3"/>`;
-    case 'pera': return `<path d="${SHAPE.pera}" fill="${fill}" ${S}/><path d="M20 7Q20 4 22 2" fill="none" stroke="${P.soil}" stroke-width="2" stroke-linecap="round"/>` +
-      `<ellipse cx="14" cy="27" rx="2.4" ry="4.5" fill="#fff" opacity=".3"/>`;
-    case 'patata': return `<path d="${SHAPE.patata}" fill="${fill}" ${S}/>` +
-      `<g fill="none" stroke="${P.soil}" stroke-width="1.3" stroke-linecap="round" opacity=".55"><path d="M13 17q2 1 3 0M25 15q2 1 3 0M21 26q2 1 3 0M11 25q1 1 2 0"/></g>`;
-    case 'pomodoro': return `<path d="${SHAPE.pomodoro}" fill="${fill}" ${S}/>` +
+    case 'pera': return `<path d="${d}" fill="${fill}" ${S}/><path d="${it.odd ? 'M25 6Q26 3 28 1' : 'M20 7Q20 4 22 2'}" fill="none" stroke="${P.soil}" stroke-width="2" stroke-linecap="round"/>` +
+      `<ellipse cx="14" cy="28" rx="2.4" ry="4.5" fill="#fff" opacity=".3"/>`;
+    case 'patata': return `<path d="${d}" fill="${fill}" ${S}/>` +
+      `<g fill="none" stroke="${P.soil}" stroke-width="1.3" stroke-linecap="round" opacity=".55"><path d="M13 18q2 1 3 0M25 15q2 1 3 0M21 26q2 1 3 0M11 25q1 1 2 0"/></g>`;
+    case 'pomodoro': return `<path d="${d}" fill="${fill}" ${S}/>` +
       '<path d="M20 14L15 10L19 11L20 6L22 11L27 9L23 14L28 16L21 15L17 18L18 14Z" fill="#5E7D2A" stroke="#4B6420" stroke-width=".8" stroke-linejoin="round"/>' +
       '<ellipse cx="12" cy="22" rx="2.4" ry="4" fill="#fff" opacity=".3"/>';
-    case 'lumaca': return `<path d="M3 34C3 30 9 29 15 29L33 29C37 29 38 33 35 34Z" fill="#D8C9A3" ${S}/>` +
-      `<path d="M33 29L35 20M30 29L29 21" stroke="${P.soil}" stroke-width="1.5" stroke-linecap="round"/><circle cx="35" cy="20" r="1.8" fill="${P.soil}"/><circle cx="29" cy="21" r="1.8" fill="${P.soil}"/>` +
-      `<circle cx="19" cy="20" r="11" fill="${fill}" ${S}/><path d="M19 20m0-6a6 6 0 1 1-6 6a4 4 0 1 1 4 4a2 2 0 1 1-2-2" fill="none" stroke="${P.soil}" stroke-width="1.4"/>`;
-    case 'coccinella': return `<g stroke="${P.ink}" stroke-width="1.6" stroke-linecap="round"><path d="M14 30l-3 4M21 32v4M28 30l3 4M14 16l-3-4M28 16l3-4M8 20l-4-5M8 20l-5 0"/></g>` +
-      `<circle cx="9" cy="22" r="5" fill="${P.ink}"/><circle cx="22" cy="23" r="12" fill="${fill}" ${S}/><path d="M11 23H34" stroke="${P.ink}" stroke-width="1.4"/>` +
-      `<g fill="${P.ink}"><circle cx="17" cy="17" r="2.4"/><circle cx="27" cy="17" r="2.4"/><circle cx="17" cy="29" r="2.2"/><circle cx="27" cy="29" r="2.2"/><circle cx="22" cy="12.8" r="1.6"/></g>`;
+    case 'carota': return `<path d="M16 10L11 1M20 9L20 0M24 10L29 2" stroke="#5E7D2A" stroke-width="3" stroke-linecap="round"/>` +
+      `<path d="${d}" fill="${fill}" ${S}/><g fill="none" stroke="${P.soil}" stroke-width="1.1" stroke-linecap="round" opacity=".45"><path d="M14 15h4M22 19h4M16 24h3M21 29h2"/></g>`;
     default: return '';
   }
 }
 
-// One item kind drawn in a 40 x 40 box. Small items are scaled down around the centre.
+function animalBody(it) {
+  const f = FILL.animal[it.c];
+  switch (it.t) {
+    case 'lumaca': return `<path d="M3 34C3 30 9 29 15 29L33 29C37 29 38 33 35 34Z" fill="#D8C9A3" ${S}/>` +
+      `<path d="M33 29L35 20M30 29L29 21" stroke="${P.soil}" stroke-width="1.5" stroke-linecap="round"/><circle cx="35" cy="20" r="1.8" fill="${P.soil}"/><circle cx="29" cy="21" r="1.8" fill="${P.soil}"/>` +
+      `<circle cx="19" cy="20" r="11" fill="${f}" ${S}/><path d="M19 20m0-6a6 6 0 1 1-6 6a4 4 0 1 1 4 4a2 2 0 1 1-2-2" fill="none" stroke="${P.soil}" stroke-width="1.4"/>`;
+    case 'coccinella': return `<g stroke="${P.ink}" stroke-width="1.6" stroke-linecap="round"><path d="M14 30l-3 4M21 32v4M28 30l3 4M14 16l-3-4M28 16l3-4M8 20l-4-5M8 20l-5 0"/></g>` +
+      `<circle cx="9" cy="22" r="5" fill="${P.ink}"/><circle cx="22" cy="23" r="12" fill="${f}" ${S}/><path d="M11 23H34" stroke="${P.ink}" stroke-width="1.4"/>` +
+      `<g fill="${P.ink}"><circle cx="17" cy="17" r="2.4"/><circle cx="27" cy="17" r="2.4"/><circle cx="17" cy="29" r="2.2"/><circle cx="27" cy="29" r="2.2"/><circle cx="22" cy="12.8" r="1.6"/></g>`;
+    case 'ape': return `<g fill="#fff" fill-opacity=".85" stroke="${P.sky}" stroke-width="1.3"><ellipse cx="17" cy="11" rx="6" ry="8" transform="rotate(-25 17 11)"/><ellipse cx="25" cy="11" rx="5" ry="7" transform="rotate(20 25 11)"/></g>` +
+      `<ellipse cx="21" cy="24" rx="12" ry="8.5" fill="${f}" ${S}/><g fill="${P.ink}"><path d="M15 16.5C13 20 13 28 15 31.5L18.5 32C16.5 28 16.5 20 18.5 16Z"/><path d="M23 15.6C21 20 21 28 23 32.4L26.3 31.8C24.3 28 24.3 20 26.3 16.2Z"/></g>` +
+      `<circle cx="7" cy="23" r="4.8" fill="${P.ink}"/><circle cx="5.6" cy="21.6" r="1.1" fill="#fff"/><path d="M5 19L2 14M8 18.5L8 13" stroke="${P.ink}" stroke-width="1.3" stroke-linecap="round"/><path d="M33 24L37 24" stroke="${P.ink}" stroke-width="2" stroke-linecap="round"/>`;
+    case 'farfalla': return `<g ${S}><path d="M20 19C14 6 3 5 4 13C5 19 12 21 20 20Z" fill="${f}"/><path d="M20 19C26 6 37 5 36 13C35 19 28 21 20 20Z" fill="${f}"/>` +
+      `<path d="M20 21C13 22 8 27 10 32C12 36 18 31 20 24Z" fill="${f}"/><path d="M20 21C27 22 32 27 30 32C28 36 22 31 20 24Z" fill="${f}"/></g>` +
+      `<g fill="#fff" opacity=".6"><circle cx="11" cy="12" r="2.4"/><circle cx="29" cy="12" r="2.4"/></g><rect x="18.6" y="12" width="2.8" height="17" rx="1.4" fill="${P.ink}"/>` +
+      `<path d="M19.5 12.5L16 5M20.5 12.5L24 5" stroke="${P.ink}" stroke-width="1.2" stroke-linecap="round"/>`;
+    case 'verme': return `<path d="M5 30C9 20 15 34 20 25C24 17 29 29 34 20" fill="none" stroke="${P.soil}" stroke-width="7.4" stroke-linecap="round" opacity=".35"/>` +
+      `<path d="M5 30C9 20 15 34 20 25C24 17 29 29 34 20" fill="none" stroke="${P.worm}" stroke-width="6" stroke-linecap="round"/>` +
+      `<g stroke="#B85A4E" stroke-width="1.1"><path d="M8.5 24.5l2 2.5M13 28.6l1.6-2.6M22.3 21.6l2.3 1.8M26.8 24l1.5-2.6"/></g>` +
+      `<circle cx="34.2" cy="19.6" r="3.6" fill="${P.worm}"/><circle cx="35.3" cy="18.4" r="1" fill="${P.ink}"/>`;
+    default: return '';
+  }
+}
+
+const miniSnail = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})">${animalBody({ t: 'lumaca', c: 'marrone' })}</g>`;
+
+// One item kind drawn in a 40 x 40 box. Small produce is scaled down around the centre.
 export function itemArt(it) {
+  if (it.alive) return animalBody(it);
   const fill = (FILL[it.t] || FILL.mela)[it.c];
-  let s = body(it, fill);
-  const shape = SHAPE[it.t];
-  if (it.big && !it.heavy && shape) {
-    // big but light: dried out, wrinkled
-    s += `<g fill="none" stroke="${P.soil}" stroke-width="1.2" stroke-linecap="round" opacity=".55"><path d="M13 16q3 3 0 6M24 14q3 4 0 8M16 27q4 2 8 0M27 25q2 2 5 1"/></g>`;
+  let s = produceBody(it, fill);
+  const d = outline(it);
+  if (it.rot) {
+    // rot: dark soft spots with a pale ring of mould
+    s += `<path d="${d}" fill="${P.soil}" opacity=".18"/><g fill="#3F2A1C" stroke="#D7D3B0" stroke-width="1.1" opacity=".92">` +
+      '<circle cx="24" cy="23" r="4"/><circle cx="15" cy="27" r="2.7"/><circle cx="18" cy="18" r="2"/><circle cx="26" cy="30" r="1.6"/></g>';
   }
-  if (it.rot && shape) {
-    s += `<path d="${shape}" fill="${P.soil}" opacity=".2"/><g fill="${P.soil}" opacity=".85"><circle cx="24" cy="23" r="4.2"/><circle cx="14" cy="27" r="2.8"/><circle cx="17" cy="18" r="2"/><circle cx="28" cy="30" r="1.6"/></g>`;
+  if (it.dirty) {
+    // soil: a caked, wavy layer of earth on the lower part (clipped to the outline), crumbs falling off
+    const y0 = MUD_LINE[it.t];
+    const cid = `mud-${it.t}-${+it.odd}`;
+    s += `<clipPath id="${cid}"><path d="${d}"/></clipPath><g clip-path="url(#${cid})">` +
+      `<path d="M0 ${y0}q3.3-3 6.6 0t6.6 0t6.6 0t6.6 0t6.6 0t6.6 0V40H0Z" fill="#6E4A2C" opacity=".9"/>` +
+      `<g fill="#B2926A">${[4, 11, 17, 24, 30, 35].map((x, k) => `<circle cx="${x}" cy="${y0 + 3 + (k % 3) * 2.6}" r="${k % 2 ? 0.8 : 1.1}"/>`).join('')}</g></g>` +
+      `<path d="M0 ${y0}q3.3-3 6.6 0t6.6 0t6.6 0t6.6 0t6.6 0t6.6 0" fill="none" stroke="${P.ink}" stroke-width=".8" opacity=".5" clip-path="url(#${cid})"/>` +
+      `<g fill="#6E4A2C"><circle cx="13" cy="38.5" r="1.2"/><circle cx="19" cy="39.3" r=".9"/><circle cx="26" cy="38.7" r="1.1"/></g>`;
   }
-  if (it.worm && shape) {
-    s += `<circle cx="27" cy="21" r="2.8" fill="${P.ink}"/><path d="M27 21C31 17 33 22 36 18" fill="none" stroke="${P.worm}" stroke-width="3.4" stroke-linecap="round"/>` +
-      `<circle cx="36.3" cy="17.6" r="2.3" fill="${P.worm}"/><circle cx="37" cy="17" r=".7" fill="${P.ink}"/>`;
+  if (it.worm) {
+    const [x, y] = WORM_HOLE[it.t];
+    s += `<circle cx="${x}" cy="${y}" r="2.8" fill="${P.ink}"/><path d="M${x} ${y}C${x + 4} ${y - 4} ${x + 6} ${y + 1} ${x + 9} ${y - 3}" fill="none" stroke="${P.worm}" stroke-width="3.4" stroke-linecap="round"/>` +
+      `<circle cx="${x + 9.3}" cy="${y - 3.4}" r="2.3" fill="${P.worm}"/><circle cx="${x + 10}" cy="${y - 4}" r=".7" fill="${P.ink}"/>`;
   }
-  return it.big ? s : `<g transform="translate(20 21) scale(.72) translate(-20 -21)">${s}</g>`;
+  const body = it.big ? s : `<g transform="translate(20 21) scale(.72) translate(-20 -21)">${s}</g>`;
+  // the snail sits on the produce, the same size whatever the produce's size
+  return it.snail ? body + miniSnail(it.big ? 17 : 15, it.big ? 18 : 17, 0.55) : body;
 }
 
 // ------------------------------------------------------------------ question icons
-const drop = (c) => `<path d="M20 5C26 14 31 20 31 26A11 11 0 0 1 9 26C9 20 14 14 20 5Z" fill="${DROP[c]}" ${S}/><ellipse cx="15.5" cy="26" rx="2" ry="3.5" fill="#fff" opacity=".35"/>`;
+// Colour: a paint splat with droplets.
+const splat = (c) => `<path d="M20 7C23 7 23 11 26 10C29 9 31 12 29 15C33 15 35 19 32 22C35 25 32 29 28 28C28 32 24 34 21 31C18 34 13 32 13 28C9 29 6 25 9 22C5 20 7 15 11 15C9 12 12 8 15 10C16 8 18 7 20 7Z" fill="${PAINT[c]}" ${S}/>` +
+  `<circle cx="34" cy="8" r="2.4" fill="${PAINT[c]}" ${S}/><circle cx="6" cy="33" r="2" fill="${PAINT[c]}" ${S}/><circle cx="31" cy="35" r="1.4" fill="${PAINT[c]}"/>` +
+  '<ellipse cx="16.5" cy="17" rx="2.5" ry="1.6" fill="#fff" opacity=".45" transform="rotate(-30 16.5 17)"/>';
 const silhouette = (t) => {
   if (t === 'mela') return `<path d="${SHAPE.mela}" fill="${P.soil}"/><path d="M20 11Q20 6 22 3" fill="none" stroke="${P.soil}" stroke-width="2.2" stroke-linecap="round"/><path d="M21 7Q27 2 31 5Q26 9 21 7Z" fill="${P.soil}"/>`;
   if (t === 'pera') return `<path d="${SHAPE.pera}" fill="${P.soil}"/><path d="M20 7Q20 4 22 2" fill="none" stroke="${P.soil}" stroke-width="2.2" stroke-linecap="round"/>`;
   if (t === 'patata') return `<path d="${SHAPE.patata}" fill="${P.soil}"/><g fill="none" stroke="${P.cream}" stroke-width="1.3" stroke-linecap="round" opacity=".6"><path d="M13 17q2 1 3 0M25 15q2 1 3 0M21 26q2 1 3 0"/></g>`;
   if (t === 'pomodoro') return `<path d="${SHAPE.pomodoro}" fill="${P.soil}"/><path d="M20 14L15 10L19 11L20 6L22 11L27 9L23 14L28 16L21 15L17 18L18 14Z" fill="${P.cream}" opacity=".75"/>`;
+  if (t === 'carota') return `<path d="M16 10L11 1M20 9L20 0M24 10L29 2" stroke="${P.soil}" stroke-width="3" stroke-linecap="round"/><path d="${SHAPE.carota}" fill="${P.soil}"/><g fill="none" stroke="${P.cream}" stroke-width="1.1" stroke-linecap="round" opacity=".6"><path d="M14 15h4M22 19h4M16 24h3"/></g>`;
   return '';
 };
 const QICON = {
-  grande: `<circle cx="9" cy="25" r="4" fill="${P.wheat}" ${S}/><circle cx="27" cy="21" r="10.5" fill="${P.wheat}" ${S}/>` +
-    `<path d="M13.5 25H19M16.5 22.5L19 25L16.5 27.5" fill="none" stroke="${P.tomato}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`,
+  sporco: `<clipPath id="q-mud"><circle cx="20" cy="18" r="13"/></clipPath><circle cx="20" cy="18" r="13" fill="${P.wheat}" ${S}/>` +
+    '<g clip-path="url(#q-mud)"><path d="M0 19q3.3-3.5 6.6 0t6.6 0t6.6 0t6.6 0t6.6 0t6.6 0V40H0Z" fill="#6E4A2C"/>' +
+    '<g fill="#B2926A"><circle cx="12" cy="24" r="1.2"/><circle cx="20" cy="27" r="1"/><circle cx="27" cy="23" r="1.2"/><circle cx="16" cy="29" r=".9"/></g></g>' +
+    `<circle cx="20" cy="18" r="13" fill="none" ${S}/><g fill="#6E4A2C"><circle cx="12" cy="36" r="1.8"/><circle cx="20" cy="38" r="1.4"/><circle cx="28" cy="35.5" r="1.7"/></g>`,
+  lumaca: `<path d="M3 34C3 30 9 29 15 29L33 29C37 29 38 33 35 34Z" fill="${P.soil}"/><path d="M33 29L35 20M30 29L29 21" stroke="${P.soil}" stroke-width="1.8" stroke-linecap="round"/>` +
+    `<circle cx="35" cy="20" r="2" fill="${P.soil}"/><circle cx="29" cy="21" r="2" fill="${P.soil}"/><circle cx="19" cy="20" r="11" fill="${P.soil}"/>` +
+    `<path d="M19 20m0-6a6 6 0 1 1-6 6a4 4 0 1 1 4 4a2 2 0 1 1-2-2" fill="none" stroke="${P.cream}" stroke-width="1.6" opacity=".75"/>`,
+  strano: `<path d="${ODD.patata}" fill="${P.wheat}" ${S}/><path d="M13 20q2-3 4 0t4 0" fill="none" stroke="${P.soil}" stroke-width="1.6" stroke-linecap="round"/>` +
+    `<path d="M24 18q1.5-2 3 0M26 25q1.5-2 3 0" fill="none" stroke="${P.soil}" stroke-width="1.4" stroke-linecap="round"/><path d="M3 8l4 3M37 8l-4 3M20 2v4" stroke="${P.tomato}" stroke-width="2" stroke-linecap="round"/>`,
   pesante: `<path d="M20 9V33M12 35H28" stroke="${P.soil}" stroke-width="2.2" stroke-linecap="round"/><path d="M6 20L34 11" stroke="${P.soil}" stroke-width="2.4" stroke-linecap="round"/>` +
     `<path d="M6 20L3 28H11ZM34 11L31 19H37Z" fill="${P.wheat}" ${S}/><rect x="3.5" y="21" width="7" height="6.5" rx="1" fill="${P.soil}"/><circle cx="20" cy="15.5" r="2" fill="${P.soil}"/>`,
   marcio: `<circle cx="20" cy="24" r="12" fill="${P.wheat}" ${S}/><g fill="${P.soil}"><circle cx="24" cy="24" r="4"/><circle cx="14" cy="28" r="2.6"/><circle cx="16" cy="19" r="2"/></g>` +
     `<g fill="none" stroke="${P.olive}" stroke-width="1.6" stroke-linecap="round"><path d="M13 3q2 2 0 4q-2 2 0 4M20 2q2 2 0 4q-2 2 0 4M27 3q2 2 0 4q-2 2 0 4"/></g>`,
   verme: `<path d="M5 27C9 17 15 32 20 23C24 15 29 27 33 18" fill="none" stroke="${P.worm}" stroke-width="5" stroke-linecap="round"/>` +
-    `<circle cx="33.5" cy="17" r="3.6" fill="${P.worm}"/><circle cx="34.6" cy="16" r="1" fill="${P.ink}"/><path d="M9 21l1 3M14 25l1-3M24 18l1 3" stroke="#C06C5A" stroke-width="1.2"/>`,
+    `<circle cx="33.5" cy="17" r="3.6" fill="${P.worm}"/><circle cx="34.6" cy="16" r="1" fill="${P.ink}"/><path d="M9 21l1 3M14 25l1-3M24 18l1 3" stroke="#B85A4E" stroke-width="1.2"/>`,
   vivo: `<path d="M20 34C8 25 4 19 4 13.5C4 8.5 8 5.5 12 5.5C15.5 5.5 18.5 8 20 11C21.5 8 24.5 5.5 28 5.5C32 5.5 36 8.5 36 13.5C36 19 32 25 20 34Z" fill="${P.tomato}" ${S}/>` +
     '<path d="M7 18H14L16.5 13L20 23L23 16L25 18H33" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
 };
 
 export function questionArt(qid) {
-  if (DROP[qid]) return drop(qid);
+  if (PAINT[qid]) return splat(qid);
   if (SHAPE[qid]) return silhouette(qid);
   return QICON[qid] || '';
 }
 
 // ------------------------------------------------------------------ truck symbols (etichette)
-const apple = (c, tr = '') => `<g transform="${tr}">${itemArt({ t: 'mela', c, big: true, heavy: true })}</g>`;
+const produce = (t, c, extra = {}) => itemArt({ t, c, big: true, heavy: true, ...extra });
+const at = (x, y, s, inner) => `<g transform="translate(${x} ${y}) scale(${s})">${inner}</g>`;
+// A balance with one pan down (heavy) or up (light), a fruit on that pan.
+const scale = (heavy) => {
+  const beam = heavy ? 'M5 18L35 10' : 'M5 10L35 18';
+  const lp = heavy ? 18 : 10, rp = heavy ? 10 : 18;
+  return `<path d="M20 12V36M13 37H27" stroke="${P.soil}" stroke-width="2.2" stroke-linecap="round"/><path d="${beam}" stroke="${P.soil}" stroke-width="2.4" stroke-linecap="round"/>` +
+    `<path d="M5 ${lp}L1 ${lp + 8}H11ZM35 ${rp}L31 ${rp + 8}H39Z" fill="${P.wheat}" ${S}/><circle cx="20" cy="14" r="2" fill="${P.soil}"/>` +
+    (heavy ? at(-4, lp - 13, 0.55, produce('mela', 'rosso')) : at(1, lp - 6, 0.3, produce('mela', 'rosso')));
+};
 const SYM = {
-  rosse: () => apple('rosso'),
-  verdi: () => apple('verde'),
-  mele: () => apple('rosso', 'translate(-5 -3) scale(.8)') + apple('verde', 'translate(12 8) scale(.72)'),
-  patate: () => itemArt({ t: 'patata', c: 'marrone', big: true, heavy: true }),
-  pomodori: () => itemArt({ t: 'pomodoro', c: 'rosso', big: true, heavy: true }),
+  rosse: () => produce('mela', 'rosso'),
+  verdi: () => produce('mela', 'verde'),
+  mele: () => at(-5, -3, 0.8, produce('mela', 'rosso')) + at(12, 8, 0.72, produce('mela', 'verde')),
+  patate: () => produce('patata', 'marrone'),
+  carote: () => produce('carota', 'arancione'),
+  pomodori: () => produce('pomodoro', 'rosso'),
+  pere: () => produce('pera', 'giallo'),
   compost: () => `<path d="M9 13H31L28 36H12Z" fill="${P.olive}" ${S}/><rect x="7" y="8" width="26" height="5" rx="2" fill="#56681F" ${S}/><path d="M17 8V6H23V8" fill="none" stroke="${P.soil}" stroke-width="1.5"/>` +
     `<path d="M20 31C14 29 14 21 20 17C26 21 26 29 20 31Z" fill="${P.wheat}"/><path d="M20 31V21" stroke="${P.olive}" stroke-width="1.4"/>`,
-  prato: () => `<path d="M2 36C6 26 14 25 20 27C27 25 34 27 38 36Z" fill="#8FA53A" ${S}/>` +
-    `<g fill="none" stroke="${P.olive}" stroke-width="1.8" stroke-linecap="round"><path d="M8 31l-2-6M10 31l1-7M29 31l-1-6M31 31l3-6M20 27l-1-5"/></g>` +
-    `<g transform="translate(24 15)"><g fill="#fff" stroke="${P.soil}" stroke-width=".8"><circle cx="0" cy="-4" r="3"/><circle cx="4" cy="0" r="3"/><circle cx="0" cy="4" r="3"/><circle cx="-4" cy="0" r="3"/></g><circle r="2.4" fill="${P.gold}"/></g>` +
-    `<path d="M24 19V28" stroke="${P.olive}" stroke-width="1.6"/>`,
+  // the vegetable garden: a raised bed with sprouts and a flower
+  orto: () => `<path d="M2 30C2 26 6 25 20 25C34 25 38 26 38 30V36H2Z" fill="#8C5E3C" ${S}/><path d="M6 30H34M8 33H32" stroke="#6E4A30" stroke-width="1.2"/>` +
+    `<g fill="none" stroke="#6B8F2A" stroke-width="2" stroke-linecap="round"><path d="M8 25V20M8 21Q5 18 4 19M8 21Q11 18 12 19M16 25V21M16 22Q14 19 12.5 20M16 22Q18 19 19.5 20"/></g>` +
+    `<path d="M28 25V13" stroke="#6B8F2A" stroke-width="2"/><path d="M28 19Q33 16 34 18Q31 21 28 19Z" fill="#8FA53A"/>` +
+    `<g transform="translate(28 10)"><g fill="#fff" stroke="${P.soil}" stroke-width=".8"><circle cx="0" cy="-4.2" r="3.2"/><circle cx="4.2" cy="0" r="3.2"/><circle cx="0" cy="4.2" r="3.2"/><circle cx="-4.2" cy="0" r="3.2"/></g><circle r="2.6" fill="${P.gold}"/></g>`,
   galline: () => `<path d="M8 22C8 13 16 10 23 12C27 8 33 10 32 15C35 17 34 22 31 23C31 31 24 35 17 34C11 33 8 28 8 22Z" fill="#FBF3E4" ${S}/>` +
     `<path d="M26 10C26 6 29 5 30 8C31 5 34 6 33 10Z" fill="${P.tomato}"/><path d="M33 15L38 17L33 19Z" fill="${P.gold}" ${S}/><circle cx="29" cy="14.5" r="1.5" fill="${P.ink}"/>` +
     `<path d="M31 19C33 21 33 24 31 24" fill="${P.tomato}"/><path d="M11 21C14 27 20 28 24 24" fill="none" stroke="${P.soil}" stroke-width="1.3" opacity=".6"/>` +
     `<path d="M16 34V38M21 34V38" stroke="${P.gold}" stroke-width="2" stroke-linecap="round"/>`,
-  succo: () => `<path d="M16 3H24V9C24 11 29 13 29 18V35C29 37 27 38 25 38H15C13 38 11 37 11 35V18C11 13 16 11 16 9Z" fill="#fff" fill-opacity=".6" ${S}/>` +
-    `<path d="M12 20H28V35C28 36.5 26.5 37 25 37H15C13.5 37 12 36.5 12 35Z" fill="${P.gold}"/><rect x="15" y="1.5" width="10" height="4" rx="1" fill="${P.olive}"/>` +
-    `<g transform="translate(20 28) scale(.36) translate(-20 -21)">${itemArt({ t: 'mela', c: 'rosso', big: true, heavy: true })}</g>`,
-  passata: () => `<path d="M16 3H24V9C24 11 29 13 29 18V35C29 37 27 38 25 38H15C13 38 11 37 11 35V18C11 13 16 11 16 9Z" fill="#fff" fill-opacity=".6" ${S}/>` +
-    `<path d="M12 17H28V35C28 36.5 26.5 37 25 37H15C13.5 37 12 36.5 12 35Z" fill="#C63D24"/><rect x="15" y="1.5" width="10" height="4" rx="1" fill="${P.olive}"/>` +
-    '<path d="M20 22C24 22 26 24 26 27C26 30 23 32 20 32C17 32 14 30 14 27C14 24 16 22 20 22Z" fill="#E86A48"/><path d="M20 22L18 20M20 22L22 20" stroke="#5E7D2A" stroke-width="1.5"/>',
-  mercato: () => `<rect x="4" y="18" width="32" height="18" rx="2" fill="#D9B77A" ${S}/><path d="M4 24H36M4 30H36" stroke="${P.soil}" stroke-width="1.2" opacity=".6"/>` +
-    `<path d="M15 12L11 24L16 21L17 26L20 14ZM25 12L29 24L24 21L23 26L20 14Z" fill="${P.sky}"/>` +
-    `<circle cx="20" cy="12" r="8.5" fill="${P.tomato}" ${S}/><path d="M20 6.5L21.6 10L25.3 10.3L22.5 12.7L23.4 16.3L20 14.4L16.6 16.3L17.5 12.7L14.7 10.3L18.4 10Z" fill="${P.gold}"/>`,
-  grandi: () => `<g transform="translate(20 22) scale(1.02) translate(-20 -21)">${itemArt({ t: 'mela', c: 'rosso', big: true, heavy: true })}</g>` +
-    `<g fill="none" stroke="${P.soil}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8L6 12M2 8H6M2 8V12M38 8L34 12M38 8H34M38 8V12M2 37L6 33M2 37H6M2 37V33M38 37L34 33M38 37H34M38 37V33"/></g>`,
-  piccole: () => `<g transform="translate(20 21) scale(.5) translate(-20 -21)">${itemArt({ t: 'mela', c: 'rosso', big: true, heavy: true })}</g>` +
-    `<g fill="none" stroke="${P.soil}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5L10 11M10 11H6M10 11V7M36 5L30 11M30 11H34M30 11V7M4 37L10 31M10 31H6M10 31V35M36 37L30 31M30 31H34M30 31V35"/></g>`,
+  // a market stall with a striped awning
+  mercato: () => `<path d="M7 15V36M33 15V36" stroke="${P.soil}" stroke-width="2.2"/>` +
+    `<path d="M3 6H37L38 15H2Z" fill="#fff" ${S}/><path d="M9.5 6L8.3 15H2.7L3 6ZM21.5 6V15H15.5L16 6ZM33.5 6L34.3 15H28.3L28 6Z" fill="${P.tomato}"/>` +
+    `<path d="M2 15Q5 19 8 15Q11 19 14 15Q17 19 20 15Q23 19 26 15Q29 19 32 15Q35 19 38 15" fill="${P.tomato}" ${S}/>` +
+    `<rect x="4" y="26" width="32" height="7" rx="1.5" fill="#C99A5B" ${S}/>` +
+    `<g ${S}><circle cx="11" cy="24" r="3.4" fill="#D9502B"/><circle cx="17.5" cy="24" r="3.4" fill="#9DB23E"/><circle cx="24" cy="24" r="3.4" fill="#EC8A2E"/><circle cx="30" cy="24" r="3.4" fill="#E9BE4C"/></g>`,
+  // washing: a tap pouring water onto a potato, with bubbles
+  lavaggio: () => `<path d="M6 7H22Q27 7 27 12V14H23V12Q23 11 22 11H6Z" fill="#9FB3B8" ${S}/><rect x="10" y="3" width="6" height="4" rx="1" fill="#9FB3B8" ${S}/>` +
+    `<g fill="${P.sky}"><path d="M25 16Q27 19 25 21Q23 19 25 16Z"/><path d="M22 20Q24 23 22 25Q20 23 22 20Z"/><path d="M28 21Q30 24 28 26Q26 24 28 21Z"/></g>` +
+    at(6, 16, 0.62, produce('patata', 'giallo')) +
+    `<g fill="#fff" stroke="${P.sky}" stroke-width="1.1"><circle cx="9" cy="30" r="2.6"/><circle cx="34" cy="31" r="3"/><circle cx="32" cy="24.5" r="1.6"/><circle cx="6" cy="24" r="1.6"/></g>`,
+  // ugly but good: a twin carrot with a heart
+  brutti: () => at(-2, 3, 0.9, produce('carota', 'arancione', { odd: true })) +
+    `<path d="M31 22C25 18 23 15 23 12.5C23 10 25 8.5 27 8.5C28.8 8.5 30.2 9.7 31 11.2C31.8 9.7 33.2 8.5 35 8.5C37 8.5 39 10 39 12.5C39 15 37 18 31 22Z" fill="${P.tomato}" ${S}/>`,
+  grandi: () => scale(true),
+  piccole: () => scale(false),
 };
 export const truckSymbolArt = (sym) => (SYM[sym] ? SYM[sym]() : '');
 
