@@ -342,6 +342,8 @@ canvas.preview { flex: 1; min-width: 0; height: 84px; background: #F4ECD8; borde
 .s-actions { display: flex; gap: 8px; margin-top: 6px; }
 .s-actions .btn.big { flex: 1; min-width: 0; padding: 0 8px; font-size: 16.5px; }
 #s-deliver.ready { animation: glow 1.8s ease-in-out infinite; }
+.s-tg.drive-in { animation: drivein 0.7s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes drivein { from { transform: translateX(-460px); } }
 
 .s-card {
   position: absolute; left: 8px; right: 8px; bottom: 132px; z-index: 5;
@@ -361,8 +363,8 @@ canvas.preview { flex: 1; min-width: 0; height: 84px; background: #F4ECD8; borde
 .s-wrong { color: var(--tomato); display: inline-flex; align-items: center; gap: 4px; }
 .s-card .s-msg { font-size: 12.5px; margin-top: 4px; }
 
-.s-palette { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 8px; margin: 4px 0 10px; }
-.s-q { height: 58px; padding: 0; display: flex; align-items: center; justify-content: center; background: #fff; border-color: var(--wheat); }
+.s-palette { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 7px; margin: 4px 0 10px; }
+.s-q { height: 54px; padding: 0; display: flex; align-items: center; justify-content: center; background: #fff; border-color: var(--wheat); }
 .s-q svg { display: block; }
 .s-q.on { border-color: var(--olive); border-width: 3px; background: #EEF2DC; }
 .s-locked svg { vertical-align: middle; }

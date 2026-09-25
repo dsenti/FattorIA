@@ -1,6 +1,6 @@
 // Minigame 2: Lo smistamento (the sorting station). A decision tree sorts a batch into trucks.
 // Owns the #screen-sort screen: the hopper with the batch, the tree (gates, branches, pipes),
-// the trucks, the question palette, the Prova / Consegna runs and the level list.
+// the trucks, the question palette, the Prova run, "Avanti" (test + pay + trucks drive off), the level list.
 // Everything is one inline SVG, rebuilt on each level/run; only moving items change per frame.
 import { CONFIG } from '../config.js';
 import { LEVELS, TRUCKS } from './levels.js';
@@ -28,9 +28,9 @@ export function helpHTML() {
     '<li>In alto c\'è il <b>lotto di addestramento</b> <em>(training)</em>. Sotto ogni pezzo c\'è la sua <b>etichetta</b> <em>(label)</em>: il camion giusto. Tocca un pezzo per vedere le sue caratteristiche <em>(features)</em>.</li>' +
     '<li>Tocca un cancello <b>?</b> e scegli una domanda.</li>' +
     '<li><b>Prova l\'albero</b> quante volte vuoi: vedi l\'<b>accuratezza</b> <em>(accuracy)</em>, cioè quanti pezzi finiscono nel camion giusto. Tocca un pezzo cerchiato di rosso per vedere la sua strada.</li>' +
-    '<li>Quando è tutto giusto, <b>Consegna</b>: arriva un lotto nuovo, mai visto, il <b>test</b>. Se l\'albero funziona anche lì, guadagni monete.</li>' +
+    '<li>Quando è tutto giusto, l\'albero smista anche un lotto nuovo, mai visto: il <b>test</b>. Se funziona anche lì, guadagni monete. Poi <b>Avanti</b>: i camion partono e arriva il prossimo livello.</li>' +
     '</ol>' +
-    '<p>Nel negozio ci sono i sensori: ognuno aggiunge una domanda nuova.</p>';
+    '<p>Api, farfalle e coccinelle aiutano l\'orto. Vermi e lumache piacciono alle galline. Nel negozio ci sono i sensori: ognuno aggiunge una domanda nuova.</p>';
 }
 
 export class SortingGame {
@@ -60,7 +60,7 @@ export class SortingGame {
     const stopFollow = () => { this.follow = false; };
     for (const ev of ['pointerdown', 'wheel', 'touchstart']) this.el.scroll.addEventListener(ev, stopFollow, { passive: true });
     this.el.card.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) this.closeCard(); });
-    window.addEventListener('resize', () => { if (this.active && this.phase !== 'run') this.render(); });
+    window.addEventListener('resize', () => { if (this.active && this.phase !== 'run' && this.phase !== 'leaving') this.render(); });
   }
 
   get sort() { return this.app.getState().sort; }
@@ -91,8 +91,10 @@ export class SortingGame {
     this.updateUI();
   }
 
-  load(li) {
+  load(li, driveIn = false) {
     cancelAnimationFrame(this.raf);
+    clearTimeout(this.leaveTimer);
+    this.settled = null;
     this.li = li;
     this.c = COMPILED[li];
     const lv = this.level;
@@ -115,6 +117,7 @@ export class SortingGame {
     this.render();
     this.updateUI();
     this.el.scroll.scrollTop = 0;
+    if (driveIn) this.el.svg.querySelectorAll('.s-tg').forEach((g) => g.classList.add('drive-in'));
   }
 
   boardKey() { return this.board.join('|'); }
@@ -127,12 +130,14 @@ export class SortingGame {
     if (hinted) h.add(g); else h.delete(g);
     s.hinted[this.level.id] = [...h];
     this.app.save();
-    if (this.mode === 'test' || this.phase !== 'edit') this.backToTraining();
+    this.settled = null;
+    if (this.phase !== 'edit') this.backToTraining();
     else { this.run = null; this.render(); }
     this.updateUI();
   }
 
   backToTraining() {
+    this.settled = null;
     this.mode = 'train';
     this.batch = this.training;
     this.run = null;
@@ -142,20 +147,20 @@ export class SortingGame {
   }
 
   // ------------------------------------------------------------ bottom bar
+  // Buttons: "Prova l'albero" (run the training batch through the tree, as often as you like) and
+  // "Avanti": enabled once a run sorts everything right. The test batch is checked at that moment
+  // (no replay of the animation), the coins are paid, and "Avanti" sends the trucks off.
   updateUI() {
     if (this.li < 0) return;
     const st = levelStatus(this.sort, this.li);
     const full = this.board.every((q) => q);
-    const running = this.phase === 'run';
-    const perfectNow = this.perfectKey === this.boardKey();
+    const busy = this.phase === 'run' || this.phase === 'leaving';
     const T = this.el.tryBtn, D = this.el.deliver, R = this.el.result;
-    this.el.caption.innerHTML = this.mode === 'test'
-      ? `<b>Lotto di test</b>: ${this.batch.length} pezzi nuovi, mai visti. Niente etichette: le conosce solo l'agricoltore.`
-      : `<b>Lotto di addestramento</b> <em>(training)</em>: ${this.batch.length} pezzi. Sotto ognuno, la sua etichetta <em>(label)</em>: il camion giusto.`;
+    this.el.caption.innerHTML = `<b>Lotto di addestramento</b> <em>(training)</em>: ${this.batch.length} pezzi. Sotto ognuno, la sua etichetta <em>(label)</em>: il camion giusto.`;
     T.textContent = 'Prova l\'albero';
-    D.textContent = 'Consegna';
-    T.disabled = running || !full || !st.playable;
-    D.disabled = running || !perfectNow || !st.playable;
+    D.textContent = this.li + 1 < LEVELS.length ? 'Avanti' : 'Fine';
+    T.disabled = busy || !full || !st.playable;
+    D.disabled = this.phase === 'leaving' || !this.settled || !st.playable;
     D.classList.toggle('ready', !D.disabled);
 
     if (!st.playable) {
@@ -167,24 +172,19 @@ export class SortingGame {
       if (b) b.addEventListener('click', () => this.app.openShop());
       return;
     }
-    if (running) { R.innerHTML = `<div class="s-msg">${this.mode === 'test' ? 'Test in corso…' : 'L\'albero smista…'}</div>`; return; }
-    if (this.phase === 'delivered' && this.run) {
-      const r = this.run;
-      const next = this.li + 1 < LEVELS.length ? levelStatus(this.sort, this.li + 1) : null;
-      R.innerHTML = accLine(r, 'Test') +
-        `<div class="s-msg">${r.right === r.total ? 'L\'albero funziona anche su pezzi mai visti.' : 'Qualcosa è andato storto sui pezzi nuovi.'} ` +
-        `<b class="s-pay">+${this.lastPay} ${coinSvg(16)}</b></div>`;
-      if (next && next.open) { D.textContent = 'Prossimo livello'; D.disabled = false; D.classList.add('ready'); }
-      else if (!next) { D.textContent = 'Tutti i livelli'; D.disabled = false; }
-      else D.disabled = true;
+    if (this.phase === 'leaving') { R.innerHTML = '<div class="s-msg">I camion partono…</div>'; return; }
+    if (this.settled) {
+      const t = this.settled;
+      R.innerHTML = accLine(this.run, 'Addestramento') +
+        `<div class="s-msg">Test su ${t.total} pezzi nuovi, mai visti: <b>${t.right}/${t.total}</b> giusti. ` +
+        `<b class="s-pay">+${t.coins} ${coinSvg(16)}</b></div>`;
       return;
     }
+    if (this.phase === 'run') { R.innerHTML = '<div class="s-msg">L\'albero smista…</div>'; return; }
     if (this.phase === 'result' && this.run) {
       const r = this.run;
       const wrong = r.total - r.right;
-      R.innerHTML = accLine(r, 'Addestramento') + `<div class="s-msg">${wrong === 0
-        ? 'Tutto giusto! Ora <b>Consegna</b>: arriva un lotto nuovo, il test.'
-        : `${wrong} ${wrong === 1 ? 'pezzo è finito' : 'pezzi sono finiti'} nel camion sbagliato: toccali (cerchio rosso) per vedere la strada.`}</div>`;
+      R.innerHTML = accLine(r, 'Addestramento') + `<div class="s-msg">${wrong} ${wrong === 1 ? 'pezzo è finito' : 'pezzi sono finiti'} nel camion sbagliato: toccali (cerchio rosso) per vedere la strada.</div>`;
       return;
     }
     const empty = this.board.filter((q) => !q).length;
@@ -194,19 +194,51 @@ export class SortingGame {
   }
 
   onTry() {
-    if (this.phase === 'run') return;
+    if (this.phase === 'run' || this.phase === 'leaving') return;
     this.closeCard();
-    this.startRun('train');
+    this.startRun();
   }
 
+  // A perfect run: check the test batch (new items of the same kinds) at once and pay.
+  // Called when the last item of a perfect run has left the hopper, or at the end of the run.
+  settle() {
+    if (this.settled || !this.run || this.run.right !== this.run.total) return;
+    const lv = this.level;
+    const test = runBatch(this.c, this.board, testBatch(lv));
+    const first = !this.sort.solved.includes(lv.id);
+    const coins = first ? Math.round(CONFIG.SORT.pay(this.li + 1) * test.accuracy) : (test.accuracy === 1 ? CONFIG.SORT.REPLAY_PAY : 0);
+    this.settled = { right: test.right, total: test.total, coins };
+    this.app.onDeliver({ levelIdx: this.li, coins, first: first && test.accuracy === 1 });
+    this.updateUI();
+  }
+
+  // "Avanti": the loaded trucks drive off, then the next level comes in. Works while the last
+  // items are still sliding: they are put into their trucks at once.
   onDeliverBtn() {
-    if (this.phase === 'delivered') {
-      if (this.li + 1 < LEVELS.length) this.load(this.li + 1); else this.openLevels();
-      return;
-    }
-    if (this.perfectKey !== this.boardKey()) return;
+    if (!this.settled || this.phase === 'leaving') return;
+    if (this.phase === 'run') this.finishRunNow(true);
     this.closeCard();
-    this.startRun('test');
+    this.phase = 'leaving';
+    this.updateUI();
+    const W = this.geo.W;
+    this.el.svg.querySelectorAll('.s-tg').forEach((g, k) => {
+      const to = `translateX(${W + 90}px)`;
+      if (g.animate) {
+        g.animate([{ transform: 'translateX(0px)' }, { transform: 'translateX(-10px)', offset: 0.15 }, { transform: to }],
+          { duration: CONFIG.SORT.DRIVE_OFF_MS, delay: k * 70, easing: 'ease-in', fill: 'forwards' });
+      } else g.style.transform = to;
+    });
+    const sc = this.el.scroll;
+    sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' });
+    clearTimeout(this.leaveTimer);
+    this.leaveTimer = setTimeout(() => {
+      if (this.li + 1 < LEVELS.length) this.load(this.li + 1, true);
+      else {
+        this.load(this.li, true);
+        this.app.toast('Hai finito tutti i livelli dello smistamento. Bravissimi!', 3500);
+        this.openLevels();
+      }
+    }, CONFIG.SORT.DRIVE_OFF_MS + 70 * this.level.trucks.length + 100);
   }
 
   // ------------------------------------------------------------ SVG
@@ -316,9 +348,10 @@ export class SortingGame {
     for (const id of lv.trucks) {
       const x = truckAt[id];
       const t = truckArt(TRUCKS[id].sym, slotW);
-      s += `<g class="s-truck" data-truck="${id}" transform="translate(${x} ${g.bedTop})" aria-label="${esc(TRUCKS[id].name)}">${t.svg}</g>`;
+      // truck and its load in one group, so "Avanti" can drive them off together
+      s += `<g class="s-tg" data-tg="${id}"><g class="s-truck" data-truck="${id}" transform="translate(${x} ${g.bedTop})" aria-label="${esc(TRUCKS[id].name)}">${t.svg}</g><g class="s-tp" data-tp="${id}"></g></g>`;
     }
-    s += '<g id="s-overlay"></g><g id="s-piles"></g><g id="s-hopper"></g><g id="s-movers"></g>';
+    s += '<g id="s-overlay"></g><g id="s-hopper"></g><g id="s-movers"></g>';
     this.el.svg.setAttribute('viewBox', `0 0 ${W} ${g.H}`);
     this.el.svg.setAttribute('width', W);
     this.el.svg.setAttribute('height', g.H);
@@ -346,17 +379,15 @@ export class SortingGame {
   }
 
   renderPiles(hidden) {
-    const g = this.geo;
-    let p = '';
+    const p = {};
     this.run.results.forEach((r, i) => {
       const pos = this.slotPos(r.truck, r.slot);
-      p += `<g class="s-pile${hidden ? ' hidden' : ''}${!r.ok && this.phase !== 'run' ? ' wrong' : ''}" data-p="${i}" transform="translate(${pos.x} ${pos.y})">` +
+      p[r.truck] = (p[r.truck] || '') + `<g class="s-pile${hidden ? ' hidden' : ''}${!r.ok && this.phase !== 'run' ? ' wrong' : ''}" data-p="${i}" transform="translate(${pos.x} ${pos.y})">` +
         '<rect x="-9" y="-9" width="18" height="18" fill="transparent"/>' +
         `<circle class="ring" r="${PILE / 2 + 1}" fill="none" stroke="${P.tomato}" stroke-width="2.5"/>` +
         `<use href="#${itemSymbolId(r.item)}" x="${-PILE / 2}" y="${-PILE / 2}" width="${PILE}" height="${PILE}"/></g>`;
     });
-    this.el.svg.querySelector('#s-piles').innerHTML = p;
-    void g;
+    for (const tp of this.el.svg.querySelectorAll('.s-tp')) tp.innerHTML = p[tp.dataset.tp] || '';
   }
 
   slotPos(truck, j) {
@@ -405,10 +436,10 @@ export class SortingGame {
   }
 
   // ------------------------------------------------------------ runs
-  startRun(mode) {
-    const lv = this.level;
-    this.mode = mode;
-    this.batch = mode === 'train' ? this.training : testBatch(lv);
+  startRun() {
+    this.mode = 'train';
+    this.batch = this.training;
+    this.settled = null;
     this.overlay = null;
     const run = runBatch(this.c, this.board, this.batch);
     this.run = run;
@@ -439,7 +470,7 @@ export class SortingGame {
     this.movers = tls.map((x) => ({ ...x, el: null, ev: 0, done: false }));
     this.flashes = [];
     this.t0 = performance.now();
-    this.follow = this.el.scroll.scrollHeight > this.el.scroll.clientHeight + 20;
+    this.follow = true;   // until the player scrolls by hand
     this.updateUI();
     cancelAnimationFrame(this.raf);
     this.raf = requestAnimationFrame(this.loop);
@@ -450,12 +481,12 @@ export class SortingGame {
     if (this.replay) { this.replayFrame(now); return; }
     const t = now - this.t0;
     const layer = this.el.svg.querySelector('#s-movers');
-    let active = 0, sumY = 0, left = 0;
+    let active = 0, maxY = 0, left = 0, waiting = 0;
     for (const m of this.movers) {
       if (m.done) continue;
       left++;
       const lt = t - m.start;
-      if (lt < 0) continue;
+      if (lt < 0) { waiting++; continue; }
       if (!m.el) {
         m.el = document.createElementNS('http://www.w3.org/2000/svg', 'use');
         m.el.setAttribute('href', `#${itemSymbolId(m.r.item)}`);
@@ -480,8 +511,10 @@ export class SortingGame {
       }
       const pos = posAt(m, lt);
       m.el.setAttribute('transform', `translate(${pos.x.toFixed(1)} ${pos.y.toFixed(1)})`);
-      active++; sumY += pos.y;
+      active++; maxY = Math.max(maxY, pos.y);
     }
+    // a perfect run: once every item has left the hopper, "Avanti" is ready (no need to wait)
+    if (waiting === 0 && this.run.right === this.run.total && !this.settled) this.settle();
     // gate flashes
     this.flashes = this.flashes.filter((f) => {
       if (f.until > now) return true;
@@ -489,10 +522,13 @@ export class SortingGame {
       if (ge && !this.flashes.some((o) => o !== f && o.gate === f.gate && o.until > now)) ge.classList.remove('lit-yes', 'lit-no');
       return false;
     });
+    // Auto-scroll: follow the lowest item down, then stay at the bottom with the trucks.
+    // Only ever downwards; stops for good if the player scrolls by hand.
     if (this.follow && active) {
       const sc = this.el.scroll;
-      const target = Math.max(0, Math.min(sc.scrollHeight - sc.clientHeight, sumY / active - sc.clientHeight * 0.45));
-      sc.scrollTop += (target - sc.scrollTop) * 0.08;
+      const bottom = sc.scrollHeight - sc.clientHeight;
+      const target = Math.min(bottom, maxY - sc.clientHeight * 0.55);
+      if (target > sc.scrollTop + 0.5) sc.scrollTop = Math.min(bottom, sc.scrollTop + Math.max(1, (target - sc.scrollTop) * 0.12));
     }
     if (left === 0) { this.endRun(); return; }
     this.raf = requestAnimationFrame(this.loop);
@@ -515,32 +551,22 @@ export class SortingGame {
   endRun(silent) {
     const run = this.run;
     this.movers = [];
-    this.follow = false;
-    if (this.mode === 'train') {
-      this.phase = 'result';
-      this.perfectKey = run.right === run.total ? this.boardKey() : null;
-    } else {
-      this.phase = 'delivered';
-      this.lastPay = 0;
-      const lv = this.level;
-      const first = !this.sort.solved.includes(lv.id);
-      const acc = run.accuracy;
-      const coins = first ? Math.round(CONFIG.SORT.pay(this.li + 1) * acc) : (acc === 1 ? CONFIG.SORT.REPLAY_PAY : 0);
-      this.lastPay = coins;
-      if (acc === 1 || coins > 0) this.app.onDeliver({ levelIdx: this.li, coins, first: first && acc === 1 });
-    }
+    this.phase = 'result';
+    if (run.right === run.total) this.settle();
     this.render();
     this.updateUI();
-    if (!silent) {
+    if (!silent && this.follow) {
       const sc = this.el.scroll;
-      sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' });
+      if (sc.scrollHeight - sc.clientHeight > sc.scrollTop) sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' });
     }
+    this.follow = false;
   }
 
   // ------------------------------------------------------------ taps
   onSvgClick(e) {
     if (this.app.overlayOpen()) return;
     const gateEl = e.target.closest('[data-g]');
+    if (this.phase === 'leaving') return;
     if (gateEl) {
       if (this.phase === 'run') return;
       if (!levelStatus(this.sort, this.li).playable) { this.app.toast('Per questo livello serve un sensore del negozio.'); return; }
@@ -559,7 +585,6 @@ export class SortingGame {
     const it = this.batch[i];
     const res = this.run && this.phase !== 'run' ? this.run.results[i] : null;
     const sensors = this.sort.sensors;
-    const test = this.mode === 'test';
     let feats = '';
     for (const q of QUESTIONS) {
       const known = questionUnlocked(q.id, sensors);
@@ -569,7 +594,7 @@ export class SortingGame {
       feats += `<span class="s-feat${known ? '' : ' unknown'}" title="${esc(q.text)}" aria-label="${esc(q.text)} ${known ? (ans ? 'sì' : 'no') : 'non misurato'}">` +
         svg40(questionArt(q.id), 30) + (known ? (ans ? yesSvg(15) : noSvg(15)) : svg40(ICON.lock, 15)) + '</span>';
     }
-    const label = res || !test
+    const label = true
       ? `<div class="s-label"><span>Etichetta <em>(label)</em>:</span> ${svg40(truckSymbolArt(TRUCKS[it.label].sym), 30, 'lbl')}` +
         (res && !res.ok ? ` <span class="s-wrong">finito qui: ${svg40(truckSymbolArt(TRUCKS[res.truck].sym), 30, 'lbl')}</span>` : '') + '</div>'
       : '';
