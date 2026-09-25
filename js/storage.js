@@ -24,7 +24,7 @@ export function defaultState() {
     coins: 0,              // coins in the wallet
     totalEarned: 0,        // all coins ever earned (leaderboard "Più ricchi")
     farmersServed: 0,      // number of finished rounds
-    levels: { scanner: 0, belt: 0, truck: 0, fitter: 0 },
+    levels: { scanner: 0, belt: 0, truck: 0 },   // scanner 0..10, or 100 (secret level)
     day: 1,
     dayFarmers: 0,
     dayCoins: 0,
@@ -39,7 +39,7 @@ function clampLevel(v) {
   return Math.max(0, Math.min(CONFIG.MAX_LEVEL, n));
 }
 
-function sanitize(raw) {
+export function sanitize(raw) {
   const d = defaultState();
   if (!raw || typeof raw !== 'object') return d;
   const num = (v, def) => (Number.isFinite(v) && v >= 0 ? v : def);
@@ -51,10 +51,11 @@ function sanitize(raw) {
     totalEarned: num(raw.totalEarned, 0),
     farmersServed: num(raw.farmersServed, 0),
     levels: {
-      scanner: clampLevel(raw.levels?.scanner),
+      // Secret level 100. Old saves that had the "Adattatore automatico" (levels.fitter) get it too.
+      scanner: raw.levels?.scanner === CONFIG.SECRET_SCANNER_LEVEL || raw.levels?.fitter === 1 || raw.levels?.fitter === true
+        ? CONFIG.SECRET_SCANNER_LEVEL : clampLevel(raw.levels?.scanner),
       belt: clampLevel(raw.levels?.belt),
       truck: clampLevel(raw.levels?.truck),
-      fitter: raw.levels?.fitter === 1 ? 1 : 0,
     },
     day: Math.max(1, num(raw.day, 1)),
     dayFarmers: num(raw.dayFarmers, 0),

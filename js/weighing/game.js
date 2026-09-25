@@ -4,10 +4,10 @@
 import { CONFIG } from '../config.js';
 import { Slider } from '../slider.js';
 import { xLabel, yLabel } from './farmers.js';
-import { makeRound, takeUnit, measure, scoreLine, sliderToLine, startSliders, applyLiveLevels, autoFit, lineToSliders } from './round.js';
+import { makeRound, takeUnit, measure, scoreLine, sliderToLine, startSliders, applyLiveLevels, autoFit, lineToSliders, scannerIndex, isSmartScanner } from './round.js';
 import { clamp } from '../stats.js';
 import { C, FONT } from './draw.js';
-import { drawScanner, drawScannerBeam, drawFitter, drawUpgradeFx, upgradePop, scannerMetrics } from './scanner.js';
+import { drawScanner, drawScannerBeam, drawFitter, drawUpgradeFx, drawFinaleFx, upgradePop, scannerMetrics } from './scanner.js';
 import { drawVehicle, VEHICLE_NAMES } from './vehicles.js';
 import { drawUnloader, UNLOADER_NAMES, HERDER_NAMES } from './unloaders.js';
 import { drawPile } from './pile.js';
@@ -39,7 +39,7 @@ export class WeighingGame {
       plot: $('w-plot'), scene: $('w-scene'),
       face: $('w-face'), who: $('w-who'), text: $('w-text'), sub: $('w-sub'),
       crates: $('w-crates'), count: $('w-count'),
-      controls: $('w-controls'), lock: $('w-lock'), fit: $('w-fit'),
+      controls: $('w-controls'), lock: $('w-lock'),
       result: $('w-result'), resTitle: $('w-res-title'), resCoins: $('w-res-coins'),
       barMe: $('w-bar-me'), barBest: $('w-bar-best'), resNote: $('w-res-note'), next: $('w-next'),
     };
@@ -48,15 +48,6 @@ export class WeighingGame {
     this.intercept = new Slider($('w-intercept'), { value: s0.intercept, label: 'intercetta', onInput: () => this.onSlider() });
 
     this.el.lock.addEventListener('click', () => this.lock());
-    if (!this.el.fit) {
-      // An older cached index.html (e.g. right after a deploy) may not have the button yet.
-      const b = document.createElement('button');
-      b.className = 'btn olive big'; b.id = 'w-fit'; b.hidden = true; b.disabled = true;
-      b.textContent = '🤖 Trova la retta';
-      this.el.lock.parentNode.insertBefore(b, this.el.lock);
-      this.el.fit = b;
-    }
-    this.el.fit.addEventListener('click', () => this.startAutoFit());
     this.el.next.addEventListener('click', () => this.nextFarmer());
     this.el.scene.addEventListener('pointerdown', (e) => this.onSceneTap(e));
 
@@ -100,7 +91,7 @@ export class WeighingGame {
     this.units = [];
     this.carry = null;
     this.truckLeave = null;   // { t0 } while the empty truck drives away
-    this.fitting = null;      // { t0, from, to } while the auto-fitter moves the sliders
+    this.smartReadyAt = null; // scanner 100: when the automatic lock may happen
     this.truckGone = false;
     this.emptySince = null;
     this.result = null;
@@ -188,30 +179,27 @@ export class WeighingGame {
     this.nextSpawnAt = t;
   }
 
-  // "🤖 Trova la retta": move both sliders to the least-squares line of the measured points,
-  // then lock. Only with the fitter bought and at least 2 measured points.
-  startAutoFit() {
-    if (!this.app.getState().levels.fitter || this.fitting || this.phase !== 'collect' || !this.canLock()) return;
-    const fit = autoFit(this.round);
-    if (!fit) return;
-    const to = lineToSliders(fit);
-    this.fitting = { t0: performance.now(), from: { slope: this.slope.value, intercept: this.intercept.value }, to };
-    this.slope.setEnabled(false);
-    this.intercept.setEnabled(false);
-    this.updateInfo();
-  }
-
-  stepAutoFit(now) {
-    const f = this.fitting;
-    if (!f) return;
-    const t = clamp((now - f.t0) / CONFIG.FITTER_ANIM_MS, 0, 1);
-    const e = easeInOut(t);
-    this.slope.set(f.from.slope + (f.to.slope - f.from.slope) * e, false);
-    this.intercept.set(f.from.intercept + (f.to.intercept - f.from.intercept) * e, false);
-    if (t >= 1) {
-      this.slope.set(f.to.slope, false);
-      this.intercept.set(f.to.intercept, false);
-      this.fitting = null;
+  // Scanner level 100: the line keeps following the least-squares line of the measured points
+  // (never the whole harvest); the sliders move with it. Once the truck is empty and every dot is
+  // in, it waits SMART_LOCK_DELAY_MS and locks by itself.
+  stepSmart(now, dt) {
+    const r = this.round;
+    if (!r.smart || this.phase !== 'collect') { this.smartReadyAt = null; return; }
+    const fit = autoFit(r);
+    if (fit) {
+      const to = lineToSliders(fit);
+      const k = Math.min(1, dt * CONFIG.SMART_FOLLOW_RATE);
+      this.slope.set(this.slope.value + (to.slope - this.slope.value) * k, false);
+      this.intercept.set(this.intercept.value + (to.intercept - this.intercept.value) * k, false);
+      this.smartTarget = to;
+    }
+    const done = r.cratesLeft === 0 && !this.carry && this.canLock();
+    if (!done) { this.smartReadyAt = null; return; }
+    if (this.smartReadyAt == null) this.smartReadyAt = now;
+    if (now - this.smartReadyAt >= CONFIG.SMART_LOCK_DELAY_MS) {
+      // snap exactly onto the fit, then lock
+      this.slope.set(this.smartTarget.slope, false);
+      this.intercept.set(this.smartTarget.intercept, false);
       this.lock();
     }
   }
@@ -316,10 +304,15 @@ export class WeighingGame {
       ? `🚚 ${f.unit} ${r.cratesLeft * k}/${r.cratesTotal * k} · ${r.unloadAll ? 'tutti in un colpo' : `${r.perTrip * k} per viaggio`}`
       : `📦 cassette: ${r.cratesLeft}/${r.cratesTotal} · ${r.unloadAll ? 'tutte in un colpo' : `${r.perTrip} per viaggio`}`;
     this.el.count.innerHTML = `dati <em>(data)</em>: ${r.sample.length}`;
-    this.el.lock.disabled = !(this.phase === 'collect' && this.canLock()) || !!this.fitting;
-    const hasFitter = !!this.app.getState().levels.fitter;
-    this.el.fit.hidden = !hasFitter;
-    this.el.fit.disabled = this.el.lock.disabled;
+    // Scanner 100 fits and locks by itself: sliders and Blocca are disabled.
+    const smart = !!r.smart;
+    this.el.controls.classList.toggle('smart', smart);
+    this.el.lock.disabled = smart || !(this.phase === 'collect' && this.canLock());
+    this.el.lock.textContent = smart ? '🤖 Retta automatica' : 'Blocca la retta 🔒';
+    if (this.phase === 'collect' || this.phase === 'arriving') {
+      this.slope.setEnabled(!smart);
+      this.intercept.setEnabled(!smart);
+    }
   }
 
   // ------------------------------------------------------------ simulation + drawing
@@ -375,7 +368,7 @@ export class WeighingGame {
     if (changed) this.updateInfo();
 
     this.checkTruckLeave(now);
-    this.stepAutoFit(now);
+    this.stepSmart(now, dt);
     if (this.phase === 'reveal') {
       const total = CONFIG.REVEAL_HARVEST_MS + CONFIG.REVEAL_RESIDUALS_MS + 200;
       if (now - this.phaseT0 >= total) this.showResult();
@@ -575,7 +568,7 @@ export class WeighingGame {
 
     // scanner body, then the products passing through it, then the scan beam on top
     const sc = {
-      cx: g.scanner * W, ground, H, level: lv.scanner, now, beltY: by,
+      cx: g.scanner * W, ground, H, level: scannerIndex(lv.scanner), smart: isSmartScanner(lv.scanner), now, beltY: by,
       flashAge: now - (this.scanFlash || -1e9), upgradeAge: now - (this.fx.scanner ?? -1e9),
     };
     drawScanner(ctx, sc);
@@ -588,11 +581,10 @@ export class WeighingGame {
       ctx.fillText(f.unit, u.x * W, by - 1 - bob);
     }
     drawScannerBeam(ctx, sc);
-    if (lv.fitter) {
-      drawFitter(ctx, {
-        ...sc, scannerUpgradeAge: sc.upgradeAge, upgradeAge: now - (this.fx.fitter ?? -1e9),
-        fitting: this.fitting ? clamp((now - this.fitting.t0) / CONFIG.FITTER_ANIM_MS, 0, 1) : null,
-      });
+    if (sc.smart) {
+      // scanner 100: the small computer on top, busy while dots arrive
+      const busy = this.phase === 'collect' && now - (this.scanFlash || -1e9) < 600;
+      drawFitter(ctx, { ...sc, scannerUpgradeAge: sc.upgradeAge, upgradeAge: Infinity, fitting: busy ? ((now / 600) % 1) : null });
     }
 
     // vehicle: drives in from the left, and drives back out to the left when sent away
@@ -662,8 +654,9 @@ export class WeighingGame {
     }
 
     // upgrade moments: sparkles and a label
-    drawUpgradeFx(ctx, sc.cx, ground - scannerMetrics(lv.scanner, H).heightPx * 0.6, now - (this.fx.scanner ?? -1e9), `Scanner ${lv.scanner}!`);
-    drawUpgradeFx(ctx, sc.cx, ground - scannerMetrics(lv.scanner, H).heightPx - 8, now - (this.fx.fitter ?? -1e9), 'Adattatore automatico!');
+    const scAge = now - (this.fx.scanner ?? -1e9);
+    if (sc.smart) drawFinaleFx(ctx, sc.cx, ground - scannerMetrics(sc.level, H).heightPx * 0.55, scAge, W, H);
+    else drawUpgradeFx(ctx, sc.cx, ground - scannerMetrics(sc.level, H).heightPx * 0.6, scAge, `Scanner ${lv.scanner}!`);
     drawUpgradeFx(ctx, idleX, ground - H * 0.45, now - (this.fx.belt ?? -1e9), UNLOADER_LABEL(f.animal, lv.belt));
     if (!this.truckGone) drawUpgradeFx(ctx, g.truckRear * W * 0.55, H * 0.3, now - (this.fx.truck ?? -1e9), `${VEHICLE_NAMES[r.truckLevel]}!`);
 
@@ -681,7 +674,8 @@ export class WeighingGame {
       ctx.fillStyle = color;
       ctx.fillText(msg, W * 0.38, 11);
     };
-    if (this.truckTappable(now) && r.sample.length === 0 && this.units.length === 0) {
+    const finale = sc.smart && scAge < 2600;   // keep the level-100 finale readable
+    if (!finale && this.truckTappable(now) && r.sample.length === 0 && this.units.length === 0) {
       hint('👈 Tocca il camion!', `rgba(217,80,43,${0.6 + 0.4 * Math.sin(now / 250)})`, 14);
     }
     ctx.textBaseline = 'alphabetic';
@@ -691,11 +685,11 @@ export class WeighingGame {
   // Scanner and unloading apply at once; a new truck arrives with the next farmer.
   checkUpgrades(now, lv) {
     if (!this.shown) {
-      this.shown = { scanner: lv.scanner, belt: lv.belt, fitter: lv.fitter, truck: this.round.truckLevel };
+      this.shown = { scanner: lv.scanner, belt: lv.belt, truck: this.round.truckLevel };
       return;
     }
     if (this.app.overlayOpen && this.app.overlayOpen()) return;
-    for (const key of ['scanner', 'belt', 'fitter']) {
+    for (const key of ['scanner', 'belt']) {
       if (lv[key] !== this.shown[key]) {
         if (lv[key] > this.shown[key]) this.fx[key] = now;
         this.shown[key] = lv[key];

@@ -63,11 +63,14 @@ export const CONFIG = {
   TRUCK_BASE,
   TRUCK_FACTOR,
   TRUCK_CRATES: Array.from({ length: 11 }, (_, n) => Math.round(TRUCK_BASE * TRUCK_FACTOR ** n)),
-  // "Adattatore automatico" (auto-fitter): one level, bought once. A computer on the scanner
-  // that finds the least-squares line of the points measured so far (never the whole harvest),
-  // moves both sliders there in FITTER_ANIM_MS and locks the line.
-  FITTER_COST: 100,
-  FITTER_ANIM_MS: 1200,
+  // Secret scanner level "100" ("Scanner intelligente"). Offered in the shop only after scanner
+  // level 10, as a surprise, for SECRET_SCANNER_COST coins. Same noise as level 10, and the scanner
+  // fits by itself: the line keeps following the least-squares line of the measured points
+  // (never the whole harvest), and locks by itself once the truck is empty and the belt is clear.
+  SECRET_SCANNER_LEVEL: 100,
+  SECRET_SCANNER_COST: 100,
+  SMART_FOLLOW_RATE: 5,          // how fast the sliders follow the fit (per second)
+  SMART_LOCK_DELAY_MS: 900,      // pause after the last dot before the automatic lock
 
   // Drawing only (the machines grow with their level). Scanner height = SCANNER_SCALE[level] *
   // SCANNER_HEIGHT_FRACTION * scene height. Vehicle length = TRUCK_LENGTH[level] * scene width
@@ -93,7 +96,7 @@ export const CONFIG = {
   // ---------------------------------------------------------------- harvest
   // Number of units in the farmer's whole harvest. Must stay larger than the biggest truck (173).
   // 240 (instead of 1000) so that with everything maxed the measured sample is most of the harvest
-  // and the auto-fitter pays 10 in about 2 of 3 visits; with a bigger harvest that drops to ~1 in 3.
+  // and the level-100 scanner pays 10 in about 2 of 3 visits; with a bigger harvest ~1 in 3.
   HARVEST_SIZE: 240,
   // x values of the harvest are uniform in this range.
   HARVEST_X_RANGE: [0.06, 0.94],

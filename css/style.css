@@ -195,6 +195,9 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
 .controls .btn.big { margin-top: 4px; }
 .lock-row { display: flex; gap: 8px; }
+/* scanner 100: sliders move by themselves; keep them readable and say so */
+.controls.smart .slider.disabled { opacity: 0.9; }
+.controls.smart .slider-label::after { content: ' · automatico 🤖'; color: var(--olive); font-weight: 700; }
 .lock-row .btn.big { flex: 1; min-width: 0; padding: 0 8px; font-size: 17px; }
 
 .result { display: flex; flex-direction: column; gap: 5px; }

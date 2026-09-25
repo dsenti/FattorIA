@@ -5,6 +5,7 @@ import { nameChoices, formatName } from './names.js';
 import { submitScore, fetchBoard } from './leaderboard.js';
 import { WeighingGame } from './weighing/game.js';
 import { drawPreview } from './weighing/previews.js';
+import { scannerOffer, scannerIndex, isSmartScanner } from './weighing/round.js';
 import { VEHICLE_NAMES } from './weighing/vehicles.js';
 import { UNLOADER_NAMES } from './weighing/unloaders.js';
 import { installDebugButton } from './debug.js'; // TODO(Dominik): remove before the course
@@ -217,34 +218,37 @@ function showHelp() {
 }
 
 // ------------------------------------------------------------ shop
+const normalOffer = (lv) => (lv < CONFIG.MAX_LEVEL ? { kind: 'level', level: lv + 1, cost: CONFIG.levelCost(lv + 1) } : null);
 const SHOP = [
   {
-    key: 'scanner', icon: '📡', name: 'Scanner',
-    desc: 'Misure con meno rumore e meno valori anomali <em>(outlier)</em>: migliore qualità dei dati <em>(data quality)</em>.',
+    // Levels 0..10, then (only after 10) a surprise: the secret level 100 "Scanner intelligente".
+    key: 'scanner', icon: '📡', name: (lv) => (isSmartScanner(lv) ? 'Scanner intelligente' : 'Scanner'),
+    desc: (lv) => (isSmartScanner(lv)
+      ? 'Lo scanner impara da solo la retta migliore dai punti che misura: la retta si sistema mentre arrivano i dati, poi si blocca da sola. Il raccolto intero non lo vede.'
+      : 'Misure con meno rumore e meno valori anomali <em>(outlier)</em>: migliore qualità dei dati <em>(data quality)</em>.'),
+    offer: scannerOffer,
+    levelText: (lv) => (isSmartScanner(lv) ? 'Livello 100' : `Livello ${lv}/${CONFIG.MAX_LEVEL}`),
     effect: (lv) => {
-      const p = CONFIG.SCANNER_GLITCH[lv];
+      if (isSmartScanner(lv)) return 'Trova e blocca la retta da solo';
+      const p = CONFIG.SCANNER_GLITCH[scannerIndex(lv)];
       const glitch = p > 0 ? `sbaglia di grosso circa 1 misura su ${Math.round(1 / p)}` : 'non sbaglia più di grosso';
       return glitch.charAt(0).toUpperCase() + glitch.slice(1);
     },
   },
   {
     // Stored as "belt" in the save file (the old name); shown as "Scarico" (unloading).
-    key: 'belt', icon: '🦾', name: 'Scarico',
-    desc: 'Chi scarica il camion: prima aiutanti, poi attrezzi e macchine. Più cassette (o più animali) a ogni viaggio: scarichi più in fretta. Non dà più dati, fa risparmiare tempo.',
+    key: 'belt', icon: '🦾', name: () => 'Scarico',
+    desc: () => 'Chi scarica il camion: prima aiutanti, poi attrezzi e macchine. Più cassette (o più animali) a ogni viaggio: scarichi più in fretta. Non dà più dati, fa risparmiare tempo.',
+    offer: normalOffer,
     effect: (lv) => (lv >= CONFIG.UNLOAD_ALL_LEVEL
       ? 'Robot: svuota tutto il camion in un colpo'
       : `${UNLOADER_NAMES[lv]}: ${CONFIG.BELT_BOXES[lv]} ${CONFIG.BELT_BOXES[lv] === 1 ? 'cassetta' : 'cassette'} per viaggio`),
   },
   {
-    key: 'truck', icon: '🚚', name: 'Camion',
-    desc: 'Un mezzo più grande porta più cassette: più dati <em>(data)</em> per ogni agricoltore.',
+    key: 'truck', icon: '🚚', name: () => 'Camion',
+    desc: () => 'Un mezzo più grande porta più cassette: più dati <em>(data)</em> per ogni agricoltore.',
+    offer: normalOffer,
     effect: (lv) => `${VEHICLE_NAMES[lv]}: ${CONFIG.TRUCK_CRATES[lv]} cassette = ${CONFIG.TRUCK_CRATES[lv] * CONFIG.UNITS_PER_BOX} dati`,
-  },
-  {
-    // One level only, bought once. Mounted on top of the scanner.
-    key: 'fitter', icon: '🤖', name: 'Adattatore automatico', maxLevel: 1, cost: () => CONFIG.FITTER_COST,
-    desc: 'Si monta sopra lo scanner. Il computer trova da solo la retta migliore per i punti che hai misurato tu, poi la blocca. Il raccolto intero non lo vede neanche lui.',
-    effect: (lv) => (lv ? 'Installato: premi 🤖 Trova la retta' : 'Non installato'),
   },
 ];
 
@@ -256,32 +260,33 @@ function openShop(onClose) {
         'Scanner e scarico valgono subito; il mezzo nuovo arriva con il prossimo agricoltore.</p>';
       for (const it of SHOP) {
         const lv = state.levels[it.key] || 0;
-        const maxLv = it.maxLevel || CONFIG.MAX_LEVEL;
-        const maxed = lv >= maxLv;
-        const cost = maxed ? 0 : it.cost ? it.cost(lv + 1) : CONFIG.levelCost(lv + 1);
+        const offer = it.offer(lv);
+        const secret = offer && offer.kind === 'secret';
         const box = document.createElement('div');
         box.className = 'shop-item';
-        const pips = Array.from({ length: maxLv }, (_, i) => `<span class="pip ${i < lv ? 'on' : ''}"></span>`).join('');
-        const next = maxed ? '' : ` → <b>${it.effect(lv + 1)}</b>`;
+        const pips = Array.from({ length: CONFIG.MAX_LEVEL }, (_, i) => `<span class="pip ${i < lv ? 'on' : ''}"></span>`).join('');
+        const next = !offer ? '' : secret ? ' → <b>Una sorpresa… 🎁</b>' : ` → <b>${it.effect(offer.level)}</b>`;
+        const levelText = it.levelText ? it.levelText(lv) : `Livello ${lv}/${CONFIG.MAX_LEVEL}`;
         box.innerHTML =
-          `<div class="shop-top"><span class="shop-icon">${it.icon}</span><div><div class="shop-name">${it.name}</div>` +
-          `<div>${maxLv === 1 ? (lv ? 'Comprato' : 'Un solo acquisto') : `Livello ${lv}/${maxLv}`}</div></div></div>` +
+          `<div class="shop-top"><span class="shop-icon">${it.icon}</span><div><div class="shop-name">${it.name(lv)}</div>` +
+          `<div>${levelText}${secret ? ' · <b>Livello ???</b>' : ''}</div></div></div>` +
           `<div class="pips">${pips}</div>` +
           `<div class="preview-row"><canvas class="preview" data-key="${it.key}" data-lv="${lv}" aria-hidden="true"></canvas>` +
-          (maxed ? '' : `<span class="preview-arrow">➜</span><canvas class="preview" data-key="${it.key}" data-lv="${lv + 1}" aria-hidden="true"></canvas>`) +
+          (!offer ? '' : `<span class="preview-arrow">➜</span><canvas class="preview" data-key="${it.key}" data-lv="${secret ? 'secret' : offer.level}" aria-hidden="true"></canvas>`) +
           '</div>' +
-          `<div class="shop-desc">${it.desc}</div>` +
+          `<div class="shop-desc">${it.desc(lv)}</div>` +
           `<div class="shop-effect">${it.effect(lv)}${next}</div>`;
         const btn = document.createElement('button');
         btn.className = 'btn primary';
-        if (maxed) { btn.textContent = maxLv === 1 ? 'Comprato ✔' : 'Livello massimo ✔'; btn.disabled = true; }
+        if (!offer) { btn.textContent = isSmartScanner(lv) && it.key === 'scanner' ? 'Livello massimo (100) ✔' : 'Livello massimo ✔'; btn.disabled = true; }
         else {
-          btn.textContent = maxLv === 1 ? `Compra · ${cost} 🪙` : `Compra livello ${lv + 1} · ${cost} 🪙`;
-          btn.disabled = state.coins < cost;
+          btn.textContent = secret ? `Compra ??? · ${offer.cost} 🪙` : `Compra livello ${offer.level} · ${offer.cost} 🪙`;
+          btn.disabled = state.coins < offer.cost;
           btn.addEventListener('click', () => {
-            if (state.coins < cost || (state.levels[it.key] || 0) >= maxLv) return;
-            state.coins -= cost;
-            state.levels[it.key] = (state.levels[it.key] || 0) + 1;
+            const o2 = it.offer(state.levels[it.key] || 0);
+            if (!o2 || state.coins < o2.cost) return;
+            state.coins -= o2.cost;
+            state.levels[it.key] = o2.level;
             save();
             renderCoins(false);
             draw();
@@ -295,7 +300,7 @@ function openShop(onClose) {
     // Animate the previews while the shop is open.
     const tick = (now) => {
       if ($('#sheet').hidden) return;
-      for (const c of body.querySelectorAll('canvas.preview')) drawPreview(c, c.dataset.key, Number(c.dataset.lv), now, { scannerLevel: state.levels.scanner });
+      for (const c of body.querySelectorAll('canvas.preview')) drawPreview(c, c.dataset.key, c.dataset.lv === 'secret' ? 'secret' : Number(c.dataset.lv), now);
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);

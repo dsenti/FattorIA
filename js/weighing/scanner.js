@@ -93,6 +93,14 @@ export function drawScanner(ctx, o) {
   ctx.scale(u * pop, u * pop);
   if (L === 0) ctx.rotate(-0.04);
 
+  // secret level 100 ("smart"): an extra green-blue glow behind the level-10 aura
+  if (o.smart) {
+    for (let i = 3; i >= 1; i--) {
+      ctx.fillStyle = `rgba(155,197,61,${0.06 + 0.04 * Math.sin(now / 320 + i * 1.3)})`;
+      rrect(ctx, -half - 12 * i, top - 26 - 7 * i, w + 24 * i, 128 + 7 * i, 18 + 5 * i);
+      ctx.fill();
+    }
+  }
   // level 10: glow aura behind everything
   if (L === 10) {
     for (let i = 3; i >= 1; i--) {
@@ -174,7 +182,7 @@ export function drawScanner(ctx, o) {
     ctx.fillStyle = C.cream;
     ctx.font = `800 ${L >= 7 ? 7.5 : 7}px system-ui, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(L === 10 ? 'MEGA SCANNER' : L >= 3 ? 'SCANNER' : 'scanner', L >= 2 ? -6 : 0, top + barH / 2 + 0.5);
+    ctx.fillText(o.smart ? 'SCANNER 100' : L === 10 ? 'MEGA SCANNER' : L >= 3 ? 'SCANNER' : 'scanner', L >= 2 ? -6 : 0, top + barH / 2 + 0.5);
     // lamp
     const lampX = L >= 2 ? -half + 5 : half - 6;
     ctx.fillStyle = fl > 0 ? C.tomato : (L >= 4 ? '#9BC53D' : C.wheat);
@@ -252,8 +260,42 @@ export function drawScanner(ctx, o) {
   ctx.restore();
 }
 
-// The "Adattatore automatico": a small computer with a screen and a light, mounted on top of the
-// scanner's bar. o as for drawScanner, plus fitting (0..1 progress while it works, or null).
+// The finale when the secret scanner level 100 is bought: a bigger, longer upgrade moment.
+export function drawFinaleFx(ctx, x, y, age, W, H, ms = 2600) {
+  if (!(age < ms)) return;
+  const t = age / ms;
+  ctx.save();
+  // a soft flash over the whole scene
+  ctx.fillStyle = `rgba(244,201,93,${0.35 * Math.max(0, 1 - t * 2.5)})`;
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = Math.min(1, (1 - t) * 1.6);
+  for (let ring = 0; ring < 2; ring++) {
+    ctx.fillStyle = ring ? C.tomato : C.sun;
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2 + ring * 0.22 + t * 1.5;
+      const d = (14 + ring * 10) + 70 * t;
+      sparkle(ctx, x + Math.cos(a) * d, y + Math.sin(a) * d * 0.6, (5 - ring) * (1 - t) + 1.5, t * 6 + i);
+    }
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  const pop = 1 + 0.25 * Math.max(0, 1 - t * 4);
+  ctx.font = `900 ${Math.round(18 * pop)}px system-ui, sans-serif`;
+  const ly = Math.max(14, y - 20 - 10 * t);
+  ctx.lineWidth = 4; ctx.strokeStyle = C.cream;
+  ctx.strokeText('Livello 100!', x - W * 0.12, ly);
+  ctx.fillStyle = C.tomato;
+  ctx.fillText('Livello 100!', x - W * 0.12, ly);
+  ctx.font = '800 12px system-ui, sans-serif';
+  ctx.strokeText('Scanner intelligente', x - W * 0.12, ly + 17);
+  ctx.fillStyle = C.soil;
+  ctx.fillText('Scanner intelligente', x - W * 0.12, ly + 17);
+  ctx.restore();
+}
+
+// The small computer on top of the level-100 scanner ("Scanner intelligente"): a screen and a
+// light, mounted on the scanner's bar. o as for drawScanner, plus fitting (0..1 while busy, or null).
 export function drawFitter(ctx, o) {
   const { cx, ground, H, level: L, now } = o;
   const { u, w } = scannerMetrics(L, H);
@@ -269,7 +311,7 @@ export function drawFitter(ctx, o) {
   ctx.translate(cx, ground);
   ctx.scale(u * pop, u * pop);
   if (L === 0) ctx.rotate(-0.04);
-  ctx.translate(-w * 0.12, -100 + sink);
+  ctx.translate(w / 2 - 17, -100 + sink);   // right end of the bar, clear of the label
   ctx.scale(s, s);
   // stand and case
   ctx.fillStyle = C.ink; ctx.fillRect(-2, -4, 4, 4);

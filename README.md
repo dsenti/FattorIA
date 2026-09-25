@@ -57,7 +57,7 @@ Everything is in `js/config.js`, with comments:
 - **Economy:** `levelCost` (level n costs n), `SCORE_THRESHOLDS` (error ratio → 0–10 coins), `MAX_PAY`, `REACTIONS`, `FARMERS_PER_DAY`.
 - **Data per object:** `UNITS_PER_BOX` (1: one crate or one animal = one data point).
 - **Upgrades, per level 0–10:** `BELT_BOXES` ("Scarico" in the shop, stored as `belt`: objects per trip, 1→11; faster, not more data), `TRUCK_BASE` × `TRUCK_FACTOR`^level → `TRUCK_CRATES` (3, 5, 7, 10, 15, 23, 34, 51, 77, 115, 173), `SCANNER_NOISE` (never zero), `SCANNER_GLITCH` (1/8 → 0), `GLITCH_OFFSET`. `PILE_VISIBLE_MAX` caps how many boxes are drawn (the rest shows as "+N").
-- **Adattatore automatico (auto-fitter):** `FITTER_COST` (100), `FITTER_ANIM_MS`. One level (`levels.fitter` 0/1); fits least squares on the measured points only (`autoFit` in `round.js`).
+- **Secret scanner level 100** ("Scanner intelligente"): `SECRET_SCANNER_LEVEL`, `SECRET_SCANNER_COST` (100), `SMART_FOLLOW_RATE`, `SMART_LOCK_DELAY_MS`. Offered only after scanner 10 (`scannerOffer` in `round.js`); fits least squares on the measured points only (`autoFit`) and locks by itself. Old saves with the former "Adattatore automatico" (`levels.fitter`) are migrated to scanner 100.
 - **Machine sizes (drawing only):** `SCANNER_SCALE`, `SCANNER_HEIGHT_FRACTION`, `TRUCK_LENGTH`, `TRUCK_HEIGHT_SCALE`, per level.
 - **Harvest and difficulty:** `HARVEST_SIZE`, `NATURAL_NOISE_EASY/HARD`, `DIFFICULTY_RAMP_FARMERS`, `FIRST_FARMER`.
 - **Hidden true line and axes:** `AXIS_FLIP_PROB` (each axis drawn normal or reversed, so the real relation stays positive but the line on the plot falls in about half the rounds), `SLOPE_ABS_RANGE`, `LINE_MARGIN` (random steepness and height, always inside the plot).

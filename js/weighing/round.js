@@ -83,11 +83,29 @@ export function makeRound({ visitNo, lastFarmerId, levels }) {
   return round;
 }
 
+// The secret scanner level 100 behaves like level 10 for noise, glitches and drawing.
+export function isSmartScanner(level) {
+  return level >= CONFIG.SECRET_SCANNER_LEVEL;
+}
+export function scannerIndex(level) {
+  return Math.min(level, CONFIG.MAX_LEVEL);
+}
+
+// What the shop offers next for the scanner: a normal level, the secret level (only once level 10
+// is bought), or nothing.
+export function scannerOffer(level) {
+  if (level < CONFIG.MAX_LEVEL) return { kind: 'level', level: level + 1, cost: CONFIG.levelCost(level + 1) };
+  if (!isSmartScanner(level)) return { kind: 'secret', level: CONFIG.SECRET_SCANNER_LEVEL, cost: CONFIG.SECRET_SCANNER_COST };
+  return null;
+}
+
 // Scanner and unloading ("Scarico") upgrades apply at once, even during a visit.
 export function applyLiveLevels(round, levels) {
+  const si = scannerIndex(levels.scanner);
   round.scannerLevel = levels.scanner;
-  round.scannerNoise = CONFIG.SCANNER_NOISE[levels.scanner] * (round.first ? CONFIG.FIRST_FARMER.scannerNoiseScale : 1);
-  round.glitchProb = round.first && !CONFIG.FIRST_FARMER.glitches ? 0 : CONFIG.SCANNER_GLITCH[levels.scanner];
+  round.smart = isSmartScanner(levels.scanner);
+  round.scannerNoise = CONFIG.SCANNER_NOISE[si] * (round.first ? CONFIG.FIRST_FARMER.scannerNoiseScale : 1);
+  round.glitchProb = round.first && !CONFIG.FIRST_FARMER.glitches ? 0 : CONFIG.SCANNER_GLITCH[si];
   // boxes carried per tap; at the top unloading level one tap empties the whole truck
   round.unloadAll = levels.belt >= CONFIG.UNLOAD_ALL_LEVEL;
   round.perTrip = round.unloadAll ? Infinity : CONFIG.BELT_BOXES[levels.belt];
@@ -136,7 +154,7 @@ export function scoreLine(round, playerLine) {
   return { playerError, bestError: round.bestError, ratio, coins: coinsForRatio(ratio) };
 }
 
-// The auto-fitter: least squares on the points measured so far, never on the whole harvest.
+// The level-100 scanner's fit: least squares on the points measured so far, never on the whole harvest.
 // Returns null with fewer than 2 points.
 export function autoFit(round) {
   if (round.sample.length < 2) return null;

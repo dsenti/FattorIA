@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { CONFIG } from '../js/config.js';
 import { EMOJIS, NOUNS, ADJECTIVES, formatName, nameChoices, isValidName } from '../js/names.js';
 import { FARMERS } from '../js/weighing/farmers.js';
-import { makeRound, takeUnit, measure, scoreLine, coinsForRatio, sliderToLine, startSliders, dataSlope, autoFit, lineToSliders } from '../js/weighing/round.js';
+import { makeRound, takeUnit, measure, scoreLine, coinsForRatio, sliderToLine, startSliders, dataSlope, autoFit, lineToSliders, scannerOffer, isSmartScanner, scannerIndex } from '../js/weighing/round.js';
+import { sanitize } from '../js/storage.js';
 import { leastSquares } from '../js/stats.js';
 
 let passed = 0;
@@ -150,16 +151,19 @@ function collectAll(r) {
     r.sample.push(measure(r, idx));
   }
 }
-// What the fit button does: auto-fit, then through the sliders (clamped), then score.
+// What the level-100 scanner does at the end: its fit, through the sliders (clamped), then score.
 function fitterCoins(r) {
   const s = lineToSliders(autoFit(r));
   return scoreLine(r, sliderToLine(s.slope, s.intercept));
 }
 
-test('auto-fitter: least squares on the measured points only, never the harvest', () => {
-  const lv = { scanner: 3, belt: 0, truck: 3, fitter: 1 };
+test('scanner 100 fit: least squares on the measured points only, never the harvest', () => {
+  const lv = { scanner: 100, belt: 0, truck: 3 };
   for (let i = 0; i < 300; i++) {
     const r = makeRound({ visitNo: 8, lastFarmerId: null, levels: lv });
+    assert.ok(r.smart, 'level 100 is the smart scanner');
+    assert.equal(r.scannerNoise, CONFIG.SCANNER_NOISE[10], 'noise as at level 10');
+    assert.equal(r.glitchProb, CONFIG.SCANNER_GLITCH[10]);
     assert.equal(autoFit(r), null, 'no fit without points');
     r.sample.push(measure(r, takeUnit(r)));
     assert.equal(autoFit(r), null, 'no fit with one point');
@@ -178,16 +182,37 @@ test('auto-fitter: least squares on the measured points only, never the harvest'
   }
 });
 
-test('auto-fitter with everything maxed scores 10 most of the time', () => {
-  const lv = { scanner: 10, belt: 10, truck: 10, fitter: 1 };
+test('scanner 100 with everything else maxed scores 10 most of the time', () => {
+  const lv = { scanner: 100, belt: 10, truck: 10 };
   let tens = 0; const N = 400;
   for (let i = 0; i < N; i++) {
     const r = makeRound({ visitNo: 20, lastFarmerId: null, levels: lv });
     collectAll(r);
     if (fitterCoins(r).coins === 10) tens++;
   }
-  console.log(`      auto-fitter, all maxed: ${((100 * tens) / N).toFixed(0)}% of farmers pay 10`);
+  console.log(`      scanner 100 + all 10: ${((100 * tens) / N).toFixed(0)}% of farmers pay 10`);
   assert.ok(tens / N > 0.5, `share of 10s: ${tens / N}`);
+});
+
+test('secret scanner level 100: offered only after level 10; old saves migrate', () => {
+  for (let lv = 0; lv < 10; lv++) {
+    const o = scannerOffer(lv);
+    assert.equal(o.kind, 'level'); assert.equal(o.level, lv + 1); assert.equal(o.cost, lv + 1);
+  }
+  const o10 = scannerOffer(10);
+  assert.deepEqual(o10, { kind: 'secret', level: 100, cost: CONFIG.SECRET_SCANNER_COST });
+  assert.equal(CONFIG.SECRET_SCANNER_COST, 100);
+  assert.equal(scannerOffer(100), null, 'nothing after 100');
+  assert.ok(!isSmartScanner(10) && isSmartScanner(100));
+  assert.equal(scannerIndex(100), 10);
+  // saves
+  const base = { playerId: '11111111-2222-4333-8444-555555555555', coins: 3, levels: { scanner: 10, belt: 2, truck: 4 } };
+  assert.equal(sanitize({ ...base, levels: { ...base.levels, fitter: 1 } }).levels.scanner, 100, 'fitter -> scanner 100');
+  assert.equal(sanitize({ ...base, levels: { ...base.levels, scanner: 4, fitter: 1 } }).levels.scanner, 100, 'fitter at any scanner level -> 100');
+  assert.equal(sanitize({ ...base, levels: { ...base.levels, fitter: 0 } }).levels.scanner, 10);
+  assert.equal(sanitize({ ...base, levels: { ...base.levels, scanner: 100 } }).levels.scanner, 100);
+  assert.equal(sanitize({ ...base, levels: { ...base.levels, scanner: 55 } }).levels.scanner, 10, 'other values clamp to 0..10');
+  assert.ok(!('fitter' in sanitize(base).levels), 'no fitter key any more');
 });
 
 test('glitch rate at scanner level 0 is about 1/8', () => {
@@ -227,11 +252,11 @@ test('tuning report (sample-perfect player)', () => {
   for (const [name, lv, v] of rows) console.log(`      avg coins ${simulate(lv, v).toFixed(2)}  ${name}`);
   let sum = 0; const n = 800;
   for (let i = 0; i < n; i++) {
-    const r = makeRound({ visitNo: 20, lastFarmerId: null, levels: { scanner: 10, belt: 10, truck: 10, fitter: 1 } });
+    const r = makeRound({ visitNo: 20, lastFarmerId: null, levels: { scanner: 100, belt: 10, truck: 10 } });
     collectAll(r);
     sum += fitterCoins(r).coins;
   }
-  console.log(`      avg coins ${(sum / n).toFixed(2)}  all 10 + fitter (through the sliders), farmer 20`);
+  console.log(`      avg coins ${(sum / n).toFixed(2)}  scanner 100 + all 10 (automatic fit), farmer 20`);
 });
 
 console.log(`\n${passed} checks passed`);
