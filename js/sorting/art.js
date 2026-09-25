@@ -164,6 +164,9 @@ const QICON = {
     `<g fill="${P.ink}"><circle cx="10.5" cy="22.5" r="1.3"/><circle cx="17.5" cy="22.5" r="1.3"/></g>` +
     `<g transform="translate(22 1) scale(.42)"><path d="${SHAPE.mela}" fill="#D9502B" ${S}/><path d="M20 11Q20 6 22 3" fill="none" stroke="${P.soil}" stroke-width="2.4"/></g>` +
     `<path d="M23 3L38 18" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M23 3L38 18" stroke="${P.ink}" stroke-width="2.6" stroke-linecap="round"/>`,
+  farfalla: `<g fill="${P.soil}"><path d="M20 19C14 6 3 5 4 13C5 19 12 21 20 20Z"/><path d="M20 19C26 6 37 5 36 13C35 19 28 21 20 20Z"/>` +
+    '<path d="M20 21C13 22 8 27 10 32C12 36 18 31 20 24Z"/><path d="M20 21C27 22 32 27 30 32C28 36 22 31 20 24Z"/></g>' +
+    `<rect x="18.6" y="12" width="2.8" height="17" rx="1.4" fill="${P.soil}"/><path d="M19.5 12.5L16 5M20.5 12.5L24 5" stroke="${P.soil}" stroke-width="1.4" stroke-linecap="round"/>`,
 };
 
 export function questionArt(qid) {

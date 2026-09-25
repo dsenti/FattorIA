@@ -320,7 +320,7 @@ function otherSolutions(c, items) {
 test('smistamento: 12-15 levels, well formed (items, trucks, leaves, limits)', () => {
   assert.ok(LEVELS.length >= 12 && LEVELS.length <= 15, `${LEVELS.length} levels`);
   assert.equal(new Set(LEVELS.map((l) => l.id)).size, LEVELS.length, 'unique ids');
-  assert.equal(QUESTIONS.length, 17);
+  assert.equal(QUESTIONS.length, 18);
   assert.ok(!QUESTIONS.some((q) => q.id === 'grande'), 'size is not a feature any more');
   let prevGates = 0, maxGates = 0;
   LEVELS.forEach((lv, i) => {
@@ -386,15 +386,15 @@ test('smistamento: the solution sorts the training batch 100% and every leaf get
   });
 });
 
-test('smistamento: EXACTLY ONE question assignment (of all 17 questions) sorts each training batch perfectly', () => {
+test('smistamento: EXACTLY ONE question assignment (of all 18 questions) sorts each training batch perfectly', () => {
   let literal = 0;
   LEVELS.forEach((lv, i) => {
     const c = compile(lv.tree);
     const items = trainingBatch(lv, i + 1);
-    // exhaustive over all 17^gates assignments, factorised per subtree
+    // exhaustive over all 18^gates assignments, factorised per subtree
     const n = countSolutions(c, items, ALLQ);
     assert.equal(n, 1, `${lv.id}: ${n} perfect assignments, e.g.\n        ${otherSolutions(c, items).join('\n        ')}\n        (gates in pre-order; solution: ${solutionOf(c).join(' ')})`);
-    // literal brute force, one assignment at a time, where it is fast enough (17^5 = 1.4 million)
+    // literal brute force, one assignment at a time, where it is fast enough (18^5 = 1.9 million)
     if (c.gates.length <= 5) {
       const bf = bruteForce(c, items, ALLQ);
       assert.equal(bf.tried, ALLQ.length ** c.gates.length);

@@ -70,6 +70,8 @@ export const QUESTIONS = [
   { id: 'patata', group: 'tipo', sensor: null, text: 'È una patata?', f: (it) => it.t === 'patata' },
   { id: 'pomodoro', group: 'tipo', sensor: null, text: 'È un pomodoro?', f: (it) => it.t === 'pomodoro' },
   { id: 'carota', group: 'tipo', sensor: null, text: 'È una carota?', f: (it) => it.t === 'carota' },
+  // A distractor in the type palette: no level needs it (only lone butterflies answer yes).
+  { id: 'farfalla', group: 'tipo', sensor: null, text: 'È una farfalla?', f: (it) => it.t === 'farfalla' },
   { id: 'sporco', group: 'sporco', sensor: null, text: 'È sporco di terra?', f: (it) => it.dirty },
   { id: 'lumaca', group: 'lumaca', sensor: null, text: 'C\'è una lumaca?', f: (it) => it.snail },
   { id: 'marcio', group: 'marcio', sensor: 'naso', text: 'È marcio?', f: (it) => it.rot },
