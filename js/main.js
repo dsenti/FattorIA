@@ -231,7 +231,9 @@ const SHOP = [
     // Stored as "belt" in the save file (the old name); shown as "Scarico" (unloading).
     key: 'belt', icon: '🦾', name: 'Scarico',
     desc: 'Chi scarica il camion: prima aiutanti, poi attrezzi e macchine. Più cassette (o più animali) a ogni viaggio: scarichi più in fretta. Non dà più dati, fa risparmiare tempo.',
-    effect: (lv) => `${UNLOADER_NAMES[lv]}: ${CONFIG.BELT_BOXES[lv]} ${CONFIG.BELT_BOXES[lv] === 1 ? 'cassetta' : 'cassette'} per viaggio`,
+    effect: (lv) => (lv >= CONFIG.UNLOAD_ALL_LEVEL
+      ? 'Robot: svuota tutto il camion in un colpo'
+      : `${UNLOADER_NAMES[lv]}: ${CONFIG.BELT_BOXES[lv]} ${CONFIG.BELT_BOXES[lv] === 1 ? 'cassetta' : 'cassette'} per viaggio`),
   },
   {
     key: 'truck', icon: '🚚', name: 'Camion',

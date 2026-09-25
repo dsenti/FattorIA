@@ -88,7 +88,9 @@ export function applyLiveLevels(round, levels) {
   round.scannerLevel = levels.scanner;
   round.scannerNoise = CONFIG.SCANNER_NOISE[levels.scanner] * (round.first ? CONFIG.FIRST_FARMER.scannerNoiseScale : 1);
   round.glitchProb = round.first && !CONFIG.FIRST_FARMER.glitches ? 0 : CONFIG.SCANNER_GLITCH[levels.scanner];
-  round.perTrip = CONFIG.BELT_BOXES[levels.belt];   // boxes carried per tap
+  // boxes carried per tap; at the top unloading level one tap empties the whole truck
+  round.unloadAll = levels.belt >= CONFIG.UNLOAD_ALL_LEVEL;
+  round.perTrip = round.unloadAll ? Infinity : CONFIG.BELT_BOXES[levels.belt];
 }
 
 // Mirror values that fall outside the plot back inside (keeps the spread, avoids a pile-up on the edge).

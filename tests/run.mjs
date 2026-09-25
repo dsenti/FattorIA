@@ -133,9 +133,10 @@ test('scoring: best line pays 10 for any slope; ratios sane for flat and negativ
 });
 
 test('belt changes boxes per trip, not the amount of data', () => {
-  for (const belt of [0, 10]) {
+  for (const belt of [0, 5, 9, 10]) {
     const r = makeRound({ visitNo: 3, lastFarmerId: null, levels: { scanner: 0, belt, truck: 0 } });
-    assert.equal(r.perTrip, CONFIG.BELT_BOXES[belt]);
+    if (belt >= CONFIG.UNLOAD_ALL_LEVEL) assert.ok(r.unloadAll && r.perTrip >= CONFIG.TRUCK_CRATES[10], 'top level empties the truck in one tap');
+    else assert.equal(r.perTrip, CONFIG.BELT_BOXES[belt]);
     assert.equal(r.unitsPerBox, CONFIG.UNITS_PER_BOX);
     assert.equal(r.cratesTotal * r.unitsPerBox, 3, 'level-0 truck gives 3 data points');
   }

@@ -54,6 +54,11 @@ export const CONFIG = {
   // Unloading ("Scarico", stored as "belt"): objects carried per trip (per tap on the truck), per
   // level. It adds no data; it only unloads the truck faster.
   BELT_BOXES: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  // From this unloading level on, one tap empties the whole truck in one continuous animation of
+  // UNLOAD_ALL_MS (the robot shuttles up to UNLOAD_ALL_MAX_TRIPS times, whatever the truck size).
+  UNLOAD_ALL_LEVEL: 10,
+  UNLOAD_ALL_MS: 2500,
+  UNLOAD_ALL_MAX_TRIPS: 4,
   // Truck: boxes per farmer, per level (from TRUCK_BASE and TRUCK_FACTOR above).
   TRUCK_BASE,
   TRUCK_FACTOR,

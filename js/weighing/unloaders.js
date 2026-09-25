@@ -180,7 +180,18 @@ function drawCarrier(ctx, o) {
   ctx.fillStyle = `rgba(74,143,163,${0.5 + 0.4 * Math.sin(now / 200)})`; ctx.fillRect(rx - 14 * k, ry - 4 * k, 28 * k, 1.5 * k);
   for (const dx of [-11, -3, 5, 12]) wheel(ctx, rx + dx * k, ground - 3.5 * k, 3.5 * k, -x / 3.5);
   ctx.fillStyle = '#9A9189'; ctx.fillRect(rx - 15 * k, ry - 18 * k, 30 * k, 2 * k);
-  if (carrying) drawStack(ctx, rx, ry - 18 * k, n, unit, 3, bw * 0.8, bh * 0.75);
+  if (carrying) {
+    const shown = Math.min(n, 12);   // big loads: draw 12 boxes and a count
+    drawStack(ctx, rx, ry - 18 * k, shown, unit, 3, bw * 0.8, bh * 0.75);
+    if (n > shown) {
+      ctx.font = '800 12px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 3; ctx.strokeStyle = C.cream; ctx.fillStyle = C.soil;
+      const ty = ry - 18 * k - Math.ceil(shown / 3) * bh * 0.75 - 10;
+      ctx.strokeText(`+${n - shown}`, rx, ty);
+      ctx.fillText(`+${n - shown}`, rx, ty);
+    }
+  }
 }
 
 function drawHerder(ctx, o) {

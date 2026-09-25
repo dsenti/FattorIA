@@ -145,16 +145,25 @@ export class WeighingGame {
     if (!this.truckTappable(now)) return;
     const boxes = Math.min(this.round.perTrip, this.round.cratesLeft);
     this.round.cratesLeft -= boxes;
-    this.carry = { t0: now, boxes };
-    this.cooldownUntil = now + CONFIG.CARRY_MS + CONFIG.RETURN_MS;
+    if (this.round.unloadAll) {
+      // One continuous animation: the robot shuttles a few times and drops a share each time.
+      const trips = Math.max(1, Math.min(CONFIG.UNLOAD_ALL_MAX_TRIPS, Math.ceil(boxes / CONFIG.BELT_BOXES[CONFIG.MAX_LEVEL])));
+      const shares = Array.from({ length: trips }, (_, i) => Math.floor(boxes / trips) + (i < boxes % trips ? 1 : 0));
+      this.carry = { t0: now, boxes, all: true, trips, shares, period: CONFIG.UNLOAD_ALL_MS / trips, dropped: 0 };
+      this.cooldownUntil = now + CONFIG.UNLOAD_ALL_MS;
+    } else {
+      this.carry = { t0: now, boxes };
+      this.cooldownUntil = now + CONFIG.CARRY_MS + CONFIG.RETURN_MS;
+    }
     this.updateInfo();
   }
 
-  dropCrate(now) {
-    const n = this.carry.boxes * this.round.unitsPerBox;
+  dropCrate(now, boxes = this.carry.boxes) {
+    const n = boxes * this.round.unitsPerBox;
     const W = this.sceneW || 390;
     const spacing = 26 / W;                       // in scene-width units
-    const interval = Math.min(spacing / CONFIG.BELT_SPEED * 1000, CONFIG.TRIP_UNLOAD_MS / n);
+    const span = this.carry && this.carry.all ? this.carry.period : CONFIG.TRIP_UNLOAD_MS;
+    const interval = Math.min(spacing / CONFIG.BELT_SPEED * 1000, span / n);
     let t = Math.max(now, this.nextSpawnAt || 0);
     for (let i = 0; i < n; i++) {
       const idx = takeUnit(this.round);
@@ -262,8 +271,8 @@ export class WeighingGame {
     const f = r.farmer;
     const k = r.unitsPerBox;
     this.el.crates.textContent = f.animal
-      ? `🚚 ${f.unit} ${r.cratesLeft * k}/${r.cratesTotal * k} · ${r.perTrip * k} per viaggio`
-      : `📦 cassette: ${r.cratesLeft}/${r.cratesTotal} · ${r.perTrip} per viaggio`;
+      ? `🚚 ${f.unit} ${r.cratesLeft * k}/${r.cratesTotal * k} · ${r.unloadAll ? 'tutti in un colpo' : `${r.perTrip * k} per viaggio`}`
+      : `📦 cassette: ${r.cratesLeft}/${r.cratesTotal} · ${r.unloadAll ? 'tutte in un colpo' : `${r.perTrip} per viaggio`}`;
     this.el.count.innerHTML = `dati <em>(data)</em>: ${r.sample.length}`;
     this.el.lock.disabled = !(this.phase === 'collect' && this.canLock());
   }
@@ -283,11 +292,19 @@ export class WeighingGame {
       this.updateInfo();
     }
     // Carry animation: drop the crate at the end.
-    if (this.carry && now - this.carry.t0 >= CONFIG.CARRY_MS && !this.carry.dropped) {
+    if (this.carry && this.carry.all) {
+      // unload-all: trip i drops its share half-way through its period
+      const c = this.carry;
+      while (c.dropped < c.trips && now - c.t0 >= (c.dropped + 0.5) * c.period) {
+        this.dropCrate(now, c.shares[c.dropped]);
+        c.dropped++;
+      }
+      if (now - c.t0 >= CONFIG.UNLOAD_ALL_MS) { this.carry = null; this.updateInfo(); }
+    } else if (this.carry && now - this.carry.t0 >= CONFIG.CARRY_MS && !this.carry.dropped) {
       this.carry.dropped = true;
       this.dropCrate(now);
     }
-    if (this.carry && now - this.carry.t0 >= CONFIG.CARRY_MS + CONFIG.RETURN_MS) {
+    if (this.carry && !this.carry.all && now - this.carry.t0 >= CONFIG.CARRY_MS + CONFIG.RETURN_MS) {
       this.carry = null;
       this.updateInfo();
     }
@@ -543,7 +560,11 @@ export class WeighingGame {
       const bed = drawVehicle(ctx, { level: r.truckLevel, xRear: g.truckRear * W, ground, W, H, now, off: tOff });
       // While the farmer walks to the truck, the boxes being fetched are still on the pile.
       let shown = r.cratesLeft;
-      if (this.carry && now - this.carry.t0 < CONFIG.CARRY_MS * 0.35) shown += this.carry.boxes;
+      if (this.carry && this.carry.all) {
+        // shares of trips that haven't been picked up yet are still on the pile
+        const c = this.carry, started = Math.min(c.trips, Math.floor((now - c.t0) / c.period) + 1);
+        for (let i = started; i < c.trips; i++) shown += c.shares[i];
+      } else if (this.carry && now - this.carry.t0 < CONFIG.CARRY_MS * 0.35) shown += this.carry.boxes;
       const per = f.animal ? r.unitsPerBox : 1;   // animals are drawn one by one
       drawPile(ctx, f.unit, f.animal, r.cratesTotal * per, shown * per, bed.bx, bed.bw, bed.floorY, bed.maxH);
       ctx.restore();
@@ -551,8 +572,18 @@ export class WeighingGame {
 
     // unloading: farmer, helpers or tools, moving between truck and belt
     const idleX = g.farmerIdle * W, pickX = g.pick * W, dropX = (g.beltStart + 0.01) * W;
-    let x = idleX, carrying = false, tripP = null, walking = false;
-    if (this.carry) {
+    let x = idleX, carrying = false, tripP = null, walking = false, load = this.carry ? this.carry.boxes : 0;
+    if (this.carry && this.carry.all) {
+      // shuttle: truck -> belt (carrying) -> truck ...; the last run ends back at the idle spot
+      const c = this.carry, t = now - c.t0;
+      const i = Math.min(c.trips - 1, Math.floor(t / c.period));
+      const q = clamp((t - i * c.period) / c.period, 0, 1);
+      walking = true;
+      load = c.shares[i];
+      tripP = q;
+      if (q < 0.5) { x = pickX + (dropX - pickX) * easeInOut(q / 0.5); carrying = true; }
+      else { const back = i === c.trips - 1 ? idleX : pickX; x = dropX + (back - dropX) * easeInOut((q - 0.5) / 0.5); }
+    } else if (this.carry) {
       const t = now - this.carry.t0;
       tripP = clamp(t / (CONFIG.CARRY_MS + CONFIG.RETURN_MS), 0, 1);
       walking = true;
@@ -571,7 +602,7 @@ export class WeighingGame {
       ctx.translate(x, ground); ctx.scale(uPop, uPop); ctx.translate(-x, -ground);
       drawUnloader(ctx, {
         level: lv.belt, animal: f.animal, x, ground, H, now, carrying, walking,
-        boxes: this.carry ? this.carry.boxes : 0, unitsPerBox: r.unitsPerBox, unit: f.unit, face: f.face,
+        boxes: load, unitsPerBox: r.unitsPerBox, unit: f.unit, face: f.face,
         tripP, pickX, dropX, idleX,
       });
       ctx.restore();
