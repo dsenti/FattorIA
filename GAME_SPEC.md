@@ -119,36 +119,44 @@ The story behind the trucks:
    - The **shape of the tree is fixed** per level. Empty gates show a "?" and pulse gently.
    - Each leaf ends in a **pipe** that runs down to a truck. Several leaves can pipe into the same truck, and pipes may cross, as in the sketch.
    - At most 5 gates per row, up to 6 trucks. Big trees scroll vertically; nothing needs horizontal scrolling on 360 px.
-3. **Trucks:** a row of trucks at the bottom, each with a big symbol painted on it saying what it wants. The symbol is the **etichetta (label)**.
-4. **Buttons:** "Prova l'albero" (try the tree; free, as often as you like) and "Avanti" (next), enabled after a perfect Prova.
+3. **Trucks:** a row of trucks at the bottom, each with a big symbol painted on it saying what it wants. The symbol is the **etichetta (label)**. Symbols are built per level from the items that go into the truck (`js/sorting/trucks.js`), so they always show exactly what goes in, without needing the level text:
+   - type trucks show that type in every colour that goes in (e.g. "mele": red, green and yellow apples; "carote": orange and yellow);
+   - the scale trucks (grandi / piccoli) show that level's produce on a heavy or light pan (pears in "Pere a peso");
+   - lavaggio shows a dirty item that is washed there under a tap; brutti ma buoni a misshapen one with a heart;
+   - compost (bin), galline (hen), orto (garden bed with a flower) and mercato (market stall with a striped awning) are fixed.
+   A test checks that no symbol shows produce that can't go into its truck.
+4. **Pipes:** the connectors between gates are metal pipes; the ✗ (no) marker on the left branch is red, the ✓ (yes) on the right green. Each downpipe from a leaf to its truck is tinted like its truck (compost green, lavaggio blue, galline cream, orto pink, mercato red, brutti orange, …), so crossing pipes can be told apart; leaves going to the same truck share its colour. Colours differ clearly within every level (tested).
+5. **Buttons:** "Prova l'albero" (try the tree; free, as often as you like) and "Avanti" (next), enabled after a perfect Prova.
 
 **No emoji in this minigame:** every item, question icon, truck symbol and pipe is drawn as SVG in the course palette. (Minigame 1 still uses emoji; TODO(Dominik): convert it later for a uniform look?)
 
-**Items.** Produce: mela, pera, patata, pomodoro, carota, drawn small or big (big always means heavy; there is no separate size feature), in five colours (rosso, verde, giallo, arancione, marrone). Produce can be marcio (dark spots with a mould ring), sporco di terra (a caked layer of soil with crumbs), strano (a twin carrot, a lumpy potato, a crooked pear, a lopsided apple, a tomato with a bump), with a worm in it, or with a snail on it. Lone animals: ape, farfalla, coccinella, lumaca, verme.
+**Items.** Produce: mela, pera, patata, pomodoro, carota, drawn small or big (big always means heavy; there is no separate size feature), in five colours (rosso, verde, giallo, arancione, marrone). Produce can be marcio (soft, feathered dark patches with a pale mould halo), sporco di terra (a crisp caked layer of soil with crumbs), strano (a twin carrot, a lumpy potato, a crooked pear, a lopsided apple, a tomato with a bump), with a worm in it, or with a snail on it. Lone animals: ape (yellow), farfalla (wings in its colour), coccinella (red), lumaca (shell in its colour), verme (a saturated earthworm red). Every lone animal's drawing shows the colour the colour questions use (tested for bee, ladybird and worm).
 
 **Choosing a question.** Tap a gate → a bottom sheet with a grid of question icons (only the ones that are free or unlocked by a bought sensor). Tap one to place it. Tap a filled gate to change it. Every question is binary and shown as a picture:
 | Question | Icon | Unlocked by |
 |---|---|---|
 | È rosso? / verde? / giallo? / arancione? / marrone? (colour) | a paint splat in that colour | free |
 | È una mela? / pera? / patata? / pomodoro? / carota? (type) | the item's dark silhouette | free |
+| È una farfalla? (a distractor: no level needs it) | a butterfly silhouette | free |
 | È sporco di terra? (covered in soil) | a fruit with caked soil and falling crumbs | free |
-| C'è una lumaca? (a snail, alone or on produce) | a snail silhouette | free |
-| È marcio? (rotten) | a fruit with brown spots and a smell | naso elettronico |
-| C'è un verme? (a worm, alone or in produce) | a worm | rilevatore di vermi |
+| C'è una lumaca? (a snail, alone or on produce) | a snail, drawn in colour | free |
+| È marcio? (rotten) | a fruit with soft rot patches and a smell | naso elettronico |
+| C'è un verme? (a worm, alone or in produce) | a red worm | rilevatore di vermi |
 | È pesante? (heavy = big) | a scale tipping down | bilancia |
-| Ha una forma strana? (misshapen) | a lumpy potato outline | occhio delle forme |
-| È un animale vivo? (only lone animals; produce with a worm or snail is not) | a heart with a heartbeat | sensore di vita |
+| Ha una forma strana? (misshapen) | a lumpy potato outline with a small heart (like the brutti ma buoni truck) | occhio delle forme |
+| È un animale da solo? (only lone animals; produce with a worm or snail is not) | a beetle alone on bare ground next to a crossed-out apple | sensore di vita |
 
-Lone animals are not produce: no type question is true for them. So a lone snail answers ✓ to "C'è una lumaca?" and "È vivo?", while an apple with a snail answers ✓ only to "C'è una lumaca?" (and "È una mela?"). Both appear in the levels, which makes the trees harder.
+Lone animals are not produce: no produce type question is true for them. So a lone snail answers ✓ to "C'è una lumaca?" and "È un animale da solo?", while an apple with a snail answers ✓ only to "C'è una lumaca?" (and "È una mela?"). Both appear in the levels, which makes the trees harder.
 
 **Run (Prova).** Items fall one by one from the hopper. At each gate the gate lights up and shows ✓ or ✗ for that item, the item slides down the matching branch, through the pipe, and into a truck. The view scrolls down once as the items travel, then stays at the bottom with the trucks until every item has landed. It never scrolls back up by itself, and scrolling by hand stops the auto-scroll. Afterwards:
-- each wrongly sorted item gets a red ring (in the hopper and in its truck), and tapping it draws its path in red and frames the right truck;
+- each wrongly sorted item gets a red ring in its truck, and tapping it (or the item in the hopper) draws its path in red and frames the right truck;
 - a result bar shows "accuratezza (accuracy): 9/12 giusti";
-- the guilty gates (the first gate after which an item's truck can no longer be reached) get a small red dot; with the lente, a red frame with the number of errors.
+- gates are not flagged at first. From the **3rd failed Prova on a level** (counted per level, saved, reset when the level is solved), the gates whose question differs from the level's one correct tree, and empty gates, are framed in red, with the line "Dopo 3 tentativi: i cancelli con la domanda sbagliata sono segnati in rosso." A gate the player changes loses its mark until the next failed Prova. This is for everyone, not only with the lente.
+- tapping an item opens its card; tapping anywhere outside the card closes it.
 
 **Training vs test, and "Avanti".** The batch at the top is the **addestramento (training)** batch: the player can Prova on it again and again. As soon as a Prova sorts everything right (once the last item has left the hopper, while the last items are still sliding), the tree is checked on a **new batch of the same kinds of items** that the player has not seen, the **test**. This happens instantly, without replaying the pipeline. The result bar shows "Test su 13 pezzi nuovi, mai visti: 13/13 giusti · +N" and the coins are paid at once. "Avanti" then sends the loaded trucks driving off (the last items are put into their trucks at once if they are still sliding), and the next level's trucks drive in. On the last level the button reads "Fine" and opens the level list. Because each level has exactly one correct tree, and the test only contains the training kinds, a perfect tree always scores 100% on the test. The point is that students see the tree judged on new items.
 
-**Levels (15, hand-designed, in `js/sorting/levels.js`).** Every level has **exactly one** assignment of questions that sorts the training batch 100% correctly, out of all 17 questions on every gate. `node tests/run.mjs` checks this exhaustively (a factorised count for all levels, and a literal one-by-one brute force for the levels with up to 5 gates). It also checks that every leaf gets a training item, that the correct tree scores 100% on generated test batches, and that the story rules above hold (helpers → orto, lone worms and snails → galline).
+**Levels (15, hand-designed, in `js/sorting/levels.js`).** Every level has **exactly one** assignment of questions that sorts the training batch 100% correctly, out of all 18 questions on every gate. `node tests/run.mjs` checks this exhaustively (a factorised count for all levels, and a literal one-by-one brute force for the levels with up to 5 gates). It also checks that every leaf gets a training item, that the correct tree scores 100% on generated test batches, and that the story rules above hold (helpers → orto, lone worms and snails → galline).
 | # | Level | Gates | Trucks | Solution questions | Sensors needed |
 |---|---|---|---|---|---|
 | 1 | Rosse o verdi | 1 | verdi, rosse | rosso | – |
@@ -178,18 +186,18 @@ TODO(Dominik): check the level list, especially that the item combinations make 
 | Rilevatore di vermi (worm detector) | 20 | question "C'è un verme?"; from level 7 | " |
 | Bilancia (scale) | 25 | question "È pesante?"; from level 8 | " |
 | Occhio delle forme (shape camera) | 25 | question "Ha una forma strana?"; from level 9 | " |
-| Sensore di vita (life sensor) | 35 | question "È un animale vivo?"; from level 10 | " |
-| Lente d'ingrandimento (magnifying glass) | 20 | the guilty gates get a red frame with the number of errors, and tapping a wrong item replays its path slowly | reading an error back to its cause |
+| Sensore di vita (life sensor) | 35 | question "È un animale da solo?" (lone animals, not produce with an animal on it); from level 10 | " |
+| Lente d'ingrandimento (magnifying glass) | 20 | tapping a wrongly sorted item replays its path slowly, gate by gate (it no longer marks gates) | reading an error back to its cause |
 | Suggerimento (hint), consumable | 3, 6, 9, … | reveals the correct question of one gate. Bought in the shop (kept in stock) or bought and used at once from the gate sheet | — |
 | Nastro veloce (fast belt) | 15 | faster Prova animations | (comfort) |
 
-Colour, type, soil and snail questions are free: you can see them. The former "calibro" (size gauge) is gone with the size feature; saves that had bought it get its 30 coins back.
+Colour, type (including the butterfly distractor), soil and snail questions are free: you can see them. The former "calibro" (size gauge) is gone with the size feature; saves that had bought it get its 30 coins back.
 
 TODO(Dominik): prices, once it has been play-tested.
 
 **Map.** The weighing station is joined by "Lo smistamento" (the place previously shown as "Il frutteto", lesson 3). It unlocks by **paying coins** (100, in config) instead of by lesson, so the money from minigame 1 buys the next place. TODO(Dominik): or unlock by a teacher code in class? Once it is open, the shop has two tabs, "Pesatura" and "Smistamento".
 
-**Saves.** Minigame 2 progress is stored under `sort` with a `levelsVersion`. The levels were redesigned in version 2, so older saves start the levels again but keep the place, bought sensors, hints, lente and nastro veloce (and get the calibro refund).
+**Saves.** Minigame 2 progress is stored under `sort` with a `levelsVersion`, and `fails` (failed Provas per level since it was last solved). The levels were redesigned in version 2, so older saves start the levels again but keep the place, bought sensors, hints, lente and nastro veloce (and get the calibro refund).
 
 **Open questions**
 - TODO(Dominik): overfitting (L3). A later extension could give a level with a tiny training batch where a wrong tree also scores 100% on training but fails the test. This would deliberately break the "one correct tree" rule for that level only.

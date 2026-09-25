@@ -13,7 +13,7 @@ Then open http://localhost:8000. To try it on a phone on the same Wi-Fi, run `py
 
 Opening `index.html` straight from the file system (`file://`) does **not** work: browsers block ES modules there.
 
-Model checks (no browser needed): `node tests/run.mjs` from `Game/`. It also prints a small tuning report: the average coins that a player who fits the measured dots perfectly would earn at different upgrade levels. For minigame 2 it checks that **every level has exactly one question assignment that sorts its training batch 100%** (exhaustive over all 17 questions on every gate), that the correct tree scores 100% on generated test batches, that the trees fit 360 px, and that saves migrate.
+Model checks (no browser needed): `node tests/run.mjs` from `Game/`. It also prints a small tuning report: the average coins that a player who fits the measured dots perfectly would earn at different upgrade levels. For minigame 2 it checks that **every level has exactly one question assignment that sorts its training batch 100%** (exhaustive over all 18 questions on every gate), that the correct tree scores 100% on generated test batches, that every truck symbol shows only what goes in, that pipe colours differ within a level, that the trees fit 360 px, and that saves migrate.
 
 ## Deploy to GitHub Pages
 Live at **https://dsenti.github.io/FattorIA/**, from the public repo `dsenti/FattorIA`.
@@ -47,9 +47,10 @@ js/weighing/pile.js     the pseudo-3D pile in the bed
 js/weighing/previews.js shop previews (current -> next level)
 js/weighing/draw.js     shared canvas helpers (palette, crate, stack, wheel)
 js/sorting/levels.js    minigame 2: THE LEVELS (tree shape + solution, trucks, training items). Edit here.
-js/sorting/questions.js item features (produce, lone animals, soil, shape, worm, snail), the 17 yes/no questions, the sensors
+js/sorting/questions.js item features (produce, lone animals, soil, shape, worm, snail), the 18 yes/no questions, the sensors
 js/sorting/tree.js      pure model: compile a tree, route items, accuracy, guilty gate, solution count, test batches, layout
 js/sorting/progress.js  which levels are open, which sensors a level needs
+js/sorting/trucks.js    per level: what each truck symbol shows (from the items that go in), and the pipe colours
 js/sorting/art.js       all minigame 2 drawings as inline SVG (items, question icons, truck symbols, trucks, icons)
 js/sorting/game.js      the minigame: hopper, tree, pipes, trucks, question palette, Prova animation, Avanti (test, pay, trucks drive off), level list
 js/sorting/shop.js      the "Smistamento" tab of the shop (sensors, lente, nastro veloce, suggerimenti)
