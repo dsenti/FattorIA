@@ -195,6 +195,12 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
 .controls .btn.big { margin-top: 4px; }
 .lock-row { display: flex; gap: 8px; }
+/* drag mode: no sliders, a hint and the words pendenza / intercetta instead */
+.controls.drag .slider-row { display: none; }
+.drag-info { padding: 2px 2px 4px; }
+.drag-hint { font-size: 14px; font-weight: 700; }
+.drag-words { font-size: 13px; margin-top: 3px; line-height: 1.35; }
+.drag-words b { color: var(--tomato); }
 /* scanner 100: sliders move by themselves; keep them readable and say so */
 .controls.smart .slider.disabled { opacity: 0.9; }
 .controls.smart .slider-label::after { content: ' · automatico 🤖'; color: var(--olive); font-weight: 700; }
@@ -257,6 +263,9 @@ canvas.preview { flex: 1; min-width: 0; height: 84px; background: #F4ECD8; borde
 .settings-row { background: #fff; border-radius: var(--radius); padding: 12px; margin-bottom: 10px; font-size: 14px; line-height: 1.4; }
 .settings-row .btn { margin-top: 8px; width: 100%; }
 .btn.danger { border-color: var(--tomato); color: var(--tomato); }
+.choice-row { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.settings-row .choice-row .btn { margin-top: 0; text-align: left; font-size: 15px; }
+.btn.choice[aria-checked="true"] { background: var(--olive); border-color: var(--olive); color: #fff; }
 
 /* ---------------------------------------------------------------- modal */
 .modal { position: absolute; inset: 0; background: rgba(58, 37, 25, 0.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; }

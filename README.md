@@ -67,6 +67,9 @@ Everything is in `js/config.js`, with comments:
 
 Farmers (names, questions, per-farmer noise) are in `js/weighing/farmers.js`.
 
+## Moving the line
+Two modes, a setting in ⚙️ Impostazioni ("Come muovi la retta", `state.lineMode`: `'sliders'` default or `'drag'`; kept by Ricomincia). In drag mode the two handles sit at x = 0 and x = 1 and move only vertically inside the plot (`lineToEnds` / `endsToLine` / `clampEnds` in `round.js`); the sliders remain the internal source of truth, so Blocca, scanner 100 and scoring work the same in both modes.
+
 ## How the scoring works
 Plot units are normalised (0–1 on both axes; the axes show no numbers). Each farmer has a hidden true line and a harvest of `HARVEST_SIZE` units spread around it. The truck carries a random subset. The scanner adds noise, and sometimes a glitch (an outlier), to each measured unit. On "Blocca la retta", the game computes the mean absolute error of the player's line and of the least-squares line, both on the **whole harvest** (without scanner noise). The ratio of the two goes through `SCORE_THRESHOLDS`.
 

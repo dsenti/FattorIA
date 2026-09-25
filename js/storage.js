@@ -31,6 +31,7 @@ export function defaultState() {
     fits: [],              // last rounds: { f: farmer id, c: coins, r: error ratio }
     seenHelp: false,       // "how to play" shown once
     seenFlip: false,       // "axis reversed" warning shown once
+    lineMode: 'sliders',   // how the line is moved: 'sliders' or 'drag' (a setting; kept on restart)
   };
 }
 
@@ -63,6 +64,7 @@ export function sanitize(raw) {
     fits: Array.isArray(raw.fits) ? raw.fits.slice(-MAX_HISTORY) : [],
     seenHelp: raw.seenHelp === true,
     seenFlip: raw.seenFlip === true,
+    lineMode: raw.lineMode === 'drag' ? 'drag' : 'sliders',
   };
 }
 

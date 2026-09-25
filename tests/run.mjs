@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { CONFIG } from '../js/config.js';
 import { EMOJIS, NOUNS, ADJECTIVES, formatName, nameChoices, isValidName } from '../js/names.js';
 import { FARMERS } from '../js/weighing/farmers.js';
-import { makeRound, takeUnit, measure, scoreLine, coinsForRatio, sliderToLine, startSliders, dataSlope, autoFit, lineToSliders, scannerOffer, isSmartScanner, scannerIndex } from '../js/weighing/round.js';
+import { makeRound, takeUnit, measure, scoreLine, coinsForRatio, sliderToLine, startSliders, dataSlope, autoFit, lineToSliders, scannerOffer, isSmartScanner, scannerIndex, lineToEnds, endsToLine, clampEnds } from '../js/weighing/round.js';
 import { sanitize } from '../js/storage.js';
 import { leastSquares } from '../js/stats.js';
 
@@ -80,7 +80,9 @@ test('true lines: positive in reality, axis flips give the visible sign, inside 
     assert.equal(r.harvest.length, CONFIG.HARVEST_SIZE);
     // The real relation is always "more x -> more y", for every farmer.
     assert.ok(dataSlope(r.trueLine, r.axes) > 0, `${r.farmer.id}: real relation positive`);
-    assert.ok(dataSlope(r.best, r.axes) > 0, `${r.farmer.id}: best line positive in data space`);
+    // The harvest's best line agrees too, except when the true line is almost flat: then a noisy
+    // 240-unit harvest can, rarely, tilt the other way.
+    if (Math.abs(r.trueLine.b) > 0.15) assert.ok(dataSlope(r.best, r.axes) > 0, `${r.farmer.id}: best line positive in data space`);
     // Visible sign = flipX xor flipY.
     assert.equal(b < 0, r.axes.flipX !== r.axes.flipY, 'visible slope sign matches the axis flips');
     if (visit === 0) { assert.ok(!r.axes.flipX && !r.axes.flipY, 'first farmer: normal axes'); continue; }
@@ -213,6 +215,36 @@ test('secret scanner level 100: offered only after level 10; old saves migrate',
   assert.equal(sanitize({ ...base, levels: { ...base.levels, scanner: 100 } }).levels.scanner, 100);
   assert.equal(sanitize({ ...base, levels: { ...base.levels, scanner: 55 } }).levels.scanner, 10, 'other values clamp to 0..10');
   assert.ok(!('fitter' in sanitize(base).levels), 'no fitter key any more');
+});
+
+test('drag mode: end points <-> slope/intercept round-trip; every true line reachable', () => {
+  const close = (u, v) => Math.abs(u - v) < 1e-9;
+  for (let i = 0; i < 2000; i++) {
+    const ends = { left: Math.random(), right: Math.random() };
+    const line = endsToLine(ends);
+    const back = lineToEnds(line);
+    assert.ok(close(back.left, ends.left) && close(back.right, ends.right), 'ends -> line -> ends');
+    // ...and through the sliders (the game keeps the sliders as the source of truth)
+    const s = lineToSliders(line);
+    assert.ok(s.slope > 0 && s.slope < 1 && s.intercept > 0 && s.intercept < 1, 'every drag line is inside the slider ranges');
+    const viaSliders = lineToEnds(sliderToLine(s.slope, s.intercept));
+    assert.ok(close(viaSliders.left, ends.left) && close(viaSliders.right, ends.right), 'ends -> sliders -> ends');
+    const l2 = { a: Math.random() * 1.2 - 0.1, b: Math.random() * 2 - 1 };
+    const l3 = endsToLine(lineToEnds(l2));
+    assert.ok(close(l3.a, l2.a) && close(l3.b, l2.b), 'line -> ends -> line');
+  }
+  const c = clampEnds({ left: -0.3, right: 1.7 });
+  assert.ok(c.left === 0 && c.right === 1);
+  // every hidden true line has both ends inside the plot, so clamping never changes it
+  const lv = { scanner: 0, belt: 0, truck: 0 };
+  for (let v = 0; v < 2000; v++) {
+    const r = makeRound({ visitNo: v % 30, lastFarmerId: null, levels: lv });
+    for (const line of [r.trueLine, r.best]) {
+      const e = lineToEnds(line), ce = clampEnds(e);
+      if (line === r.trueLine) assert.ok(ce.left === e.left && ce.right === e.right, 'true line reachable by dragging');
+      else assert.ok(Math.abs(ce.left - e.left) < 0.05 && Math.abs(ce.right - e.right) < 0.05, 'best line (almost) reachable');
+    }
+  }
 });
 
 test('glitch rate at scanner level 0 is about 1/8', () => {

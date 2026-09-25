@@ -209,7 +209,7 @@ function showHelp() {
     '<p>Gli agricoltori della valle vogliono una regola per prevedere una cosa da un\'altra.</p>' +
     '<ol>' +
     '<li><b>Tocca il camion 🚚.</b> L\'agricoltore porta una cassetta sul nastro. Lo scanner misura ogni pezzo: ogni misura è un dato <em>(data)</em>, un puntino nel grafico. Quando il camion è vuoto, riparte da solo.</li>' +
-    '<li><b>Muovi i cursori</b> pendenza <em>(slope)</em> e intercetta <em>(intercept)</em> finché la retta passa vicino ai puntini.</li>' +
+    '<li><b>Muovi i cursori</b> pendenza <em>(slope)</em> e intercetta <em>(intercept)</em> finché la retta passa vicino ai puntini. Oppure, in Impostazioni ⚙️, scegli <b>Trascina la retta</b> e sposta i due pallini alle sue estremità.</li>' +
     '<li><b>Blocca la retta 🔒.</b> L\'agricoltore la prova sul suo raccolto intero. Più piccolo è l\'errore <em>(error)</em>, più monete ti dà (fino a 10 🪙).</li>' +
     '</ol>' +
     '<p>Attenzione: lo scanner a volte sbaglia. Con le monete puoi migliorarlo.</p>',
@@ -347,10 +347,21 @@ function openSettings() {
     body.innerHTML =
       `<div class="settings-row">Il tuo nome nel gioco:<br><b>${formatName(state.name)}</b>` +
       '<button class="btn" id="set-name">Cambia nome</button></div>' +
+      '<div class="settings-row"><b>Come muovi la retta</b>' +
+      '<div class="choice-row" role="radiogroup" aria-label="Come muovi la retta">' +
+      `<button class="btn choice" data-mode="sliders" role="radio" aria-checked="${state.lineMode !== 'drag'}">🎚️ Cursori (pendenza e intercetta)</button>` +
+      `<button class="btn choice" data-mode="drag" role="radio" aria-checked="${state.lineMode === 'drag'}">👆 Trascina la retta</button>` +
+      '</div></div>' +
       '<div class="settings-row">I progressi restano solo su questo telefono (o computer). ' +
       'Nella classifica vanno solo il nome del gioco e il punteggio: niente nome vero, niente email.</div>' +
       '<div class="settings-row">Ricomincia da zero: monete, migliorie e agricoltori serviti tornano a 0.' +
       '<button class="btn danger" id="set-reset">Ricomincia</button></div>';
+    body.querySelectorAll('.choice[data-mode]').forEach((b) => b.addEventListener('click', () => {
+      state.lineMode = b.dataset.mode;
+      save();
+      body.querySelectorAll('.choice[data-mode]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+      game.applyLineMode();
+    }));
     body.querySelector('#set-name').addEventListener('click', async () => {
       const nm = await pickName(true);
       if (nm) { state.name = nm; save(); pushScore(); renderMap(); closeSheet(); openSettings(); }
@@ -361,7 +372,7 @@ function openSettings() {
         { label: 'No, annulla', value: false },
       ]);
       if (!ok) return;
-      const keep = { playerId: state.playerId, name: state.name };
+      const keep = { playerId: state.playerId, name: state.name, lineMode: state.lineMode };
       clearState();
       state = { ...defaultState(), ...keep };
       save();

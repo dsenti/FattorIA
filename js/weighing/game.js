@@ -4,7 +4,7 @@
 import { CONFIG } from '../config.js';
 import { Slider } from '../slider.js';
 import { xLabel, yLabel } from './farmers.js';
-import { makeRound, takeUnit, measure, scoreLine, sliderToLine, startSliders, applyLiveLevels, autoFit, lineToSliders, scannerIndex, isSmartScanner } from './round.js';
+import { makeRound, takeUnit, measure, scoreLine, sliderToLine, startSliders, applyLiveLevels, autoFit, lineToSliders, scannerIndex, isSmartScanner, lineToEnds, endsToLine, clampEnds } from './round.js';
 import { clamp } from '../stats.js';
 import { C, FONT } from './draw.js';
 import { drawScanner, drawScannerBeam, drawFitter, drawUpgradeFx, drawFinaleFx, upgradePop, scannerMetrics } from './scanner.js';
@@ -39,7 +39,7 @@ export class WeighingGame {
       plot: $('w-plot'), scene: $('w-scene'),
       face: $('w-face'), who: $('w-who'), text: $('w-text'), sub: $('w-sub'),
       crates: $('w-crates'), count: $('w-count'),
-      controls: $('w-controls'), lock: $('w-lock'),
+      controls: $('w-controls'), lock: $('w-lock'), dragInfo: $('w-drag-info'), dragWords: $('w-drag-words'),
       result: $('w-result'), resTitle: $('w-res-title'), resCoins: $('w-res-coins'),
       barMe: $('w-bar-me'), barBest: $('w-bar-best'), resNote: $('w-res-note'), next: $('w-next'),
     };
@@ -50,6 +50,15 @@ export class WeighingGame {
     this.el.lock.addEventListener('click', () => this.lock());
     this.el.next.addEventListener('click', () => this.nextFarmer());
     this.el.scene.addEventListener('pointerdown', (e) => this.onSceneTap(e));
+    // Drag mode: grab one of the two line handles on the plot.
+    const plot = this.el.plot;
+    plot.addEventListener('pointerdown', (e) => this.onPlotDown(e));
+    plot.addEventListener('pointermove', (e) => { if (this.drag) { e.preventDefault(); this.onPlotMove(e); } });
+    const endDrag = () => { this.drag = null; };
+    plot.addEventListener('pointerup', endDrag);
+    plot.addEventListener('pointercancel', endDrag);
+    plot.addEventListener('lostpointercapture', endDrag);
+    this.drag = null;       // { side: 'left' | 'right' } while a handle is dragged
 
     this.round = null;
     this.phase = 'idle';
@@ -68,6 +77,7 @@ export class WeighingGame {
   show() {
     this.active = true;
     if (!this.round) this.newRound();
+    this.applyLineMode();
     cancelAnimationFrame(this.raf);
     this.raf = requestAnimationFrame(this.loop);
   }
@@ -115,6 +125,7 @@ export class WeighingGame {
     this.updateInfo();
     const ax = this.round.axes;
     if ((ax.flipX || ax.flipY) && this.app.onAxesFlipped) this.app.onAxesFlipped(ax);
+    this.applyLineMode();
   }
 
   // ------------------------------------------------------------ input
@@ -177,6 +188,82 @@ export class WeighingGame {
       t += interval;
     }
     this.nextSpawnAt = t;
+  }
+
+  // ------------------------------------------------------------ drag mode
+  dragMode() {
+    return this.app.getState().lineMode === 'drag';
+  }
+
+  dragAllowed() {
+    return this.dragMode() && this.phase === 'collect' && !this.round.smart;
+  }
+
+  // Pixel positions of the two handles (plot geometry from the last drawPlot).
+  handlePositions() {
+    const g = this.plotGeom;
+    if (!g) return null;
+    const e = lineToEnds(this.line);
+    return {
+      left: { x: g.L, y: g.B - clampEnds(e).left * (g.B - g.T) },
+      right: { x: g.R, y: g.B - clampEnds(e).right * (g.B - g.T) },
+    };
+  }
+
+  onPlotDown(e) {
+    if (!this.dragAllowed()) return;
+    const hp = this.handlePositions();
+    if (!hp) return;
+    const r = this.el.plot.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const dist = (p) => Math.hypot(p.x - x, p.y - y);
+    const HIT = 30; // px radius: a 60 px touch target, bigger than the drawn handle
+    const dl = dist(hp.left), dr = dist(hp.right);
+    const side = dl <= dr ? 'left' : 'right';   // overlapping hit areas: the nearest one wins
+    if (Math.min(dl, dr) > HIT) return;
+    e.preventDefault();
+    this.el.plot.setPointerCapture(e.pointerId);
+    this.drag = { side };
+    this.onPlotMove(e);
+  }
+
+  onPlotMove(e) {
+    if (!this.drag || !this.dragAllowed()) { this.drag = null; return; }
+    const g = this.plotGeom;
+    const r = this.el.plot.getBoundingClientRect();
+    const v = (g.B - (e.clientY - r.top)) / (g.B - g.T);
+    const ends = clampEnds(lineToEnds(this.line));
+    ends[this.drag.side] = v;
+    this.setLine(endsToLine(clampEnds(ends)));
+  }
+
+  // Move the line (the sliders stay the single source of truth, also in drag mode).
+  setLine(line) {
+    const s = lineToSliders(line);
+    this.slope.set(s.slope, false);
+    this.intercept.set(s.intercept, false);
+  }
+
+  // Called when the setting changes: show/hide sliders, keep the handles inside the plot.
+  applyLineMode() {
+    const drag = this.dragMode();
+    this.el.controls.classList.toggle('drag', drag);
+    this.el.dragInfo.hidden = !drag;
+    if (drag && this.round && this.phase === 'collect' && !this.round.smart) {
+      this.setLine(endsToLine(clampEnds(lineToEnds(this.line))));
+    }
+    this.drag = null;
+  }
+
+  // Words only (no numbers): how steep the line is and where it meets the vertical axis.
+  dragWords() {
+    const l = this.line;
+    const b = l.b;
+    const slope = b > 0.6 ? '↗ ripida in salita' : b > 0.15 ? '↗ in salita' : b >= -0.15 ? '→ quasi piatta'
+      : b >= -0.6 ? '↘ in discesa' : '↘ ripida in discesa';
+    const icpt = l.a > 0.67 ? 'in alto' : l.a > 0.33 ? 'a metà' : 'in basso';
+    const auto = this.round && this.round.smart ? ' · automatico 🤖' : '';
+    return `pendenza <em>(slope)</em>: <b>${slope}</b> · intercetta <em>(intercept)</em>: <b>${icpt}</b>${auto}`;
   }
 
   // Scanner level 100: the line keeps following the least-squares line of the measured points
@@ -374,6 +461,15 @@ export class WeighingGame {
       if (now - this.phaseT0 >= total) this.showResult();
     }
     this.drawPlot(now);
+    if (this.dragMode()) {
+      const words = this.dragWords();
+      if (words !== this.lastWords) {
+        this.el.dragWords.innerHTML = words;
+        this.lastWords = words;
+        const hint = this.el.dragInfo.querySelector('.drag-hint');
+        if (hint) hint.textContent = this.round.smart ? '🤖 Lo scanner sposta la retta da solo' : '👆 Trascina i due pallini per spostare la retta';
+      }
+    }
     this.drawScene(now);
   }
 
@@ -384,6 +480,7 @@ export class WeighingGame {
     ctx.clearRect(0, 0, W, H);
     // Plot area; the axes sit just outside it, with a gutter on the left for the y-axis markers.
     const L = 42, R = W - 16, T = 26, B = H - 32;
+    this.plotGeom = { L, R, T, B };
     const px = (x) => L + x * (R - L);
     const py = (y) => B - y * (B - T);
 
@@ -473,6 +570,28 @@ export class WeighingGame {
       ctx.setLineDash([]);
       ctx.fillStyle = C.tomato; ctx.strokeStyle = C.cream; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(px(0), py(line.a), 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+
+    // drag mode: two big handles at the ends of the line (hidden during the reveal)
+    if (this.dragMode() && !revealing) {
+      const hp = this.handlePositions();
+      const off = this.round.smart;
+      for (const side of ['left', 'right']) {
+        const p = hp[side];
+        const active = this.drag && this.drag.side === side;
+        const rad = active ? 13 : 10;
+        if (active) { ctx.fillStyle = 'rgba(217,80,43,0.22)'; ctx.beginPath(); ctx.arc(p.x, p.y, 22, 0, 7); ctx.fill(); }
+        ctx.fillStyle = off ? '#B9A48A' : C.tomato;
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = active ? 4 : 3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, 7); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = C.soil; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(p.x, p.y, rad + 2, 0, 7); ctx.stroke();
+        // small up/down arrows on the handle
+        ctx.fillStyle = '#fff';
+        for (const d of [-1, 1]) {
+          ctx.beginPath(); ctx.moveTo(p.x, p.y + d * (rad - 3)); ctx.lineTo(p.x - 3, p.y + d * (rad - 7)); ctx.lineTo(p.x + 3, p.y + d * (rad - 7)); ctx.fill();
+        }
+      }
     }
 
     if (r.sample.length === 0 && this.phase === 'collect') {

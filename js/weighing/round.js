@@ -172,6 +172,20 @@ export function lineToSliders(line) {
   };
 }
 
+// Drag mode: the line's two end points on the left and right edges of the plot (x = 0 and x = 1).
+// Each handle moves only vertically, inside the plot (0..1). Every such line is also reachable with
+// the sliders (intercept 0..1 is inside INTERCEPT_RANGE, |slope| <= 1 is inside the angle range),
+// and every hidden true line has both ends inside the plot, so it is reachable by dragging.
+export function lineToEnds(line) {
+  return { left: line.a, right: line.a + line.b };
+}
+export function endsToLine(ends) {
+  return { a: ends.left, b: ends.right - ends.left };
+}
+export function clampEnds(ends) {
+  return { left: clamp(ends.left, 0, 1), right: clamp(ends.right, 0, 1) };
+}
+
 // Slider positions (0..1) <-> line.
 export function sliderToLine(tSlope, tIntercept) {
   const [g0, g1] = CONFIG.SLOPE_ANGLE_RANGE;
