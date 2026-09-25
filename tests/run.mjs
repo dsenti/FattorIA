@@ -12,6 +12,8 @@ const test = (name, fn) => { fn(); passed++; console.log('ok  ', name); };
 test('per-level arrays have 11 entries', () => {
   for (const k of ['BELT_BOXES', 'TRUCK_CRATES', 'SCANNER_NOISE', 'SCANNER_GLITCH']) assert.equal(CONFIG[k].length, CONFIG.MAX_LEVEL + 1, k);
   assert.ok(CONFIG.SCANNER_NOISE.every((v) => v > 0), 'scanner noise never zero');
+  for (let i = 1; i < CONFIG.SCANNER_NOISE.length; i++) assert.ok(CONFIG.SCANNER_NOISE[i] < CONFIG.SCANNER_NOISE[i - 1], 'noise falls with every level');
+  assert.ok(CONFIG.SCANNER_NOISE[10] <= 0.002, 'practically no noise at level 10');
   assert.equal(CONFIG.SCANNER_GLITCH[10], 0);
   assert.ok(CONFIG.HARVEST_SIZE > CONFIG.UNITS_PER_BOX * CONFIG.TRUCK_CRATES[10], 'harvest bigger than max sample');
   assert.deepEqual(CONFIG.TRUCK_CRATES, [3, 5, 7, 10, 15, 23, 34, 51, 77, 115, 173]);

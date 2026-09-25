@@ -69,8 +69,9 @@ export const CONFIG = {
   // Drawing only: at most this many boxes (or animals) are drawn in the truck; the rest is shown as "+N".
   PILE_VISIBLE_MAX: 36,
   // Scanner: standard deviation of the measurement noise on y (plot units), per level.
-  // Never zero: some noise always remains.
-  SCANNER_NOISE: [0.10, 0.09, 0.08, 0.07, 0.06, 0.05, 0.043, 0.036, 0.03, 0.025, 0.02],
+  // Levels 0-5 as play-tested; above 5 it keeps falling, and at level 10 the dots sit on the true
+  // value within a hair. Never exactly zero.
+  SCANNER_NOISE: [0.10, 0.09, 0.08, 0.07, 0.06, 0.05, 0.034, 0.021, 0.011, 0.005, 0.0015],
   // Noise on x is this fraction of the y noise.
   SCANNER_X_NOISE_FRACTION: 0.3,
   // Scanner: probability that a single measured unit is a glitch (outlier), per level.
