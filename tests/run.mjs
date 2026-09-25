@@ -9,7 +9,7 @@ import { leastSquares } from '../js/stats.js';
 import { readFileSync } from 'node:fs';
 import { LEVELS, TRUCKS } from '../js/sorting/levels.js';
 import { QUESTIONS, QUESTION_IDS, SENSORS, parseItem, itemKey, questionUnlocked } from '../js/sorting/questions.js';
-import { compile, solutionOf, trainingBatch, testBatch, runBatch, countSolutions, bruteForce, layoutTree, treeDepth, rng, route } from '../js/sorting/tree.js';
+import { compile, solutionOf, trainingBatch, testBatch, runBatch, countSolutions, bruteForce, layoutTree, treeDepth, rng, route, wrongGates } from '../js/sorting/tree.js';
 import { levelStatus, requiredSensors, startLevel } from '../js/sorting/progress.js';
 import { truckSpec, PIPE_COLOUR } from '../js/sorting/trucks.js';
 import { defaultSort, sanitizeSort } from '../js/storage.js';
@@ -488,6 +488,17 @@ test('smistamento: pipe colours differ within every level; lone animals look lik
     const it = parseItem(str);
     if (DRAWN[it.t]) assert.equal(it.c, DRAWN[it.t], `${lv.id}: ${str} must be ${DRAWN[it.t]}`);
   }
+});
+
+test('smistamento: after failed tries only the truly wrong (or empty) gates are marked', () => {
+  const c = compile(LEVELS.find((l) => l.id === 'verme').tree);   // rosso, marcio, verme
+  assert.deepEqual(wrongGates(c, ['rosso', 'marcio', 'verme']), []);
+  assert.deepEqual(wrongGates(c, ['rosso', 'verme', 'verme']), [1]);
+  assert.deepEqual(wrongGates(c, ['verde', 'marcio', null]), [0, 2]);
+  // the failure counter is saved per level and survives a reload
+  const base = { playerId: '11111111-2222-4333-8444-555555555555', coins: 0 };
+  const s = sanitize({ ...base, sort: { ...defaultSort(), fails: { verme: 3, nope: 2, marce: -1, lumache: 'x' } } }).sort;
+  assert.deepEqual(s.fails, { verme: 3 });
 });
 
 test('smistamento: layout fits 360 px without horizontal scrolling', () => {

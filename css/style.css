@@ -321,7 +321,7 @@ canvas.preview { flex: 1; min-width: 0; height: 84px; background: #F4ECD8; borde
 .s-gate.lit-yes .f-yes, .s-gate.lit-no .f-no { display: inline; }
 .s-gate.lit-yes .box { stroke: var(--olive); stroke-width: 4; fill: #EEF2DC; }
 .s-gate.lit-no .box { stroke: var(--soil); stroke-width: 4; fill: var(--wheat); }
-.s-gate.blamed-lente .box { stroke: var(--tomato); stroke-width: 4; }
+.s-gate.wrong-q .box { stroke: var(--tomato); stroke-width: 4.5; fill: #FBE1D6; stroke-dasharray: none; }
 .s-gate .badge { font-size: 13px; font-weight: 800; fill: #fff; }
 .s-item { cursor: pointer; }
 .s-item.gone { opacity: 0.22; }

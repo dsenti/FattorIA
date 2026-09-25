@@ -6,7 +6,7 @@ import { CONFIG } from '../config.js';
 import { LEVELS, TRUCKS } from './levels.js';
 import { QUESTIONS, Q, SENSOR_BY_ID, questionUnlocked } from './questions.js';
 import { COMPILED, levelStatus, startLevel, hintCost } from './progress.js';
-import { layoutTree, runBatch, trainingBatch, testBatch, solutionOf, treeDepth } from './tree.js';
+import { layoutTree, runBatch, trainingBatch, testBatch, solutionOf, treeDepth, wrongGates } from './tree.js';
 import { P, questionArt, truckArt, truckSpecArt, ICON, svg40, itemArt, itemSymbolId, ensureItemSymbols } from './art.js';
 import { truckSpec, PIPE_COLOUR } from './trucks.js';
 
@@ -16,6 +16,8 @@ const MANIFOLD = 70;     // height of the zone where pipes bend (and cross) towa
 const CELL_W = 42;       // hopper grid cell
 const PILE = 15;         // item size in a truck pile
 const METAL = '#B7C4C8'; // the connectors between gates
+const FAILS_BEFORE_MARKS = 3;
+const MARKS_LINE = 'Dopo 3 tentativi: i cancelli con la domanda sbagliata sono segnati in rosso.';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const coinSvg = (size = 16) => svg40(ICON.coin, size, 'coin-ic');
@@ -103,6 +105,7 @@ export class SortingGame {
     cancelAnimationFrame(this.raf);
     clearTimeout(this.leaveTimer);
     this.settled = null;
+    this.markWrong = new Set();   // gates shown as wrong, after FAILS_BEFORE_MARKS failed Provas
     this.li = li;
     this.c = COMPILED[li];
     const lv = this.level;
@@ -134,6 +137,7 @@ export class SortingGame {
 
   setGate(g, qid, hinted = false) {
     this.board[g] = qid;
+    this.markWrong.delete(g);   // don't tell whether the new question is right
     const s = this.sort;
     s.boards[this.level.id] = this.board.slice();
     const h = new Set(s.hinted[this.level.id] || []);
@@ -194,7 +198,8 @@ export class SortingGame {
     if (this.phase === 'result' && this.run) {
       const r = this.run;
       const wrong = r.total - r.right;
-      R.innerHTML = accLine(r, 'Addestramento') + `<div class="s-msg">${wrong} ${wrong === 1 ? 'pezzo è finito' : 'pezzi sono finiti'} nel camion sbagliato: toccali (cerchio rosso) per vedere la strada.</div>`;
+      R.innerHTML = accLine(r, 'Addestramento') + `<div class="s-msg">${wrong} ${wrong === 1 ? 'pezzo è finito' : 'pezzi sono finiti'} nel camion sbagliato: toccali (cerchio rosso) per vedere la strada.` +
+        (this.markWrong.size ? ` <b>${MARKS_LINE}</b>` : '') + '</div>';
       return;
     }
     const empty = this.board.filter((q) => !q).length;
@@ -218,6 +223,8 @@ export class SortingGame {
     const first = !this.sort.solved.includes(lv.id);
     const coins = first ? Math.round(CONFIG.SORT.pay(this.li + 1) * test.accuracy) : (test.accuracy === 1 ? CONFIG.SORT.REPLAY_PAY : 0);
     this.settled = { right: test.right, total: test.total, coins };
+    delete this.sort.fails[lv.id];   // solved: the count of failed tries starts over
+    this.markWrong = new Set();
     this.app.onDeliver({ levelIdx: this.li, coins, first: first && test.accuracy === 1 });
     this.updateUI();
   }
@@ -297,10 +304,7 @@ export class SortingGame {
 
     const st = this.app.getState();
     const hinted = new Set(this.sort.hinted[lv.id] || []);
-    const lente = this.sort.lente;
-    const blamed = this.run && this.phase !== 'run' && this.mode === 'train' ? this.run.blamed : new Set();
-    const wrongPerGate = {};
-    if (blamed.size) for (const r of this.run.results) if (!r.ok && r.blame >= 0) wrongPerGate[r.blame] = (wrongPerGate[r.blame] || 0) + 1;
+    const marked = this.phase === 'run' ? new Set() : this.markWrong;
 
     let s = `<defs id="s-defs">`;
     for (const q of QUESTIONS) s += `<symbol id="q-${q.id}" viewBox="0 0 40 40">${questionArt(q.id)}</symbol>`;
@@ -346,15 +350,12 @@ export class SortingGame {
     for (const gate of c.gates) {
       const q = this.board[gate.idx];
       const cls = ['s-gate', q ? 'filled' : 'empty'];
-      const wrongN = wrongPerGate[gate.idx] || 0;
-      if (wrongN) cls.push(lente ? 'blamed-lente' : 'blamed');
+      if (marked.has(gate.idx)) cls.push('wrong-q');
       s += `<g class="${cls.join(' ')}" data-g="${gate.idx}" transform="translate(${gate.x} ${gate.y})" role="button" aria-label="Cancello ${gate.idx + 1}${q ? ': ' + esc(Q[q].text) : ', vuoto'}">` +
         `<rect x="-29" y="-29" width="58" height="58" fill="transparent"/>` +
         `<rect class="box" x="${-GS}" y="${-GS}" width="${2 * GS}" height="${2 * GS}" rx="8"/>` +
         (q ? `<use href="#q-${q}" x="-18" y="-18" width="36" height="36"/>` : '<text class="qmark" y="9" text-anchor="middle">?</text>') +
         (hinted.has(gate.idx) && q ? '<use href="#ic-hint" x="12" y="-33" width="18" height="18"/>' : '') +
-        (wrongN && !lente ? `<circle cx="${-GS + 3}" cy="${-GS + 3}" r="5" fill="${P.tomato}"/>` : '') +
-        (wrongN && lente ? `<g transform="translate(${-GS - 2} ${-GS - 4})"><circle r="10" fill="${P.tomato}"/><text class="badge" y="4.5" text-anchor="middle">${wrongN}</text></g>` : '') +
         `<g class="f-yes"><circle cx="${GS + 5}" cy="${-GS + 2}" r="11" fill="${P.cream}" stroke="${P.olive}" stroke-width="2"/><use href="#ic-yes" x="${GS - 3}" y="${-GS - 6}" width="16" height="16"/></g>` +
         `<g class="f-no"><circle cx="${-GS - 5}" cy="${-GS + 2}" r="11" fill="${P.cream}" stroke="${P.tomato}" stroke-width="2"/><use href="#ic-no" x="${-GS - 13}" y="${-GS - 6}" width="16" height="16"/></g>` +
         '</g>';
@@ -380,7 +381,7 @@ export class SortingGame {
       const p = g.hop[i];
       const res = this.run && this.run.results[i];
       const gone = this.phase === 'run' && res && this.spawned && this.spawned[i];
-      h += `<g class="s-item${gone ? ' gone' : ''}${res && !res.ok && this.phase !== 'run' ? ' wrong' : ''}" data-i="${i}" transform="translate(${p.x} ${p.y})">` +
+      h += `<g class="s-item${gone ? ' gone' : ''}" data-i="${i}" transform="translate(${p.x} ${p.y})">` +
         `<rect x="${-CELL_W / 2}" y="-19" width="${CELL_W}" height="${cellH - 2}" fill="transparent"/>` +
         `<circle class="ring" r="17" fill="none" stroke="${P.tomato}" stroke-width="3"/>` +
         `<use href="#${itemSymbolId(it)}" x="-16" y="-16" width="32" height="32" transform="rotate(${it.spin})"/>` +
@@ -568,6 +569,7 @@ export class SortingGame {
     this.movers = [];
     this.phase = 'result';
     if (run.right === run.total) this.settle();
+    else this.countFail();
     this.render();
     this.updateUI();
     if (!silent && this.follow) {
@@ -575,6 +577,18 @@ export class SortingGame {
       if (sc.scrollHeight - sc.clientHeight > sc.scrollTop) sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' });
     }
     this.follow = false;
+  }
+
+  // A failed Prova. From the FAILS_BEFORE_MARKS-th failure on this level, the gates whose question
+  // differs from the level's one correct tree (and empty gates) are marked in red.
+  countFail() {
+    const id = this.level.id;
+    const n = (this.sort.fails[id] || 0) + 1;
+    this.sort.fails[id] = n;
+    this.app.save();
+    if (n < FAILS_BEFORE_MARKS) return;
+    this.markWrong = new Set(wrongGates(this.c, this.board));
+    if (n === FAILS_BEFORE_MARKS) this.app.toast(MARKS_LINE, 4200);
   }
 
   // ------------------------------------------------------------ taps

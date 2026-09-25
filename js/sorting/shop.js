@@ -24,7 +24,7 @@ export function renderSortShop(body, ctx) {
   }
   cards.push({
     icon: ICON.lente, name: 'Lente d\'ingrandimento',
-    desc: 'Dopo una prova segna chiaramente i cancelli che hanno sbagliato strada, con il numero di errori. Tocca un pezzo sbagliato: lo rivedi scendere piano piano.',
+    desc: 'Tocca un pezzo finito nel camion sbagliato: lo rivedi scendere piano piano, cancello per cancello, e capisci dove ha preso la strada sbagliata.',
     owned: s.lente, cost: CONFIG.SORT.LENTE_COST, buy: () => { s.lente = true; },
   });
   cards.push({

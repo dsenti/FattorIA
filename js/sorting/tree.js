@@ -178,3 +178,7 @@ export function layoutTree(compiled, width, { top = 0, rowH = 76, pad = 10 } = {
   const depth = treeDepth(compiled.root);
   return { slot, rows: depth + 1, bottom: top + depth * rowH };
 }
+
+// Gates whose question differs from the level's one correct tree, or that are empty.
+// Shown in red after a few failed Provas (see game.js).
+export const wrongGates = (compiled, board) => compiled.gates.filter((g) => board[g.idx] !== g.q).map((g) => g.idx);

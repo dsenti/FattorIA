@@ -53,6 +53,7 @@ export function defaultSort() {
     fast: false,           // nastro veloce bought
     boards: {},            // level id -> the question on each gate (null = empty)
     hinted: {},            // level id -> gate indices revealed by a hint
+    fails: {},             // level id -> failed Provas since it was last solved (3 -> wrong gates marked)
     seenHelp: false,
   };
 }
@@ -69,13 +70,15 @@ export function sanitizeSort(raw, refund = () => {}) {
   if (!raw || typeof raw !== 'object') return d;
   const n = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
   const sameLevels = raw.levelsVersion === LEVELS_VERSION;
-  const boards = {}, hinted = {};
+  const boards = {}, hinted = {}, fails = {};
   if (sameLevels) {
     for (const [id, G] of LEVEL_GATES) {
       const b = raw.boards && raw.boards[id];
       if (Array.isArray(b) && b.length === G) boards[id] = b.map((q) => (QIDS.has(q) ? q : null));
       const h = raw.hinted && raw.hinted[id];
       if (Array.isArray(h)) hinted[id] = [...new Set(h.filter((i) => Number.isInteger(i) && i >= 0 && i < G))];
+      const f = raw.fails && raw.fails[id];
+      if (Number.isInteger(f) && f > 0) fails[id] = Math.min(f, 999);
     }
   }
   const rawSensors = Array.isArray(raw.sensors) ? raw.sensors : [];
@@ -92,6 +95,7 @@ export function sanitizeSort(raw, refund = () => {}) {
     fast: raw.fast === true,
     boards,
     hinted,
+    fails,
     seenHelp: raw.seenHelp === true,
   };
 }
