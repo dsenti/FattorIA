@@ -8,8 +8,8 @@ const TRUCK_BASE = 3;
 const TRUCK_FACTOR = 1.5;
 
 export const CONFIG = {
-  // TODO(Dominik): remove before the course. Shows a "🐞 +100" coins button on the weighing
-  // station (see js/debug.js). Those coins don't count for the leaderboard.
+  // TODO(Dominik): remove before the course. Shows a "+100" coins button on the weighing
+  // station and on Lo smistamento (see js/debug.js). Those coins don't count for the leaderboard.
   DEBUG_COINS_BUTTON: true,
 
   // Bump when the saved-state format changes in an incompatible way.
@@ -148,6 +148,30 @@ export const CONFIG = {
   REVEAL_BEST_LINE_MS: 700,
   COIN_COUNT_MS: 280,          // per coin at most...
   COIN_COUNT_TOTAL_MS: 1400,   // ...and the whole count-up takes at most this long
+
+  // ---------------------------------------------------------------- minigame 2: Lo smistamento
+  // TODO(Dominik): all prices and pay below are first guesses; tune after play-testing.
+  SORT: {
+    // Coins to unlock the place on the map (replaces "Il frutteto, lezione 3").
+    UNLOCK_COST: 100,
+    // First "Consegna" of level n (1..15) pays up to this, times the test accuracy.
+    pay: (n) => 5 + 2 * n,
+    // Delivering an already solved level again.
+    REPLAY_PAY: 1,
+    // Sensors unlock questions (colour and type are free). Ordered as the levels need them:
+    // naso (level 3), vermi (5), calibro (6), bilancia (7), vita (9).
+    SENSOR_COST: { naso: 15, vermi: 25, calibro: 30, bilancia: 40, vita: 50 },
+    LENTE_COST: 20,          // magnifying glass: marks the guilty gates, slow replay of a wrong item
+    FAST_COST: 15,           // nastro veloce: faster Prova / Consegna animations
+    // Hints (suggerimento): the k-th hint bought (k = 0, 1, 2, ...) costs this.
+    hintCost: (k) => 3 + 3 * k,
+    // Animation (px per second along the pipes, pause at each gate, time between two items).
+    SPEED: 330,
+    GATE_PAUSE_MS: 170,
+    SPAWN_MS: 380,
+    FAST_FACTOR: 2.2,        // nastro veloce multiplies the speed and divides the pauses by this
+    REPLAY_FACTOR: 0.4,      // lente: slow replay speed
+  },
 
   // ---------------------------------------------------------------- leaderboard
   // Leave empty to use the local stub. See SUPABASE_SETUP.md.

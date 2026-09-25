@@ -1,6 +1,9 @@
 // Progress saved in the browser only (localStorage). No accounts, no personal data.
 import { CONFIG } from './config.js';
 import { isValidName } from './names.js';
+import { LEVELS } from './sorting/levels.js';
+import { SENSORS, QUESTION_IDS } from './sorting/questions.js';
+import { compile } from './sorting/tree.js';
 
 const MAX_HISTORY = 50;
 
@@ -32,6 +35,54 @@ export function defaultState() {
     seenHelp: false,       // "how to play" shown once
     seenFlip: false,       // "axis reversed" warning shown once
     lineMode: 'sliders',   // how the line is moved: 'sliders' or 'drag' (a setting; kept on restart)
+    sort: defaultSort(),   // minigame 2 (Lo smistamento)
+  };
+}
+
+// Minigame 2 progress. Old saves without it get this.
+export function defaultSort() {
+  return {
+    unlocked: false,       // the place was bought on the map
+    solved: [],            // level ids delivered at least once (first delivery paid in full)
+    current: null,         // level id being played
+    sensors: [],           // bought sensor ids (see sorting/questions.js)
+    hints: 0,              // hints in stock
+    hintsBought: 0,        // hints bought so far (the price rises)
+    lente: false,          // magnifying glass bought
+    fast: false,           // nastro veloce bought
+    boards: {},            // level id -> the question on each gate (null = empty)
+    hinted: {},            // level id -> gate indices revealed by a hint
+    seenHelp: false,
+  };
+}
+
+const LEVEL_GATES = new Map(LEVELS.map((lv) => [lv.id, compile(lv.tree).gates.length]));
+const SENSOR_IDS = new Set(SENSORS.map((x) => x.id));
+const QIDS = new Set(QUESTION_IDS);
+
+export function sanitizeSort(raw) {
+  const d = defaultSort();
+  if (!raw || typeof raw !== 'object') return d;
+  const n = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
+  const boards = {}, hinted = {};
+  for (const [id, G] of LEVEL_GATES) {
+    const b = raw.boards && raw.boards[id];
+    if (Array.isArray(b) && b.length === G) boards[id] = b.map((q) => (QIDS.has(q) ? q : null));
+    const h = raw.hinted && raw.hinted[id];
+    if (Array.isArray(h)) hinted[id] = [...new Set(h.filter((i) => Number.isInteger(i) && i >= 0 && i < G))];
+  }
+  return {
+    unlocked: raw.unlocked === true,
+    solved: Array.isArray(raw.solved) ? [...new Set(raw.solved.filter((id) => LEVEL_GATES.has(id)))] : [],
+    current: LEVEL_GATES.has(raw.current) ? raw.current : null,
+    sensors: Array.isArray(raw.sensors) ? [...new Set(raw.sensors.filter((id) => SENSOR_IDS.has(id)))] : [],
+    hints: n(raw.hints),
+    hintsBought: n(raw.hintsBought),
+    lente: raw.lente === true,
+    fast: raw.fast === true,
+    boards,
+    hinted,
+    seenHelp: raw.seenHelp === true,
   };
 }
 
@@ -65,6 +116,7 @@ export function sanitize(raw) {
     seenHelp: raw.seenHelp === true,
     seenFlip: raw.seenFlip === true,
     lineMode: raw.lineMode === 'drag' ? 'drag' : 'sliders',
+    sort: sanitizeSort(raw.sort),
   };
 }
 
