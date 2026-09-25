@@ -24,16 +24,24 @@ export const CONFIG = {
   //   ratio = mean absolute error of the player's line on the whole harvest
   //         / mean absolute error of the best (least-squares) line on the whole harvest.
   // First matching row wins; anything above the last row pays 0.
+  // Pays 0..10: bad fits pay about what they did on the old 0..5 scale, close fits pay much more,
+  // and only a truly perfect fit pays 10.
   SCORE_THRESHOLDS: [
-    { maxRatio: 1.05, coins: 5 },
-    { maxRatio: 1.2, coins: 4 },
-    { maxRatio: 1.5, coins: 3 },
+    { maxRatio: 1.002, coins: 10 },
+    { maxRatio: 1.01, coins: 9 },
+    { maxRatio: 1.03, coins: 8 },
+    { maxRatio: 1.05, coins: 7 },
+    { maxRatio: 1.10, coins: 6 },
+    { maxRatio: 1.20, coins: 5 },
+    { maxRatio: 1.35, coins: 4 },
+    { maxRatio: 1.50, coins: 3 },
     { maxRatio: 2.0, coins: 2 },
     { maxRatio: 3.0, coins: 1 },
   ],
+  MAX_PAY: 10,
 
-  // Farmer reaction emoji by coins paid (index = coins 0..5).
-  REACTIONS: ['😐', '😐', '🙂', '🙂', '😄', '😄'],
+  // Farmer reaction emoji by coins paid (index = coins 0..10).
+  REACTIONS: ['😐', '😐', '😐', '🙂', '🙂', '🙂', '😄', '😄', '😄', '😄', '🤩'],
 
   // A "day done" summary appears after this many farmers.
   FARMERS_PER_DAY: 5,
@@ -120,7 +128,8 @@ export const CONFIG = {
   REVEAL_HARVEST_MS: 600,
   REVEAL_RESIDUALS_MS: 1600,
   REVEAL_BEST_LINE_MS: 700,
-  COIN_COUNT_MS: 280,
+  COIN_COUNT_MS: 280,          // per coin at most...
+  COIN_COUNT_TOTAL_MS: 1400,   // ...and the whole count-up takes at most this long
 
   // ---------------------------------------------------------------- leaderboard
   // Leave empty to use the local stub. See SUPABASE_SETUP.md.

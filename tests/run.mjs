@@ -40,13 +40,23 @@ test('every name combination formats, with gender agreement', () => {
 });
 
 test('coins thresholds', () => {
-  assert.equal(coinsForRatio(0.9), 5);
-  assert.equal(coinsForRatio(1.05), 5);
-  assert.equal(coinsForRatio(1.1), 4);
+  assert.equal(coinsForRatio(0.9), 10);
+  assert.equal(coinsForRatio(1.0), 10);
+  assert.equal(coinsForRatio(1.002), 10);
+  assert.equal(coinsForRatio(1.005), 9);
+  assert.equal(coinsForRatio(1.02), 8);
+  assert.equal(coinsForRatio(1.05), 7);
+  assert.equal(coinsForRatio(1.08), 6);
+  assert.equal(coinsForRatio(1.15), 5);
+  assert.equal(coinsForRatio(1.3), 4);
   assert.equal(coinsForRatio(1.4), 3);
   assert.equal(coinsForRatio(1.9), 2);
   assert.equal(coinsForRatio(2.9), 1);
   assert.equal(coinsForRatio(3.1), 0);
+  assert.equal(CONFIG.REACTIONS.length, CONFIG.MAX_PAY + 1);
+  // thresholds strictly increasing, coins strictly decreasing
+  const t = CONFIG.SCORE_THRESHOLDS;
+  for (let i = 1; i < t.length; i++) assert.ok(t[i].maxRatio > t[i - 1].maxRatio && t[i].coins < t[i - 1].coins);
 });
 
 test('true lines: positive in reality, axis flips give the visible sign, inside the plot, all farmers', () => {
@@ -101,12 +111,12 @@ test('sliders reach every true line; start is flat, in the middle', () => {
   assert.ok(lo.a < CONFIG.LINE_MARGIN - 0.1 && hi.a > 1 - CONFIG.LINE_MARGIN + 0.1, 'intercept range with slack');
 });
 
-test('scoring: best line pays 5 for any slope; ratios sane for flat and negative lines', () => {
+test('scoring: best line pays 10 for any slope; ratios sane for flat and negative lines', () => {
   const lv = { scanner: 0, belt: 0, truck: 0 };
   let flatSeen = 0, negSeen = 0;
   for (let i = 0; i < 600; i++) {
     const r = makeRound({ visitNo: 7, lastFarmerId: null, levels: lv });
-    assert.equal(scoreLine(r, r.best).coins, 5);
+    assert.equal(scoreLine(r, r.best).coins, CONFIG.MAX_PAY);
     assert.ok(r.bestError > 0.01, `best error not tiny: ${r.bestError}`);
     // Shifting the line up makes it worse, monotonically, whatever the slope.
     const s1 = scoreLine(r, { a: r.best.a + 0.05, b: r.best.b }).ratio;

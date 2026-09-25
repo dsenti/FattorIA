@@ -54,7 +54,7 @@ tests/run.mjs           node checks for the model and the name lists
 
 ## Tuning
 Everything is in `js/config.js`, with comments:
-- **Economy:** `levelCost` (level n costs n), `SCORE_THRESHOLDS` (error ratio → coins), `FARMERS_PER_DAY`.
+- **Economy:** `levelCost` (level n costs n), `SCORE_THRESHOLDS` (error ratio → 0–10 coins), `MAX_PAY`, `REACTIONS`, `FARMERS_PER_DAY`.
 - **Data per object:** `UNITS_PER_BOX` (1: one crate or one animal = one data point).
 - **Upgrades, per level 0–10:** `BELT_BOXES` ("Scarico" in the shop, stored as `belt`: objects per trip, 1→11; faster, not more data), `TRUCK_BASE` × `TRUCK_FACTOR`^level → `TRUCK_CRATES` (3, 5, 7, 10, 15, 23, 34, 51, 77, 115, 173), `SCANNER_NOISE` (never zero), `SCANNER_GLITCH` (1/8 → 0), `GLITCH_OFFSET`. `PILE_VISIBLE_MAX` caps how many boxes are drawn (the rest shows as "+N").
 - **Machine sizes (drawing only):** `SCANNER_SCALE`, `SCANNER_HEIGHT_FRACTION`, `TRUCK_LENGTH`, `TRUCK_HEIGHT_SCALE`, per level.

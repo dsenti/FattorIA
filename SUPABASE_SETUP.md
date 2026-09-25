@@ -35,9 +35,9 @@ create table public.scores (
   number      smallint not null check (number between 10 and 99),
   total_coins integer  not null default 0 check (total_coins between 0 and 100000),
   farmers     integer  not null default 0 check (farmers between 0 and 20000),
-  avg_coins   real     not null default 0 check (avg_coins between 0 and 5),
+  avg_coins   real     not null default 0 check (avg_coins between 0 and 10),
   updated_at  timestamptz not null default now(),
-  check (total_coins <= 5 * farmers)
+  check (total_coins <= 10 * farmers)
 );
 
 -- Row-level security on, and no direct access for the browser roles.

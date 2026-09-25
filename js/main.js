@@ -30,9 +30,10 @@ function renderCoins(animate) {
       const pill = e.parentElement;
       pill.classList.remove('bump'); void pill.offsetWidth; pill.classList.add('bump');
     });
-    if (shownCoins < to) setTimeout(step, CONFIG.COIN_COUNT_MS);
+    if (shownCoins < to) setTimeout(step, delay);
   };
-  setTimeout(step, CONFIG.COIN_COUNT_MS);
+  const delay = Math.min(CONFIG.COIN_COUNT_MS, CONFIG.COIN_COUNT_TOTAL_MS / Math.max(1, to - shownCoins));
+  setTimeout(step, delay);
 }
 
 function save() {
@@ -160,7 +161,7 @@ const game = new WeighingGame($('#screen-weigh'), {
 
 async function daySummary() {
   const recent = state.fits.slice(-state.dayFarmers);
-  const perfect = recent.filter((r) => r.c === 5).length;
+  const perfect = recent.filter((r) => r.c === CONFIG.MAX_PAY).length;
   const avg = state.dayFarmers ? state.dayCoins / state.dayFarmers : 0;
   const tip = state.levels.scanner + state.levels.belt + state.levels.truck === 0
     ? 'Consiglio: nel negozio 🛒 puoi migliorare scanner, scarico e camion.'
@@ -208,7 +209,7 @@ function showHelp() {
     '<ol>' +
     '<li><b>Tocca il camion 🚚.</b> L\'agricoltore porta una cassetta sul nastro. Lo scanner misura ogni pezzo: ogni misura è un dato <em>(data)</em>, un puntino nel grafico.</li>' +
     '<li><b>Muovi i cursori</b> pendenza <em>(slope)</em> e intercetta <em>(intercept)</em> finché la retta passa vicino ai puntini.</li>' +
-    '<li><b>Blocca la retta 🔒.</b> L\'agricoltore la prova sul suo raccolto intero. Più piccolo è l\'errore <em>(error)</em>, più monete ti dà (fino a 5 🪙).</li>' +
+    '<li><b>Blocca la retta 🔒.</b> L\'agricoltore la prova sul suo raccolto intero. Più piccolo è l\'errore <em>(error)</em>, più monete ti dà (fino a 10 🪙).</li>' +
     '</ol>' +
     '<p>Attenzione: lo scanner a volte sbaglia. Con le monete puoi migliorarlo.</p>',
     [{ label: 'Capito, si parte!', value: 'ok', cls: 'primary' }],

@@ -189,15 +189,21 @@ export class WeighingGame {
     this.phase = 'result';
     this.el.controls.hidden = true;
     this.el.result.hidden = false;
-    const titles = ['Proprio no…', 'Mah…', 'Così così', 'Bene!', 'Ottimo!', 'Perfetto!'];
+    const titles = ['Proprio no…', 'Mah…', 'Così così', 'Meglio', 'Discreta', 'Bene!', 'Molto bene!',
+      'Ottimo!', 'Quasi perfetta!', 'Bravissimo!', 'Perfetta!'];
     this.el.resTitle.textContent = `${CONFIG.REACTIONS[res.coins]} ${titles[res.coins]}`;
     this.el.face.textContent = CONFIG.REACTIONS[res.coins];
     const says = [
       'Questa retta non mi aiuta proprio.',
       'Mmh, sul mio raccolto sbaglia parecchio.',
-      'Qualcosa indovina, ma non tanto.',
+      'Qualcosa indovina, ma sbaglia ancora tanto.',
+      'Va un po\' meglio, ma si può fare di più.',
+      'Discreta, però sul raccolto intero sbaglia.',
       'Buona! Sul raccolto intero funziona bene.',
-      'Ottima retta, quasi come la migliore!',
+      'Molto buona, ci siamo quasi.',
+      'Ottima retta, vicina alla migliore!',
+      'Quasi uguale alla retta migliore!',
+      'Bravissimo, praticamente perfetta!',
       'Perfetta! Proprio quello che mi serviva.',
     ];
     this.el.text.textContent = says[res.coins];
@@ -229,6 +235,7 @@ export class WeighingGame {
     const target = res.coins;
     this.el.resCoins.textContent = '+0 🪙';
     let k = 0;
+    const step = Math.min(CONFIG.COIN_COUNT_MS, CONFIG.COIN_COUNT_TOTAL_MS / Math.max(1, target));
     const tick = () => {
       if (k >= target) return;
       k++;
@@ -236,9 +243,9 @@ export class WeighingGame {
       this.el.resCoins.classList.remove('pop');
       void this.el.resCoins.offsetWidth;
       this.el.resCoins.classList.add('pop');
-      setTimeout(tick, CONFIG.COIN_COUNT_MS);
+      setTimeout(tick, step);
     };
-    setTimeout(tick, CONFIG.COIN_COUNT_MS);
+    setTimeout(tick, step);
     this.el.next.focus({ preventScroll: true });
   }
 
