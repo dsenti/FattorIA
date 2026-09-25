@@ -62,7 +62,7 @@ Everything is in `js/config.js`, with comments:
 - **Harvest and difficulty:** `HARVEST_SIZE`, `NATURAL_NOISE_EASY/HARD`, `DIFFICULTY_RAMP_FARMERS`, `FIRST_FARMER`.
 - **Hidden true line and axes:** `AXIS_FLIP_PROB` (each axis drawn normal or reversed, so the real relation stays positive but the line on the plot falls in about half the rounds), `SLOPE_ABS_RANGE`, `LINE_MARGIN` (random steepness and height, always inside the plot).
 - **Sliders:** `SLOPE_ANGLE_RANGE`, `INTERCEPT_RANGE`, start position.
-- **Timing:** `CARRY_MS` + `RETURN_MS` (the truck cooldown), `BELT_SPEED`, `TRIP_UNLOAD_MS`, `TRUCK_LEAVE_MS`, reveal durations.
+- **Timing:** `CARRY_MS` + `RETURN_MS` (the truck cooldown), `BELT_SPEED`, `TRIP_UNLOAD_MS`, `TRUCK_AUTO_LEAVE_MS` (pause before the empty truck drives off by itself), `TRUCK_LEAVE_MS`, reveal durations.
 - **Leaderboard:** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `MIN_FARMERS_FOR_PRECISION`.
 
 Farmers (names, questions, per-farmer noise) are in `js/weighing/farmers.js`.

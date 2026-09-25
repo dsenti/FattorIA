@@ -128,7 +128,8 @@ export const CONFIG = {
 
   // ---------------------------------------------------------------- timing (ms)
   TRUCK_ARRIVE_MS: 900,
-  // The empty truck drives away when tapped.
+  // The empty truck drives away by itself: pause after the last load, then the drive-off animation.
+  TRUCK_AUTO_LEAVE_MS: 500,
   TRUCK_LEAVE_MS: 900,
   // Farmer walks to the truck and carries a crate to the belt. The truck can't be tapped meanwhile.
   CARRY_MS: 1000,

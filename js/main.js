@@ -207,7 +207,7 @@ function showHelp() {
     '<h2>⚖️ La stazione di pesatura</h2>' +
     '<p>Gli agricoltori della valle vogliono una regola per prevedere una cosa da un\'altra.</p>' +
     '<ol>' +
-    '<li><b>Tocca il camion 🚚.</b> L\'agricoltore porta una cassetta sul nastro. Lo scanner misura ogni pezzo: ogni misura è un dato <em>(data)</em>, un puntino nel grafico.</li>' +
+    '<li><b>Tocca il camion 🚚.</b> L\'agricoltore porta una cassetta sul nastro. Lo scanner misura ogni pezzo: ogni misura è un dato <em>(data)</em>, un puntino nel grafico. Quando il camion è vuoto, riparte da solo.</li>' +
     '<li><b>Muovi i cursori</b> pendenza <em>(slope)</em> e intercetta <em>(intercept)</em> finché la retta passa vicino ai puntini.</li>' +
     '<li><b>Blocca la retta 🔒.</b> L\'agricoltore la prova sul suo raccolto intero. Più piccolo è l\'errore <em>(error)</em>, più monete ti dà (fino a 10 🪙).</li>' +
     '</ol>' +

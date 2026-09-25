@@ -102,6 +102,7 @@ export class WeighingGame {
     this.truckLeave = null;   // { t0 } while the empty truck drives away
     this.fitting = null;      // { t0, from, to } while the auto-fitter moves the sliders
     this.truckGone = false;
+    this.emptySince = null;
     this.result = null;
     this.phase = 'arriving';
     this.phaseT0 = performance.now();
@@ -139,10 +140,14 @@ export class WeighingGame {
       now >= (this.cooldownUntil || 0);
   }
 
-  // The empty truck can be sent away with one more tap.
-  truckCanLeave() {
-    return this.phase === 'collect' && this.round.cratesLeft === 0 && !this.carry &&
+  // The empty truck drives off by itself TRUCK_AUTO_LEAVE_MS after the last load has left the bed
+  // and the farmer (or robot) is clear. Called every frame.
+  checkTruckLeave(now) {
+    const empty = this.phase !== 'arriving' && this.round.cratesLeft === 0 && !this.carry &&
       !this.truckLeave && !this.truckGone;
+    if (!empty) { this.emptySince = null; return; }
+    if (this.emptySince == null) this.emptySince = now;
+    if (now - this.emptySince >= CONFIG.TRUCK_AUTO_LEAVE_MS) this.truckLeave = { t0: now };
   }
 
   onSceneTap(e) {
@@ -151,7 +156,6 @@ export class WeighingGame {
     // Generous hit area: the whole left part of the scene (truck + farmer).
     if (x > 0.46) return;
     const now = performance.now();
-    if (this.truckCanLeave()) { this.truckLeave = { t0: now }; return; }
     if (!this.truckTappable(now)) return;
     const boxes = Math.min(this.round.perTrip, this.round.cratesLeft);
     this.round.cratesLeft -= boxes;
@@ -370,6 +374,7 @@ export class WeighingGame {
     if (this.units.length && this.units.every((u) => u.gone)) this.units = [];
     if (changed) this.updateInfo();
 
+    this.checkTruckLeave(now);
     this.stepAutoFit(now);
     if (this.phase === 'reveal') {
       const total = CONFIG.REVEAL_HARVEST_MS + CONFIG.REVEAL_RESIDUALS_MS + 200;
@@ -599,7 +604,7 @@ export class WeighingGame {
       if (t >= 1) { this.truckGone = true; this.truckLeave = null; }
     }
     if (!this.truckGone) {
-      const tappable = (this.truckTappable(now) && r.sample.length === 0) || this.truckCanLeave();
+      const tappable = this.truckTappable(now) && r.sample.length === 0;
       const pulse = tappable ? 1 + 0.025 * Math.sin(now / 160) : 1;
       const tPop = upgradePop(now - (this.fx.truck ?? -1e9));
       ctx.save();
@@ -678,8 +683,6 @@ export class WeighingGame {
     };
     if (this.truckTappable(now) && r.sample.length === 0 && this.units.length === 0) {
       hint('👈 Tocca il camion!', `rgba(217,80,43,${0.6 + 0.4 * Math.sin(now / 250)})`, 14);
-    } else if (this.truckCanLeave() && this.units.length === 0) {
-      hint('👈 Camion vuoto: tocca per mandarlo via', `rgba(91,58,41,${0.65 + 0.35 * Math.sin(now / 300)})`, 12);
     }
     ctx.textBaseline = 'alphabetic';
   }
