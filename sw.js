@@ -13,6 +13,7 @@ const FILES = [
   'js/names.js',
   'js/storage.js',
   'js/leaderboard.js',
+  'js/debug.js',
   'js/slider.js',
   'js/stats.js',
   'js/weighing/farmers.js',

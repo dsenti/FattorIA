@@ -8,6 +8,10 @@ const TRUCK_BASE = 3;
 const TRUCK_FACTOR = 1.5;
 
 export const CONFIG = {
+  // TODO(Dominik): remove before the course. Shows a "🐞 +100" coins button on the weighing
+  // station (see js/debug.js). Those coins don't count for the leaderboard.
+  DEBUG_COINS_BUTTON: true,
+
   // Bump when the saved-state format changes in an incompatible way.
   STORAGE_KEY: 'fateai-valle-v1',
 

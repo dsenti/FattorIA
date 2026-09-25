@@ -70,6 +70,8 @@ Farmers (names, questions, per-farmer noise) are in `js/weighing/farmers.js`.
 Plot units are normalised (0–1 on both axes; the axes show no numbers). Each farmer has a hidden true line and a harvest of `HARVEST_SIZE` units spread around it. The truck carries a random subset. The scanner adds noise, and sometimes a glitch (an outlier), to each measured unit. On "Blocca la retta", the game computes the mean absolute error of the player's line and of the least-squares line, both on the **whole harvest** (without scanner noise). The ratio of the two goes through `SCORE_THRESHOLDS`.
 
 ## Debugging
+**Temporary 🐞 +100 button** (TODO(Dominik): remove before the course): on the weighing station, adds 100 coins to the wallet without counting them as earned, so the leaderboard is unaffected. Turn it off with `DEBUG_COINS_BUTTON = false` in `js/config.js`, or delete `js/debug.js` and its two lines in `js/main.js`.
+
 Open the game with `?debug` (e.g. `http://localhost:8000/?debug`) to get `window.fattoriaDebug` in the console: `fattoriaDebug.game.round` (hidden line, harvest, sample), `fattoriaDebug.game.newRound()`, `fattoriaDebug.getState().levels.truck = 10`.
 
 ## Reset during testing

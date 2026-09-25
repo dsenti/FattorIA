@@ -7,6 +7,7 @@ import { WeighingGame } from './weighing/game.js';
 import { drawPreview } from './weighing/previews.js';
 import { VEHICLE_NAMES } from './weighing/vehicles.js';
 import { UNLOADER_NAMES } from './weighing/unloaders.js';
+import { installDebugButton } from './debug.js'; // TODO(Dominik): remove before the course
 
 let state = loadState();
 const $ = (sel) => document.querySelector(sel);
@@ -386,6 +387,7 @@ async function boot() {
   pushScore();
 }
 boot();
+installDebugButton({ getState: () => state, save, renderCoins }); // TODO(Dominik): remove before the course
 
 // Debug handle for play-testing from the browser console: open the game with ?debug
 if (new URLSearchParams(location.search).has('debug')) window.fattoriaDebug = { game, getState: () => state };
