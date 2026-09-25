@@ -97,12 +97,78 @@ Both unlock once the scanner, belt and truck are all at level 10:
 TODO(Dominik): details once the base minigame is play-tested.
 
 **Open questions**
-- TODO(Dominik): the sketch mentions "good vs bad labels". Labels are an L3 concept. Is that for minigame 2?
+- Labels ("good vs bad labels" in the sketch) are covered by minigame 2 (the truck symbols).
 
 ---
 
-## Minigame 2
-TODO(Dominik): sketch coming.
+## Minigame 2: Lo smistamento (the sorting station)
+**Lesson:** L3. **Concepts:** classificazione (classification); etichetta (label): the truck an item belongs in; albero di decisione (decision tree); caratteristica (feature), from L2; addestramento vs test (training vs test); accuratezza (accuracy). Overfitting is not a mechanic here (see the open questions).
+
+**Story.** Harvest arrives at the valley's sorting station all mixed up: red and green apples, potatoes, rotten fruit, fruit with a worm, sometimes a snail that crawled into the crate. A sorting machine, the decision tree, drops each item from a hopper at the top through pipes and gates into the right truck at the bottom. The pipes are already built. The player decides **which question each gate asks**.
+
+**Screen (portrait, top to bottom, following Dominik's sketch):**
+1. **Hopper and batch:** the items of this level's batch, shown as a row or grid at the top (scrollable if long). Tapping an item shows its features as icons.
+2. **The tree:**
+   - Every internal node is a square gate. Each gate has two exits: ✓ (sì) to the right and ✗ (no) to the left, drawn as icons, not text.
+   - The **shape of the tree is fixed** per level. Empty gates show a "?" and pulse gently.
+   - Each leaf ends in a **pipe** that runs down to a truck. Several leaves can pipe into the same truck, and pipes may cross, as in the sketch.
+   - At most 4–5 nodes per row. Big trees scroll vertically; nothing needs horizontal scrolling on 360 px.
+3. **Trucks:** a row of trucks at the bottom, each with a big symbol painted on it saying what it wants, e.g. a red apple, a green apple, a potato, a compost bin for rotten items, a meadow for living creatures. The symbol is the **etichetta (label)**.
+4. **Buttons:** "Prova l'albero" (try the tree; free, as often as you like) and, after a perfect Prova, "Consegna" (deliver, for coins).
+
+**No emoji in this minigame:** every item, question icon, truck symbol and pipe is drawn as SVG in the course palette. (Minigame 1 still uses emoji; TODO(Dominik): convert it later for a uniform look?)
+
+**Choosing a question.** Tap a gate → a bottom sheet with a grid of question icons (only the ones unlocked by sensors, see Upgrades). Tap one to place it. Tap a filled gate to change it. Every question is binary and shown as a picture:
+| Question | Icon idea |
+|---|---|
+| È rosso? / verde? / giallo? / marrone? (colour) | a colour swatch drop |
+| È una mela? / patata? / pera? / pomodoro? (type) | the item's silhouette |
+| È grande? (size) | a small and a big circle with an arrow to the big one |
+| È pesante? (weight) | a scale tipping down |
+| È marcio? (rotten) | a fruit with brown spots |
+| Ha un verme? (has a worm) | a worm |
+| È vivo? (alive) | a little creature with legs, or a heartbeat |
+
+Size and weight are separate features: most big items are heavy, but not all (e.g. a big dried-out apple is light, a small potato is heavy). That gives later levels a reason to need the scale.
+
+**Run (Prova).** Items fall one by one from the hopper. At each gate the gate lights up and shows ✓ or ✗ for that item, the item slides down the matching branch, through the pipe, and into a truck. Afterwards:
+- each wrongly sorted item gets a red ring in its truck, and tapping it shows its path;
+- a result bar shows "accuratezza (accuracy): 9/12 giusti";
+- gates that sent at least one item the wrong way get a subtle mark (upgradeable, see Upgrades).
+
+**Training vs test.** The batch at the top is the **addestramento (training)** batch: the player can Prova on it again and again. "Consegna" then runs a **new batch of the same kinds of items** the player has not seen, the **test**. Coins are paid on the test accuracy. Because each level has exactly one correct tree, a perfect tree also scores 100% on the test. The point is that students see the tree is judged on new items.
+
+**Levels (fixed, hand-designed, about 12–15).** Every level has **exactly one** assignment of questions that sorts the training batch 100% correctly. This is checked by a brute-force test over all question assignments; no two questions may be interchangeable on the batch (e.g. if all potatoes are brown, "è una patata?" and "è marrone?" would both work, so the batch needs a red potato). Rough progression:
+1. **One gate, two trucks:** red vs green apples (question: colour).
+2. **One gate:** apples vs potatoes, including a red potato so colour doesn't work (question: type).
+3. **One gate:** healthy vs rotten apples of both colours (question: rotten).
+4. **Two gates:** red, green and rotten apples (the sketch's "R/G/RU"): the root gate sorts out the rotten ones, the second sorts red from green.
+5. **Three gates, a balanced tree:** the sketch's four classes: rosso, verde, rosso con verme, verde marcio.
+6. Big vs small apples, where the trucks want sizes.
+7. Weight: a big-but-light item makes "grande?" fail, so "pesante?" is needed.
+8. Two leaves pipe into the same truck (e.g. rotten and wormy both go to compost).
+9. A snail in the harvest (è vivo? → the meadow truck).
+10–15. Deeper, unbalanced trees (depth 4–5, up to 7–9 gates) that mix type, colour, size, weight, health and life, with shared trucks and crossing pipes. These should be genuinely hard.
+
+TODO(Dominik): check the level list, especially that the item combinations make agricultural sense.
+
+**Pay.** Coins go into the same wallet as minigame 1. A first "Consegna" of a level pays according to test accuracy, up to a level-dependent maximum (e.g. 5 + 2 × level number, in config). Replaying a solved level pays little (e.g. 1 coin). Levels unlock in order. Minigame 1 is the money engine, and minigame 2 mostly spends money on sensors.
+
+**Upgrades (the minigame 2 shop):**
+| Upgrade | Effect | Teaches |
+|---|---|---|
+| Sensori (sensors): bilancia (scale), rilevatore di vermi (worm detector), naso elettronico (rot detector), sensore di vita (life sensor), … | each sensor unlocks a new question type. Levels that need it stay locked until it is bought. Colour and type are free from the start | caratteristica: measuring a feature costs something |
+| Lente d'ingrandimento (magnifying glass) | after a Prova, the gates that sorted something wrong are marked, and tapping a wrong item replays its path slowly | reading an error back to its cause |
+| Suggerimento (hint), consumable | reveals the correct question of one gate. The price rises with each use | — |
+| Nastro veloce (fast belt) | faster Prova animations | (comfort) |
+
+TODO(Dominik): prices, once it has been play-tested.
+
+**Map.** The weighing station is joined by "Lo smistamento" (the place previously shown as "Il frutteto", lesson 3). It unlocks by **paying coins** (e.g. 100, in config) instead of by lesson, so the money from minigame 1 buys the next place. TODO(Dominik): or unlock by a teacher code in class?
+
+**Open questions**
+- TODO(Dominik): overfitting (L3). A later extension could give a level with a tiny training batch where a wrong tree also scores 100% on training but fails the test. This would deliberately break the "one correct tree" rule for that level only.
+- TODO(Dominik): an endless mode with randomly generated trees after the fixed levels?
 
 ## Minigame 3
 TODO(Dominik): sketch coming.
@@ -112,5 +178,5 @@ TODO(Dominik): sketch coming.
 | Minigame | Lesson | Concepts | Status |
 |---|---|---|---|
 | 1. La stazione di pesatura | L2 | regressione lineare, errore, valore anomalo, qualità dei dati | designed |
-| 2. | | | waiting for sketch |
+| 2. Lo smistamento | L3 | classificazione, etichetta, albero di decisione, addestramento vs test, accuratezza | designed |
 | 3. | | | waiting for sketch |
