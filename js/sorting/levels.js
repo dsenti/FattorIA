@@ -3,39 +3,51 @@
 // Each level:
 //   id      stable id (saved progress refers to it; don't rename a level that players have solved)
 //   title   short Italian title
-//   story   one sentence shown above the batch (should not give away the rule)
+//   story   one or two sentences shown above the batch (may tell the story, not the tree)
 //   trucks  truck ids, drawn left to right at the bottom (see TRUCKS). Pipes may cross.
 //   tree    the tree SHAPE and its SOLUTION: ask(question, { no: ..., yes: ... }) for a gate,
 //           a truck id for a leaf. The game shows the shape and hides the questions.
 //           ✗ (no) is drawn on the left, ✓ (yes) on the right.
 //   items   the training batch: [item, truck id (the etichetta), count = 1]
-//           item = tokens, see js/sorting/questions.js: type, colour, grande, pesante/leggero,
-//           marcio, verme. Default: small; heavy if big.
-//   testSize (optional) size of the test batch for "Consegna" (default: training size)
+//           item = tokens, see js/sorting/questions.js: type, colour, then grande, marcio, sporco,
+//           strano, verme (a worm in it), lumaca (a snail on it). Default: small, healthy, clean.
+//   testSize (optional) size of the test batch (default: training size)
 //
-// RULE (checked by `node tests/run.mjs`): exactly ONE assignment of questions (out of all 13)
+// The story behind the trucks: helpers (bees, butterflies, ladybirds) are released in the orto;
+// worms and snails go to the hens (galline), alone or on produce; rotten -> compost;
+// covered in soil -> lavaggio; misshapen -> "brutti ma buoni".
+//
+// RULE (checked by `node tests/run.mjs`): exactly ONE assignment of questions (out of all 17)
 // sorts the training batch 100% correctly, and every leaf gets at least one training item.
 // If you change a level, run the tests: they print any other assignment that also works.
 // The sensors a level needs follow from the questions in its tree.
 // TODO(Dominik): check that the item combinations and trucks make agricultural sense.
 import { ask } from './tree.js';
 
+// Bump when the levels change so much that saved "solved" progress no longer fits (see storage.js).
+export const LEVELS_VERSION = 2;
+
 // Trucks: the symbol painted on the truck is its etichetta (label). `sym` is drawn by art.js.
 export const TRUCKS = {
   rosse: { name: 'Mele rosse', sym: 'rosse' },
   verdi: { name: 'Mele verdi', sym: 'verdi' },
-  mele: { name: 'Mele sane', sym: 'mele' },
+  mele: { name: 'Mele', sym: 'mele' },
   patate: { name: 'Patate', sym: 'patate' },
+  carote: { name: 'Carote', sym: 'carote' },
   pomodori: { name: 'Pomodori', sym: 'pomodori' },
+  pere: { name: 'Pere', sym: 'pere' },
   compost: { name: 'Compost', sym: 'compost' },
-  prato: { name: 'Prato (per chi è vivo)', sym: 'prato' },
-  galline: { name: 'Mangime per le galline', sym: 'galline' },
-  succo: { name: 'Succo', sym: 'succo' },
-  mercato: { name: 'Mercato, prima scelta', sym: 'mercato' },
-  grandi: { name: 'Mele grandi', sym: 'grandi' },
-  piccole: { name: 'Mele piccole', sym: 'piccole' },
-  passata: { name: 'Passata di pomodoro', sym: 'passata' },
+  orto: { name: 'L\'orto (per gli insetti amici)', sym: 'orto' },
+  galline: { name: 'Le galline (vermi e lumache)', sym: 'galline' },
+  mercato: { name: 'Il mercato', sym: 'mercato' },
+  lavaggio: { name: 'Lavaggio', sym: 'lavaggio' },
+  brutti: { name: 'Brutti ma buoni', sym: 'brutti' },
+  grandi: { name: 'Grandi (pesanti)', sym: 'grandi' },
+  piccole: { name: 'Piccoli (leggeri)', sym: 'piccole' },
 };
+
+const HENS = 'Le galline mangiano volentieri vermi e lumache.';
+const HELPERS = 'Api, farfalle e coccinelle aiutano l\'orto: liberale lì.';
 
 export const LEVELS = [
   {
@@ -69,6 +81,17 @@ export const LEVELS = [
     ],
   },
   {
+    id: 'lavare', title: 'Da lavare',
+    story: 'Carote e patate appena tolte dalla terra. Quelle sporche vanno prima al lavaggio.',
+    trucks: ['patate', 'carote', 'lavaggio'],
+    tree: ask('sporco', { no: ask('carota', { no: 'patate', yes: 'carote' }), yes: 'lavaggio' }),
+    items: [
+      ['carota arancione', 'carote'], ['carota arancione grande', 'carote'], ['carota giallo', 'carote'],
+      ['patata marrone', 'patate'], ['patata rosso grande', 'patate'], ['patata giallo', 'patate'],
+      ['carota arancione sporco', 'lavaggio'], ['patata marrone grande sporco', 'lavaggio'], ['patata giallo sporco', 'lavaggio'], ['mela rosso sporco', 'lavaggio'],
+    ],
+  },
+  {
     id: 'tre-camion', title: 'Tre camion',
     story: 'Adesso i camion sono tre. Due cancelli: chi fa la prima domanda?',
     trucks: ['verdi', 'rosse', 'compost'],
@@ -79,193 +102,191 @@ export const LEVELS = [
     ],
   },
   {
+    id: 'lumache', title: 'Lumache!',
+    story: `Nelle cassette dell'orto ci sono lumache, da sole o attaccate alle verdure. ${HENS}`,
+    trucks: ['carote', 'patate', 'galline'],
+    tree: ask('lumaca', { no: ask('patata', { no: 'carote', yes: 'patate' }), yes: 'galline' }),
+    items: [
+      ['lumaca marrone', 'galline'], ['lumaca giallo', 'galline'], ['patata marrone lumaca', 'galline'], ['carota arancione grande lumaca', 'galline'],
+      ['patata marrone', 'patate'], ['patata rosso grande', 'patate'], ['patata giallo', 'patate'],
+      ['carota arancione', 'carote'], ['carota giallo grande', 'carote'], ['carota arancione grande', 'carote'],
+    ],
+  },
+  {
     id: 'verme', title: 'Il verme',
-    story: 'Le mele col verme piacciono alle galline. Le marce vanno nel compost.',
+    story: `Le mele rosse hanno i vermi, e qualche verme è uscito dalla mela. ${HENS} Le marce vanno nel compost.`,
     trucks: ['compost', 'verdi', 'rosse', 'galline'],
     tree: ask('rosso', {
       no: ask('marcio', { no: 'verdi', yes: 'compost' }),
       yes: ask('verme', { no: 'rosse', yes: 'galline' }),
     }),
     items: [
-      ['mela rosso', 'rosse'], ['mela rosso grande', 'rosse'], ['mela rosso verme', 'galline'], ['mela rosso grande verme', 'galline'],
+      ['mela rosso', 'rosse'], ['mela rosso grande', 'rosse'], ['mela rosso verme', 'galline'], ['mela rosso grande verme', 'galline'], ['verme rosso', 'galline'],
       ['mela verde', 'verdi'], ['mela verde grande', 'verdi'], ['mela verde marcio', 'compost'], ['mela verde grande marcio', 'compost'],
     ],
   },
   {
-    id: 'grandezza', title: 'Grandi e piccole',
-    story: 'Il mercato paga di più le mele grandi. Le patate vanno tutte insieme.',
-    trucks: ['piccole', 'grandi', 'patate'],
-    tree: ask('patata', { no: ask('grande', { no: 'piccole', yes: 'grandi' }), yes: 'patate' }),
-    items: [
-      ['mela rosso', 'piccole'], ['mela verde', 'piccole'], ['mela verde pesante', 'piccole'],
-      ['mela rosso grande', 'grandi'], ['mela verde grande', 'grandi'], ['mela rosso grande leggero', 'grandi'],
-      ['patata marrone', 'patate'], ['patata marrone grande', 'patate'], ['patata rosso grande', 'patate'],
-    ],
-  },
-  {
     id: 'peso', title: 'Il peso',
-    story: 'Le mele secche sono grandi ma leggere. Il mercato le vuole pesanti.',
-    trucks: ['succo', 'mercato', 'compost'],
-    tree: ask('marcio', { no: ask('pesante', { no: 'succo', yes: 'mercato' }), yes: 'compost' }),
-    items: [
-      ['mela rosso grande', 'mercato'], ['mela verde grande', 'mercato'], ['mela verde pesante', 'mercato'], ['mela rosso pesante', 'mercato'],
-      ['mela rosso grande leggero', 'succo'], ['mela giallo grande leggero', 'succo'], ['mela rosso', 'succo'], ['mela verde', 'succo'],
-      ['mela rosso grande marcio', 'compost'], ['mela verde marcio', 'compost'],
-    ],
-  },
-  {
-    id: 'compost', title: 'Tutto nel compost',
-    story: 'Quest\'anno i vermi hanno attaccato solo le mele rosse. Marce o col verme: compost.',
-    trucks: ['compost', 'verdi', 'rosse'],
+    story: 'Le mele si vendono a peso: grandi e pesanti da una parte, piccole e leggere dall\'altra. Le patate vanno tutte insieme.',
+    trucks: ['piccole', 'grandi', 'patate', 'compost'],
     tree: ask('marcio', {
-      no: ask('rosso', { no: 'verdi', yes: ask('verme', { no: 'rosse', yes: 'compost' }) }),
+      no: ask('patata', { no: ask('pesante', { no: 'piccole', yes: 'grandi' }), yes: 'patate' }),
       yes: 'compost',
     }),
     items: [
-      ['mela rosso', 'rosse'], ['mela rosso grande', 'rosse'], ['mela rosso verme', 'compost'], ['mela rosso grande verme', 'compost'],
-      ['mela verde', 'verdi'], ['mela verde grande', 'verdi'], ['mela verde marcio', 'compost'], ['mela rosso grande marcio', 'compost'],
+      ['mela rosso', 'piccole'], ['mela verde', 'piccole'], ['mela rosso grande', 'grandi'], ['mela verde grande', 'grandi'],
+      ['patata marrone', 'patate'], ['patata marrone grande', 'patate'], ['patata rosso grande', 'patate'],
+      ['mela rosso grande marcio', 'compost'], ['patata marrone marcio', 'compost'], ['mela verde marcio', 'compost'],
     ],
   },
   {
-    id: 'lumaca', title: 'Chi è vivo?',
-    story: 'Nelle cassette si sono nascosti una lumaca e una coccinella. Riportali sul prato!',
-    trucks: ['verdi', 'rosse', 'patate', 'prato'],
-    tree: ask('vivo', {
-      no: ask('patata', { no: ask('rosso', { no: 'verdi', yes: 'rosse' }), yes: 'patate' }),
-      yes: 'prato',
+    id: 'brutti', title: 'Brutti ma buoni',
+    story: 'Una carota gemella è buona come le altre: non si butta! Le verdure strane hanno il loro camion.',
+    trucks: ['mercato', 'lavaggio', 'brutti', 'compost'],
+    tree: ask('marcio', {
+      no: ask('strano', { no: ask('sporco', { no: 'mercato', yes: 'lavaggio' }), yes: 'brutti' }),
+      yes: 'compost',
+    }),
+    items: [
+      ['carota arancione', 'mercato'], ['patata marrone grande', 'mercato'], ['pera verde', 'mercato'], ['mela rosso', 'mercato'],
+      ['carota arancione sporco', 'lavaggio'], ['patata giallo sporco', 'lavaggio'],
+      ['carota arancione strano', 'brutti'], ['patata marrone strano', 'brutti'], ['pera giallo grande strano', 'brutti'], ['carota giallo strano sporco', 'brutti'],
+      ['pomodoro rosso marcio', 'compost'], ['carota arancione marcio', 'compost'],
+    ],
+  },
+  {
+    id: 'orto', title: 'Gli amici dell\'orto',
+    story: `${HELPERS} ${HENS}`,
+    trucks: ['verdi', 'rosse', 'orto', 'galline'],
+    tree: ask('lumaca', {
+      no: ask('vivo', {
+        no: ask('rosso', { no: 'verdi', yes: 'rosse' }),
+        yes: ask('verme', { no: 'orto', yes: 'galline' }),
+      }),
+      yes: 'galline',
     }),
     items: [
       ['mela rosso', 'rosse'], ['mela rosso grande', 'rosse'], ['mela verde', 'verdi'], ['mela verde grande', 'verdi'],
-      ['patata marrone', 'patate'], ['patata rosso grande', 'patate'], ['patata marrone grande', 'patate'],
-      ['lumaca marrone', 'prato'], ['coccinella rosso', 'prato'], ['lumaca giallo', 'prato'],
+      ['mela verde lumaca', 'galline'], ['lumaca marrone', 'galline'], ['verme rosso', 'galline'],
+      ['ape giallo', 'orto'], ['farfalla arancione', 'orto'], ['coccinella rosso', 'orto'], ['farfalla giallo', 'orto'],
     ],
   },
   {
-    id: 'orto', title: 'Il carretto dell\'orto',
-    story: 'Dall\'orto arriva di tutto: mele, pomodori, patate, e qualche ospite.',
-    trucks: ['compost', 'patate', 'pomodori', 'mele', 'prato'],
+    id: 'carretto', title: 'Il carretto dell\'orto',
+    story: 'Carote e pomodori appena raccolti, sporchi, marci, e qualche ape curiosa.',
+    trucks: ['carote', 'pomodori', 'lavaggio', 'compost', 'orto'],
     tree: ask('vivo', {
       no: ask('marcio', {
-        no: ask('mela', { no: ask('pomodoro', { no: 'patate', yes: 'pomodori' }), yes: 'mele' }),
+        no: ask('sporco', { no: ask('pomodoro', { no: 'carote', yes: 'pomodori' }), yes: 'lavaggio' }),
         yes: 'compost',
       }),
-      yes: 'prato',
+      yes: 'orto',
     }),
     items: [
-      ['mela rosso', 'mele'], ['mela verde grande', 'mele'],
+      ['carota arancione', 'carote'], ['carota giallo grande', 'carote'], ['carota arancione grande', 'carote'],
       ['pomodoro rosso', 'pomodori'], ['pomodoro rosso grande', 'pomodori'], ['pomodoro verde', 'pomodori'],
-      ['patata marrone', 'patate'], ['patata rosso grande', 'patate'], ['patata giallo', 'patate'],
-      ['mela rosso marcio', 'compost'], ['pomodoro rosso marcio', 'compost'], ['patata marrone grande marcio', 'compost'],
-      ['lumaca marrone', 'prato'], ['coccinella rosso', 'prato'],
+      ['carota arancione sporco', 'lavaggio'], ['pomodoro rosso sporco', 'lavaggio'],
+      ['pomodoro rosso marcio', 'compost'], ['carota arancione grande marcio', 'compost'],
+      ['ape giallo', 'orto'], ['farfalla arancione', 'orto'], ['coccinella rosso', 'orto'],
     ],
   },
   {
-    id: 'succo', title: 'Succo o mercato?',
-    story: 'Al mercato vanno solo le mele grandi e pesanti. Le piccole diventano succo.',
-    trucks: ['succo', 'mercato', 'galline', 'compost'],
-    tree: ask('marcio', {
-      no: ask('verme', {
-        no: ask('grande', { no: 'succo', yes: ask('pesante', { no: 'galline', yes: 'mercato' }) }),
-        yes: 'galline',
-      }),
-      yes: 'compost',
-    }),
-    items: [
-      ['mela rosso', 'succo'], ['mela verde', 'succo'], ['mela rosso pesante', 'succo'],
-      ['mela rosso grande', 'mercato'], ['mela verde grande', 'mercato'],
-      ['mela giallo grande leggero', 'galline'], ['mela rosso grande leggero', 'galline'],
-      ['mela verde verme', 'galline'], ['mela rosso grande verme', 'galline'],
-      ['mela rosso marcio', 'compost'], ['mela verde grande marcio', 'compost'],
-    ],
-  },
-  {
-    id: 'patate-lumache', title: 'Patate e lumache',
-    story: 'Mele e patate, sane e marce, e le lumache dell\'orto.',
-    trucks: ['verdi', 'rosse', 'compost', 'patate', 'prato'],
-    tree: ask('vivo', {
-      no: ask('patata', {
-        no: ask('marcio', { no: ask('rosso', { no: 'verdi', yes: 'rosse' }), yes: 'compost' }),
-        yes: ask('marcio', { no: 'patate', yes: 'compost' }),
-      }),
-      yes: 'prato',
-    }),
-    items: [
-      ['mela rosso', 'rosse'], ['mela rosso grande', 'rosse'], ['mela verde', 'verdi'], ['mela verde grande', 'verdi'],
-      ['mela rosso marcio', 'compost'], ['mela verde grande marcio', 'compost'],
-      ['patata marrone', 'patate'], ['patata rosso grande', 'patate'], ['patata giallo', 'patate'],
-      ['patata marrone grande marcio', 'compost'], ['patata rosso marcio', 'compost'],
-      ['lumaca marrone', 'prato'], ['coccinella rosso', 'prato'],
-    ],
-  },
-  {
-    id: 'pere', title: 'Pere e mele',
-    story: 'Per le pere il mercato guarda il peso, per tutto il resto la grandezza. I pomodori piccoli diventano succo.',
-    trucks: ['succo', 'mercato', 'prato', 'galline', 'compost'],
-    tree: ask('marcio', {
-      no: ask('verme', {
-        no: ask('pera', {
-          no: ask('vivo', { no: ask('grande', { no: 'succo', yes: 'mercato' }), yes: 'prato' }),
-          yes: ask('pesante', { no: 'succo', yes: 'mercato' }),
+    id: 'pere', title: 'Pere a peso',
+    story: `Le pere si vendono a peso. Le mele stanno tutte insieme. Via prima le lumache: ${HENS.toLowerCase()}`,
+    trucks: ['piccole', 'grandi', 'mele', 'galline', 'compost'],
+    tree: ask('lumaca', {
+      no: ask('marcio', {
+        no: ask('verme', {
+          no: ask('pera', { no: 'mele', yes: ask('pesante', { no: 'piccole', yes: 'grandi' }) }),
+          yes: 'galline',
         }),
-        yes: 'galline',
+        yes: 'compost',
       }),
-      yes: 'compost',
+      yes: 'galline',
     }),
     items: [
-      ['mela rosso', 'succo'], ['mela verde pesante', 'succo'], ['mela rosso grande', 'mercato'], ['mela verde grande leggero', 'mercato'],
-      ['pera giallo grande', 'mercato'], ['pera verde pesante', 'mercato'], ['pera giallo grande leggero', 'succo'], ['pera verde', 'succo'],
-      ['mela rosso verme', 'galline'], ['pera giallo grande verme', 'galline'],
-      ['mela verde marcio', 'compost'], ['pera giallo marcio', 'compost'],
-      ['mela giallo grande', 'mercato'], ['pomodoro rosso pesante', 'succo'], ['pomodoro rosso grande', 'mercato'],
-      ['lumaca giallo', 'prato'],
+      ['pera giallo', 'piccole'], ['pera verde', 'piccole'], ['pera giallo grande', 'grandi'], ['pera verde grande', 'grandi'],
+      ['mela rosso', 'mele'], ['mela verde grande', 'mele'], ['mela giallo', 'mele'],
+      ['pera giallo grande verme', 'galline'], ['mela rosso verme', 'galline'], ['verme rosso', 'galline'],
+      ['mela rosso marcio lumaca', 'galline'], ['lumaca giallo', 'galline'], ['pera verde lumaca', 'galline'],
+      ['pera giallo marcio', 'compost'], ['mela verde grande marcio', 'compost'],
+    ],
+  },
+  {
+    id: 'mercato', title: 'Al mercato',
+    story: `Al mercato solo verdura pulita e bella. ${HELPERS} ${HENS}`,
+    trucks: ['mercato', 'lavaggio', 'brutti', 'compost', 'orto', 'galline'],
+    tree: ask('lumaca', {
+      no: ask('vivo', {
+        no: ask('marcio', {
+          no: ask('strano', { no: ask('sporco', { no: 'mercato', yes: 'lavaggio' }), yes: 'brutti' }),
+          yes: 'compost',
+        }),
+        yes: ask('verme', { no: 'orto', yes: 'galline' }),
+      }),
+      yes: 'galline',
+    }),
+    items: [
+      ['carota arancione', 'mercato'], ['patata marrone grande', 'mercato'], ['pomodoro rosso', 'mercato'],
+      ['carota arancione sporco', 'lavaggio'], ['patata marrone sporco', 'lavaggio'],
+      ['carota arancione grande strano', 'brutti'], ['patata giallo strano sporco', 'brutti'], ['pomodoro rosso strano', 'brutti'],
+      ['pomodoro rosso marcio', 'compost'], ['patata marrone marcio sporco', 'compost'],
+      ['ape giallo', 'orto'], ['farfalla giallo', 'orto'], ['coccinella rosso', 'orto'],
+      ['verme rosso', 'galline'], ['lumaca marrone', 'galline'], ['patata marrone sporco lumaca', 'galline'],
     ],
   },
   {
     id: 'cooperativa', title: 'La cooperativa',
-    story: 'Alla cooperativa arriva il raccolto di tutta la valle. Ogni prodotto ha le sue regole.',
-    trucks: ['succo', 'mercato', 'passata', 'galline', 'prato', 'compost'],
-    tree: ask('marcio', {
+    story: `Alla cooperativa arriva il raccolto di tutta la valle. ${HENS} ${HELPERS}`,
+    trucks: ['mele', 'galline', 'patate', 'lavaggio', 'compost', 'orto'],
+    tree: ask('lumaca', {
       no: ask('vivo', {
-        no: ask('patata', {
-          no: ask('pomodoro', {
-            no: ask('grande', { no: 'succo', yes: 'mercato' }),
-            yes: ask('rosso', { no: 'mercato', yes: 'passata' }),
+        no: ask('marcio', {
+          no: ask('patata', {
+            no: ask('verme', { no: 'mele', yes: 'galline' }),
+            yes: ask('sporco', { no: 'patate', yes: 'lavaggio' }),
           }),
-          yes: ask('grande', { no: 'galline', yes: 'mercato' }),
+          yes: 'compost',
         }),
-        yes: 'prato',
+        yes: ask('verme', { no: 'orto', yes: 'galline' }),
       }),
-      yes: 'compost',
+      yes: 'galline',
     }),
     items: [
-      ['mela rosso', 'succo'], ['mela verde pesante', 'succo'], ['mela rosso grande', 'mercato'], ['mela verde grande leggero', 'mercato'],
-      ['pomodoro rosso', 'passata'], ['pomodoro rosso grande', 'passata'], ['pomodoro verde', 'mercato'], ['pomodoro verde grande', 'mercato'],
-      ['patata marrone', 'galline'], ['patata rosso pesante', 'galline'], ['patata marrone grande', 'mercato'], ['patata giallo grande leggero', 'mercato'],
-      ['lumaca marrone', 'prato'], ['coccinella rosso', 'prato'],
-      ['mela rosso marcio', 'compost'], ['pomodoro rosso grande marcio', 'compost'], ['patata marrone marcio', 'compost'],
+      ['mela rosso', 'mele'], ['mela verde grande', 'mele'], ['mela giallo', 'mele'],
+      ['mela rosso verme', 'galline'], ['mela verde grande verme', 'galline'],
+      ['patata marrone', 'patate'], ['patata rosso grande', 'patate'], ['patata marrone sporco', 'lavaggio'], ['patata giallo grande sporco', 'lavaggio'],
+      ['mela rosso marcio', 'compost'], ['patata marrone marcio', 'compost'],
+      ['ape giallo', 'orto'], ['farfalla arancione', 'orto'], ['coccinella rosso', 'orto'],
+      ['verme rosso', 'galline'], ['lumaca marrone', 'galline'], ['patata marrone sporco lumaca', 'galline'], ['mela verde lumaca', 'galline'],
     ],
   },
   {
     id: 'finale', title: 'Il gran finale',
-    story: 'L\'ultimo carico della stagione: mele, pere e patate, tutto insieme. Buona fortuna!',
-    trucks: ['succo', 'mercato', 'galline', 'compost'],
-    tree: ask('patata', {
-      no: ask('pera', {
+    story: 'L\'ultimo carico della stagione: le carote hanno le loro regole, mele e patate le loro. Arrivano anche gli ospiti dell\'orto.',
+    trucks: ['mercato', 'lavaggio', 'brutti', 'compost', 'galline', 'orto'],
+    tree: ask('carota', {
+      no: ask('vivo', {
+        no: ask('verme', { no: ask('sporco', { no: 'mercato', yes: 'lavaggio' }), yes: 'galline' }),
+        yes: ask('verme', { no: 'orto', yes: 'galline' }),
+      }),
+      yes: ask('lumaca', {
         no: ask('marcio', {
-          no: ask('verme', { no: ask('grande', { no: 'succo', yes: 'mercato' }), yes: 'galline' }),
+          no: ask('strano', { no: ask('sporco', { no: 'mercato', yes: 'lavaggio' }), yes: 'brutti' }),
           yes: 'compost',
         }),
-        yes: ask('marcio', { no: ask('pesante', { no: 'succo', yes: 'mercato' }), yes: 'compost' }),
+        yes: 'galline',
       }),
-      yes: ask('marcio', { no: ask('grande', { no: 'galline', yes: 'mercato' }), yes: 'compost' }),
     }),
     items: [
-      ['mela rosso', 'succo'], ['mela verde pesante', 'succo'], ['mela rosso grande', 'mercato'], ['mela verde grande leggero', 'mercato'],
-      ['mela rosso verme', 'galline'], ['mela verde grande verme', 'galline'], ['mela rosso grande marcio', 'compost'],
-      ['pera giallo grande', 'mercato'], ['pera verde pesante', 'mercato'], ['pera giallo grande leggero', 'succo'], ['pera verde', 'succo'],
-      ['pera giallo marcio', 'compost'],
-      ['patata marrone', 'galline'], ['patata rosso pesante', 'galline'], ['patata marrone grande', 'mercato'], ['patata giallo grande leggero', 'mercato'],
-      ['patata marrone grande marcio', 'compost'],
+      ['mela rosso', 'mercato'], ['mela verde grande', 'mercato'], ['mela rosso verme', 'galline'], ['mela verde grande verme', 'galline'],
+      ['patata marrone', 'mercato'], ['patata rosso grande', 'mercato'], ['patata marrone sporco', 'lavaggio'], ['patata giallo grande sporco', 'lavaggio'],
+      ['patata marrone sporco verme', 'galline'],
+      ['carota arancione', 'mercato'], ['carota giallo grande', 'mercato'], ['carota arancione sporco', 'lavaggio'],
+      ['carota arancione strano', 'brutti'], ['carota giallo strano sporco', 'brutti'],
+      ['carota arancione marcio', 'compost'], ['carota giallo grande marcio strano', 'compost'],
+      ['carota arancione lumaca', 'galline'], ['carota arancione grande marcio lumaca', 'galline'],
+      ['ape giallo', 'orto'], ['farfalla arancione', 'orto'], ['coccinella rosso', 'orto'], ['verme rosso', 'galline'],
     ],
   },
 ];

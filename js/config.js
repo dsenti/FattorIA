@@ -154,15 +154,17 @@ export const CONFIG = {
   SORT: {
     // Coins to unlock the place on the map (replaces "Il frutteto, lezione 3").
     UNLOCK_COST: 100,
-    // First "Consegna" of level n (1..15) pays up to this, times the test accuracy.
+    // First perfect run of level n (1..15) pays up to this, times the test accuracy.
     pay: (n) => 5 + 2 * n,
-    // Delivering an already solved level again.
+    // Solving an already solved level again.
     REPLAY_PAY: 1,
-    // Sensors unlock questions (colour and type are free). Ordered as the levels need them:
-    // naso (level 3), vermi (5), calibro (6), bilancia (7), vita (9).
-    SENSOR_COST: { naso: 15, vermi: 25, calibro: 30, bilancia: 40, vita: 50 },
+    // Sensors unlock questions (colour, type, soil and snail are free). Ordered as the levels
+    // need them: naso (level 3), vermi (7), bilancia (8), forma (9), vita (10).
+    SENSOR_COST: { naso: 15, vermi: 20, bilancia: 25, forma: 25, vita: 35 },
+    // The size gauge ("calibro") was removed; saves that had bought it get this refund.
+    CALIBRO_REFUND: 30,
     LENTE_COST: 20,          // magnifying glass: marks the guilty gates, slow replay of a wrong item
-    FAST_COST: 15,           // nastro veloce: faster Prova / Consegna animations
+    FAST_COST: 15,           // nastro veloce: faster Prova animations
     // Hints (suggerimento): the k-th hint bought (k = 0, 1, 2, ...) costs this.
     hintCost: (k) => 3 + 3 * k,
     // Animation (px per second along the pipes, pause at each gate, time between two items).
@@ -171,6 +173,7 @@ export const CONFIG = {
     SPAWN_MS: 380,
     FAST_FACTOR: 2.2,        // nastro veloce multiplies the speed and divides the pauses by this
     REPLAY_FACTOR: 0.4,      // lente: slow replay speed
+    DRIVE_OFF_MS: 1100,      // "Avanti": the loaded trucks drive away before the next level
   },
 
   // ---------------------------------------------------------------- leaderboard

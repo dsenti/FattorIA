@@ -319,7 +319,8 @@ function otherSolutions(c, items) {
 test('smistamento: 12-15 levels, well formed (items, trucks, leaves, limits)', () => {
   assert.ok(LEVELS.length >= 12 && LEVELS.length <= 15, `${LEVELS.length} levels`);
   assert.equal(new Set(LEVELS.map((l) => l.id)).size, LEVELS.length, 'unique ids');
-  assert.equal(QUESTIONS.length, 13);
+  assert.equal(QUESTIONS.length, 17);
+  assert.ok(!QUESTIONS.some((q) => q.id === 'grande'), 'size is not a feature any more');
   let prevGates = 0, maxGates = 0;
   LEVELS.forEach((lv, i) => {
     const c = compile(lv.tree);
@@ -347,6 +348,33 @@ test('smistamento: 12-15 levels, well formed (items, trucks, leaves, limits)', (
   assert.ok(LEVELS.some((lv) => treeDepth(compile(lv.tree).root) >= 4), 'some deep trees');
 });
 
+test('smistamento: item model (big = heavy, lone animals, attached worm/snail)', () => {
+  const q = (id, str) => QUESTIONS.find((x) => x.id === id).f(parseItem(str));
+  assert.ok(q('pesante', 'mela rosso grande') && !q('pesante', 'mela rosso'), 'big means heavy');
+  for (const a of ['ape giallo', 'farfalla arancione', 'coccinella rosso', 'lumaca marrone', 'verme rosso']) {
+    assert.ok(q('vivo', a), `${a} is alive`);
+    for (const t of ['mela', 'pera', 'patata', 'pomodoro', 'carota']) assert.ok(!q(t, a), `${a} is not a ${t}`);
+  }
+  assert.ok(!q('vivo', 'mela rosso verme') && !q('vivo', 'patata marrone lumaca'), 'produce with an animal is not alive');
+  assert.ok(q('verme', 'verme rosso') && q('verme', 'mela rosso verme') && !q('verme', 'lumaca marrone'));
+  assert.ok(q('lumaca', 'lumaca marrone') && q('lumaca', 'carota arancione lumaca') && !q('lumaca', 'verme rosso'));
+  assert.ok(q('carota', 'carota giallo strano sporco') && q('strano', 'carota giallo strano sporco') && q('sporco', 'carota giallo strano sporco'));
+  assert.throws(() => parseItem('ape giallo sporco'), /lone animal/);
+  assert.throws(() => parseItem('mela rosso leggero'), /unknown token/);
+  // every animal and every flag appears in some level
+  const all = LEVELS.flatMap((lv) => lv.items.map(([str]) => parseItem(str)));
+  for (const t of ['ape', 'farfalla', 'coccinella', 'lumaca', 'verme', 'carota']) assert.ok(all.some((it) => it.t === t), `${t} appears`);
+  for (const f of ['dirty', 'odd', 'worm', 'snail', 'rot']) assert.ok(all.some((it) => it[f] && !it.alive), `produce with ${f} appears`);
+  // helpers go to the orto, worms and snails to the hens (the story behind the trucks)
+  for (const lv of LEVELS) for (const [str, label] of lv.items) {
+    const it = parseItem(str);
+    if (['ape', 'farfalla', 'coccinella'].includes(it.t)) assert.equal(label, 'orto', `${lv.id}: ${str}`);
+    if (it.t === 'verme' || it.t === 'lumaca') assert.equal(label, 'galline', `${lv.id}: ${str}`);
+  }
+  for (const gone of ['succo', 'passata', 'prato']) assert.ok(!TRUCKS[gone], `${gone} truck removed`);
+  for (const t of ['lavaggio', 'brutti', 'orto', 'mercato', 'compost', 'galline']) assert.ok(TRUCKS[t], `${t} truck`);
+});
+
 test('smistamento: the solution sorts the training batch 100% and every leaf gets an item', () => {
   LEVELS.forEach((lv, i) => {
     const c = compile(lv.tree);
@@ -357,16 +385,16 @@ test('smistamento: the solution sorts the training batch 100% and every leaf get
   });
 });
 
-test('smistamento: EXACTLY ONE question assignment sorts each training batch perfectly', () => {
+test('smistamento: EXACTLY ONE question assignment (of all 17 questions) sorts each training batch perfectly', () => {
   let literal = 0;
   LEVELS.forEach((lv, i) => {
     const c = compile(lv.tree);
     const items = trainingBatch(lv, i + 1);
-    // exhaustive over all 13^gates assignments, factorised per subtree
+    // exhaustive over all 17^gates assignments, factorised per subtree
     const n = countSolutions(c, items, ALLQ);
     assert.equal(n, 1, `${lv.id}: ${n} perfect assignments, e.g.\n        ${otherSolutions(c, items).join('\n        ')}\n        (gates in pre-order; solution: ${solutionOf(c).join(' ')})`);
-    // literal brute force, one assignment at a time, where it is fast enough (13^6 = 4.8 million)
-    if (c.gates.length <= 6) {
+    // literal brute force, one assignment at a time, where it is fast enough (17^5 = 1.4 million)
+    if (c.gates.length <= 5) {
       const bf = bruteForce(c, items, ALLQ);
       assert.equal(bf.tried, ALLQ.length ** c.gates.length);
       assert.equal(bf.found.length, 1, `${lv.id}: brute force found ${bf.found.length}`);
@@ -376,7 +404,7 @@ test('smistamento: EXACTLY ONE question assignment sorts each training batch per
   });
   // the factorised count agrees with the literal brute force on small synthetic trees too
   const c3 = compile(LEVELS.find((l) => l.id === 'verme').tree);
-  const items = trainingBatch(LEVELS.find((l) => l.id === 'verme'), 5).slice(0, 3);
+  const items = trainingBatch(LEVELS.find((l) => l.id === 'verme'), 7).slice(0, 3);
   assert.equal(countSolutions(c3, items, ALLQ), bruteForce(c3, items, ALLQ, 1e9).found.length, 'count = brute force');
   console.log(`      literal brute force on ${literal} levels, factorised exhaustive count on all ${LEVELS.length}`);
 });
@@ -439,7 +467,7 @@ test('smistamento: layout fits 360 px without horizontal scrolling', () => {
 
 test('smistamento: sensors, level locks, prices', () => {
   const free = QUESTIONS.filter((q) => !q.sensor).map((q) => q.group);
-  assert.deepEqual([...new Set(free)], ['colore', 'tipo'], 'colour and type are free');
+  assert.deepEqual([...new Set(free)], ['colore', 'tipo', 'sporco', 'lumaca'], 'colour, type, soil and snail are free');
   for (const s of SENSORS) {
     assert.ok(QUESTIONS.some((q) => q.id === s.q && q.sensor === s.id));
     assert.ok(Number.isInteger(CONFIG.SORT.SENSOR_COST[s.id]) && CONFIG.SORT.SENSOR_COST[s.id] > 0, `price for ${s.id}`);
@@ -462,26 +490,35 @@ test('smistamento: sensors, level locks, prices', () => {
   assert.equal(CONFIG.SORT.pay(1), 7);
 });
 
-test('smistamento: saves migrate (old save without "sort") and are sanitised', () => {
+test('smistamento: saves migrate (no "sort"; older levels; calibro refund) and are sanitised', () => {
   const base = { playerId: '11111111-2222-4333-8444-555555555555', coins: 3, levels: { scanner: 2, belt: 2, truck: 4 } };
   const old = sanitize(base);
-  assert.deepEqual(old.sort, defaultSort(), 'old save gets an empty minigame 2 progress');
+  assert.deepEqual(old.sort, defaultSort(), 'save without minigame 2 gets an empty progress');
   assert.equal(old.coins, 3);
-  const good = {
-    unlocked: true, solved: ['rosse-verdi', 'nope'], current: 'marce', sensors: ['naso', 'laser'], hints: 2, hintsBought: 3,
-    lente: true, fast: 'yes', boards: { 'rosse-verdi': ['rosso'], 'tre-camion': ['marcio', 'xx'], marce: ['a', 'b'] }, hinted: { 'rosse-verdi': [0, 5] }, seenHelp: true,
-  };
+  // a save from the first version of the levels (no levelsVersion), with the removed calibro
+  const v1 = { unlocked: true, solved: ['rosse-verdi', 'marce'], current: 'marce', sensors: ['naso', 'calibro', 'bilancia'], hints: 2, hintsBought: 3,
+    lente: true, fast: true, boards: { 'rosse-verdi': ['rosso'] }, hinted: { 'rosse-verdi': [0] }, seenHelp: true };
+  const m = sanitize({ ...base, sort: v1 });
+  assert.equal(m.coins, 3 + CONFIG.SORT.CALIBRO_REFUND, 'calibro refunded');
+  assert.deepEqual(m.sort.sensors, ['naso', 'bilancia'], 'other sensors kept');
+  assert.deepEqual(m.sort.solved, [], 'level progress starts over');
+  assert.equal(m.sort.current, null);
+  assert.deepEqual(m.sort.boards, {});
+  assert.ok(m.sort.unlocked && m.sort.lente && m.sort.fast && m.sort.seenHelp && m.sort.hints === 2 && m.sort.hintsBought === 3);
+  const again = sanitize(JSON.parse(JSON.stringify(m)));
+  assert.equal(again.coins, m.coins, 'refund only once');
+  assert.deepEqual(again.sort, m.sort, 'round trip');
+  // a current save is kept and cleaned
+  const good = { ...defaultSort(), unlocked: true, solved: ['rosse-verdi', 'nope'], current: 'marce', sensors: ['naso', 'laser'],
+    fast: 'yes', boards: { 'rosse-verdi': ['rosso'], 'tre-camion': ['marcio', 'xx'], marce: ['a', 'b'] }, hinted: { 'rosse-verdi': [0, 5] } };
   const s = sanitize({ ...base, sort: good }).sort;
-  assert.equal(s.unlocked, true);
   assert.deepEqual(s.solved, ['rosse-verdi']);
   assert.equal(s.current, 'marce');
   assert.deepEqual(s.sensors, ['naso']);
-  assert.equal(s.hints, 2); assert.equal(s.hintsBought, 3);
-  assert.equal(s.lente, true); assert.equal(s.fast, false);
+  assert.equal(s.fast, false);
   assert.deepEqual(s.boards, { 'rosse-verdi': ['rosso'], 'tre-camion': ['marcio', null] }, 'boards of the wrong length are dropped');
   assert.deepEqual(s.hinted, { 'rosse-verdi': [0] });
   assert.deepEqual(sanitizeSort('garbage'), defaultSort());
-  assert.deepEqual(sanitize(JSON.parse(JSON.stringify(sanitize({ ...base, sort: good })))).sort, s, 'round trip');
 });
 
 test('smistamento: no emoji in minigame 2; no L3 words in minigame 1; no "bias"', () => {

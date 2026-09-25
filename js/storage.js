@@ -1,7 +1,7 @@
 // Progress saved in the browser only (localStorage). No accounts, no personal data.
 import { CONFIG } from './config.js';
 import { isValidName } from './names.js';
-import { LEVELS } from './sorting/levels.js';
+import { LEVELS, LEVELS_VERSION } from './sorting/levels.js';
 import { SENSORS, QUESTION_IDS } from './sorting/questions.js';
 import { compile } from './sorting/tree.js';
 
@@ -42,6 +42,7 @@ export function defaultState() {
 // Minigame 2 progress. Old saves without it get this.
 export function defaultSort() {
   return {
+    levelsVersion: LEVELS_VERSION,  // saved progress belongs to this version of the levels
     unlocked: false,       // the place was bought on the map
     solved: [],            // level ids delivered at least once (first delivery paid in full)
     current: null,         // level id being played
@@ -60,22 +61,31 @@ const LEVEL_GATES = new Map(LEVELS.map((lv) => [lv.id, compile(lv.tree).gates.le
 const SENSOR_IDS = new Set(SENSORS.map((x) => x.id));
 const QIDS = new Set(QUESTION_IDS);
 
-export function sanitizeSort(raw) {
+// Returns the cleaned minigame 2 progress. If the save is from an older version of the levels,
+// the level progress (solved, boards, hints on gates) starts over, but the place, bought sensors,
+// hints in stock, lente and nastro stay. `refund` gets coins back for removed sensors.
+export function sanitizeSort(raw, refund = () => {}) {
   const d = defaultSort();
   if (!raw || typeof raw !== 'object') return d;
   const n = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
+  const sameLevels = raw.levelsVersion === LEVELS_VERSION;
   const boards = {}, hinted = {};
-  for (const [id, G] of LEVEL_GATES) {
-    const b = raw.boards && raw.boards[id];
-    if (Array.isArray(b) && b.length === G) boards[id] = b.map((q) => (QIDS.has(q) ? q : null));
-    const h = raw.hinted && raw.hinted[id];
-    if (Array.isArray(h)) hinted[id] = [...new Set(h.filter((i) => Number.isInteger(i) && i >= 0 && i < G))];
+  if (sameLevels) {
+    for (const [id, G] of LEVEL_GATES) {
+      const b = raw.boards && raw.boards[id];
+      if (Array.isArray(b) && b.length === G) boards[id] = b.map((q) => (QIDS.has(q) ? q : null));
+      const h = raw.hinted && raw.hinted[id];
+      if (Array.isArray(h)) hinted[id] = [...new Set(h.filter((i) => Number.isInteger(i) && i >= 0 && i < G))];
+    }
   }
+  const rawSensors = Array.isArray(raw.sensors) ? raw.sensors : [];
+  if (rawSensors.includes('calibro')) refund(CONFIG.SORT.CALIBRO_REFUND);
   return {
+    levelsVersion: LEVELS_VERSION,
     unlocked: raw.unlocked === true,
-    solved: Array.isArray(raw.solved) ? [...new Set(raw.solved.filter((id) => LEVEL_GATES.has(id)))] : [],
-    current: LEVEL_GATES.has(raw.current) ? raw.current : null,
-    sensors: Array.isArray(raw.sensors) ? [...new Set(raw.sensors.filter((id) => SENSOR_IDS.has(id)))] : [],
+    solved: sameLevels && Array.isArray(raw.solved) ? [...new Set(raw.solved.filter((id) => LEVEL_GATES.has(id)))] : [],
+    current: sameLevels && LEVEL_GATES.has(raw.current) ? raw.current : null,
+    sensors: [...new Set(rawSensors.filter((id) => SENSOR_IDS.has(id)))],
     hints: n(raw.hints),
     hintsBought: n(raw.hintsBought),
     lente: raw.lente === true,
@@ -95,11 +105,13 @@ export function sanitize(raw) {
   const d = defaultState();
   if (!raw || typeof raw !== 'object') return d;
   const num = (v, def) => (Number.isFinite(v) && v >= 0 ? v : def);
+  let refund = 0;   // coins back for removed sensors (the calibro)
+  const sort = sanitizeSort(raw.sort, (c) => { refund += c; });
   return {
     version: 1,
     playerId: typeof raw.playerId === 'string' && raw.playerId.length >= 32 ? raw.playerId : d.playerId,
     name: isValidName(raw.name) ? raw.name : null,
-    coins: num(raw.coins, 0),
+    coins: num(raw.coins, 0) + refund,
     totalEarned: num(raw.totalEarned, 0),
     farmersServed: num(raw.farmersServed, 0),
     levels: {
@@ -116,7 +128,7 @@ export function sanitize(raw) {
     seenHelp: raw.seenHelp === true,
     seenFlip: raw.seenFlip === true,
     lineMode: raw.lineMode === 'drag' ? 'drag' : 'sliders',
-    sort: sanitizeSort(raw.sort),
+    sort,
   };
 }
 
