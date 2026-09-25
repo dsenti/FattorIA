@@ -104,84 +104,96 @@ TODO(Dominik): details once the base minigame is play-tested.
 ## Minigame 2: Lo smistamento (the sorting station)
 **Lesson:** L3. **Concepts:** classificazione (classification); etichetta (label): the truck an item belongs in; albero di decisione (decision tree); caratteristica (feature), from L2; addestramento vs test (training vs test); accuratezza (accuracy). Overfitting is not a mechanic here (see the open questions).
 
-**Story.** Harvest arrives at the valley's sorting station all mixed up: red and green apples, potatoes, rotten fruit, fruit with a worm, sometimes a snail that crawled into the crate. A sorting machine, the decision tree, drops each item from a hopper at the top through pipes and gates into the right truck at the bottom. The pipes are already built. The player decides **which question each gate asks**.
+**Story.** Harvest arrives at the valley's sorting station all mixed up: red and green apples, pears, potatoes, carrots, tomatoes, rotten produce, produce covered in soil or oddly shaped, and the garden's animals: bees, butterflies and ladybirds, snails and worms, either alone or sitting on (or in) the produce. A sorting machine, the decision tree, drops each item from a hopper at the top through pipes and gates into the right truck at the bottom. The pipes are already built. The player decides **which question each gate asks**.
+
+The story behind the trucks:
+- **helpers** (bee, butterfly, ladybird) are released in the **orto** (vegetable garden);
+- **worms and snails** go to the **galline** (hens eat them), whether alone or on produce ("Le galline mangiano volentieri vermi e lumache." in the level intros);
+- **rotten** → compost; **covered in soil** → lavaggio (washing); **misshapen** → "brutti ma buoni" (ugly but good: no food waste);
+- the rest goes to the single-type or single-colour trucks (mele rosse, carote, …), to the scale trucks (grandi / piccoli), or to the market.
 
 **Screen (portrait, top to bottom, following Dominik's sketch):**
-1. **Hopper and batch:** the items of this level's batch, shown as a row or grid at the top (scrollable if long). Tapping an item shows its features as icons.
+1. **Hopper and batch:** the training batch as a grid at the top. Under every item a small tag shows its truck symbol: its **etichetta (label)**, as in a real labelled training set. Tapping an item shows its features as question icons with ✓/✗ (features whose sensor isn't bought show a lock).
 2. **The tree:**
    - Every internal node is a square gate. Each gate has two exits: ✓ (sì) to the right and ✗ (no) to the left, drawn as icons, not text.
    - The **shape of the tree is fixed** per level. Empty gates show a "?" and pulse gently.
    - Each leaf ends in a **pipe** that runs down to a truck. Several leaves can pipe into the same truck, and pipes may cross, as in the sketch.
-   - At most 4–5 nodes per row. Big trees scroll vertically; nothing needs horizontal scrolling on 360 px.
-3. **Trucks:** a row of trucks at the bottom, each with a big symbol painted on it saying what it wants, e.g. a red apple, a green apple, a potato, a compost bin for rotten items, a meadow for living creatures. The symbol is the **etichetta (label)**.
-4. **Buttons:** "Prova l'albero" (try the tree; free, as often as you like) and, after a perfect Prova, "Consegna" (deliver, for coins).
+   - At most 5 gates per row, up to 6 trucks. Big trees scroll vertically; nothing needs horizontal scrolling on 360 px.
+3. **Trucks:** a row of trucks at the bottom, each with a big symbol painted on it saying what it wants. The symbol is the **etichetta (label)**.
+4. **Buttons:** "Prova l'albero" (try the tree; free, as often as you like) and "Avanti" (next), enabled after a perfect Prova.
 
 **No emoji in this minigame:** every item, question icon, truck symbol and pipe is drawn as SVG in the course palette. (Minigame 1 still uses emoji; TODO(Dominik): convert it later for a uniform look?)
 
-**Choosing a question.** Tap a gate → a bottom sheet with a grid of question icons (only the ones unlocked by sensors, see Upgrades). Tap one to place it. Tap a filled gate to change it. Every question is binary and shown as a picture:
-| Question | Icon idea |
-|---|---|
-| È rosso? / verde? / giallo? / marrone? (colour) | a colour swatch drop |
-| È una mela? / patata? / pera? / pomodoro? (type) | the item's silhouette |
-| È grande? (size) | a small and a big circle with an arrow to the big one |
-| È pesante? (weight) | a scale tipping down |
-| È marcio? (rotten) | a fruit with brown spots |
-| Ha un verme? (has a worm) | a worm |
-| È vivo? (alive) | a little creature with legs, or a heartbeat |
+**Items.** Produce: mela, pera, patata, pomodoro, carota, drawn small or big (big always means heavy; there is no separate size feature), in five colours (rosso, verde, giallo, arancione, marrone). Produce can be marcio (dark spots with a mould ring), sporco di terra (a caked layer of soil with crumbs), strano (a twin carrot, a lumpy potato, a crooked pear, a lopsided apple, a tomato with a bump), with a worm in it, or with a snail on it. Lone animals: ape, farfalla, coccinella, lumaca, verme.
 
-Size and weight are separate features: most big items are heavy, but not all (e.g. a big dried-out apple is light, a small potato is heavy). That gives later levels a reason to need the scale.
-
-**Run (Prova).** Items fall one by one from the hopper. At each gate the gate lights up and shows ✓ or ✗ for that item, the item slides down the matching branch, through the pipe, and into a truck. Afterwards:
-- each wrongly sorted item gets a red ring in its truck, and tapping it shows its path;
-- a result bar shows "accuratezza (accuracy): 9/12 giusti";
-- gates that sent at least one item the wrong way get a subtle mark (upgradeable, see Upgrades).
-
-**Training vs test.** The batch at the top is the **addestramento (training)** batch: the player can Prova on it again and again. "Consegna" then runs a **new batch of the same kinds of items** the player has not seen, the **test**. Coins are paid on the test accuracy. Because each level has exactly one correct tree, a perfect tree also scores 100% on the test. The point is that students see the tree is judged on new items.
-
-**Levels (fixed, hand-designed, about 12–15).** Every level has **exactly one** assignment of questions that sorts the training batch 100% correctly. This is checked by a brute-force test over all question assignments; no two questions may be interchangeable on the batch (e.g. if all potatoes are brown, "è una patata?" and "è marrone?" would both work, so the batch needs a red potato). Rough progression:
-1. **One gate, two trucks:** red vs green apples (question: colour).
-2. **One gate:** apples vs potatoes, including a red potato so colour doesn't work (question: type).
-3. **One gate:** healthy vs rotten apples of both colours (question: rotten).
-4. **Two gates:** red, green and rotten apples (the sketch's "R/G/RU"): the root gate sorts out the rotten ones, the second sorts red from green.
-5. **Three gates, a balanced tree:** the sketch's four classes: rosso, verde, rosso con verme, verde marcio.
-6. Big vs small apples, where the trucks want sizes.
-7. Weight: a big-but-light item makes "grande?" fail, so "pesante?" is needed.
-8. Two leaves pipe into the same truck (e.g. rotten and wormy both go to compost).
-9. A snail in the harvest (è vivo? → the meadow truck).
-10–15. Deeper, unbalanced trees (depth 4–5, up to 7–9 gates) that mix type, colour, size, weight, health and life, with shared trucks and crossing pipes. These should be genuinely hard.
-
-TODO(Dominik): check the level list, especially that the item combinations make agricultural sense.
-
-**Pay.** Coins go into the same wallet as minigame 1. A first "Consegna" of a level pays according to test accuracy, up to a level-dependent maximum (e.g. 5 + 2 × level number, in config). Replaying a solved level pays little (e.g. 1 coin). Levels unlock in order. Minigame 1 is the money engine, and minigame 2 mostly spends money on sensors.
-
-**Upgrades (the minigame 2 shop):**
-| Upgrade | Effect | Teaches |
+**Choosing a question.** Tap a gate → a bottom sheet with a grid of question icons (only the ones that are free or unlocked by a bought sensor). Tap one to place it. Tap a filled gate to change it. Every question is binary and shown as a picture:
+| Question | Icon | Unlocked by |
 |---|---|---|
-| Sensori (sensors): bilancia (scale), rilevatore di vermi (worm detector), naso elettronico (rot detector), sensore di vita (life sensor), … | each sensor unlocks a new question type. Levels that need it stay locked until it is bought. Colour and type are free from the start | caratteristica: measuring a feature costs something |
-| Lente d'ingrandimento (magnifying glass) | after a Prova, the gates that sorted something wrong are marked, and tapping a wrong item replays its path slowly | reading an error back to its cause |
-| Suggerimento (hint), consumable | reveals the correct question of one gate. The price rises with each use | — |
-| Nastro veloce (fast belt) | faster Prova animations | (comfort) |
+| È rosso? / verde? / giallo? / arancione? / marrone? (colour) | a paint splat in that colour | free |
+| È una mela? / pera? / patata? / pomodoro? / carota? (type) | the item's dark silhouette | free |
+| È sporco di terra? (covered in soil) | a fruit with caked soil and falling crumbs | free |
+| C'è una lumaca? (a snail, alone or on produce) | a snail silhouette | free |
+| È marcio? (rotten) | a fruit with brown spots and a smell | naso elettronico |
+| C'è un verme? (a worm, alone or in produce) | a worm | rilevatore di vermi |
+| È pesante? (heavy = big) | a scale tipping down | bilancia |
+| Ha una forma strana? (misshapen) | a lumpy potato outline | occhio delle forme |
+| È un animale vivo? (only lone animals; produce with a worm or snail is not) | a heart with a heartbeat | sensore di vita |
+
+Lone animals are not produce: no type question is true for them. So a lone snail answers ✓ to "C'è una lumaca?" and "È vivo?", while an apple with a snail answers ✓ only to "C'è una lumaca?" (and "È una mela?"). Both appear in the levels, which makes the trees harder.
+
+**Run (Prova).** Items fall one by one from the hopper. At each gate the gate lights up and shows ✓ or ✗ for that item, the item slides down the matching branch, through the pipe, and into a truck. The view scrolls down once as the items travel, then stays at the bottom with the trucks until every item has landed. It never scrolls back up by itself, and scrolling by hand stops the auto-scroll. Afterwards:
+- each wrongly sorted item gets a red ring (in the hopper and in its truck), and tapping it draws its path in red and frames the right truck;
+- a result bar shows "accuratezza (accuracy): 9/12 giusti";
+- the guilty gates (the first gate after which an item's truck can no longer be reached) get a small red dot; with the lente, a red frame with the number of errors.
+
+**Training vs test, and "Avanti".** The batch at the top is the **addestramento (training)** batch: the player can Prova on it again and again. As soon as a Prova sorts everything right (once the last item has left the hopper, while the last items are still sliding), the tree is checked on a **new batch of the same kinds of items** that the player has not seen, the **test**. This happens instantly, without replaying the pipeline. The result bar shows "Test su 13 pezzi nuovi, mai visti: 13/13 giusti · +N" and the coins are paid at once. "Avanti" then sends the loaded trucks driving off (the last items are put into their trucks at once if they are still sliding), and the next level's trucks drive in. On the last level the button reads "Fine" and opens the level list. Because each level has exactly one correct tree, and the test only contains the training kinds, a perfect tree always scores 100% on the test. The point is that students see the tree judged on new items.
+
+**Levels (15, hand-designed, in `js/sorting/levels.js`).** Every level has **exactly one** assignment of questions that sorts the training batch 100% correctly, out of all 17 questions on every gate. `node tests/run.mjs` checks this exhaustively (a factorised count for all levels, and a literal one-by-one brute force for the levels with up to 5 gates). It also checks that every leaf gets a training item, that the correct tree scores 100% on generated test batches, and that the story rules above hold (helpers → orto, lone worms and snails → galline).
+| # | Level | Gates | Trucks | Solution questions | Sensors needed |
+|---|---|---|---|---|---|
+| 1 | Rosse o verdi | 1 | verdi, rosse | rosso | – |
+| 2 | Mele e patate | 1 | mele, patate | patata | – |
+| 3 | Via le marce | 1 | mele, compost | marcio | naso |
+| 4 | Da lavare | 2 | patate, carote, lavaggio | sporco, carota | – |
+| 5 | Tre camion | 2 | verdi, rosse, compost | marcio, rosso | naso |
+| 6 | Lumache! | 2 | carote, patate, galline | lumaca, patata | – |
+| 7 | Il verme | 3 | compost, verdi, rosse, galline | rosso, marcio, verme | naso, vermi |
+| 8 | Il peso | 3 | piccole, grandi, patate, compost | marcio, patata, pesante | naso, bilancia |
+| 9 | Brutti ma buoni | 3 | mercato, lavaggio, brutti, compost | marcio, strano, sporco | naso, forma |
+| 10 | Gli amici dell'orto | 4 | verdi, rosse, orto, galline | lumaca, vivo, rosso, verme | vermi, vita |
+| 11 | Il carretto dell'orto | 4 | carote, pomodori, lavaggio, compost, orto | vivo, marcio, sporco, pomodoro | naso, vita |
+| 12 | Pere a peso | 5 | piccole, grandi, mele, galline, compost | lumaca, marcio, verme, pera, pesante | naso, vermi, bilancia |
+| 13 | Al mercato | 6 | mercato, lavaggio, brutti, compost, orto, galline | lumaca, vivo, marcio, strano, sporco, verme | naso, vermi, forma, vita |
+| 14 | La cooperativa | 7 | mele, galline, patate, lavaggio, compost, orto | lumaca, vivo, marcio, patata, verme, sporco, verme | naso, vermi, vita |
+| 15 | Il gran finale | 9 (depth 5) | mercato, lavaggio, brutti, compost, galline, orto | carota, vivo, verme, sporco, verme, lumaca, marcio, strano, sporco | naso, vermi, forma, vita |
+
+TODO(Dominik): check the level list, especially that the item combinations make agricultural sense (e.g. level 15: carrots are checked for shape and soil, apples for worms, potatoes for soil).
+
+**Pay.** Coins go into the same wallet as minigame 1. The first perfect run of a level pays according to test accuracy, up to 5 + 2 × level number (in config). Replaying a solved level pays 1 coin. Levels unlock in order. The coins count for the "Più ricchi" leaderboard, but not as farmers served. Minigame 1 is the money engine, and minigame 2 mostly spends money on sensors.
+
+**Upgrades (the minigame 2 shop, tab "Smistamento"):**
+| Upgrade | Price (config) | Effect | Teaches |
+|---|---|---|---|
+| Naso elettronico (electronic nose) | 15 | question "È marcio?"; needed from level 3 | caratteristica: measuring a feature costs something |
+| Rilevatore di vermi (worm detector) | 20 | question "C'è un verme?"; from level 7 | " |
+| Bilancia (scale) | 25 | question "È pesante?"; from level 8 | " |
+| Occhio delle forme (shape camera) | 25 | question "Ha una forma strana?"; from level 9 | " |
+| Sensore di vita (life sensor) | 35 | question "È un animale vivo?"; from level 10 | " |
+| Lente d'ingrandimento (magnifying glass) | 20 | the guilty gates get a red frame with the number of errors, and tapping a wrong item replays its path slowly | reading an error back to its cause |
+| Suggerimento (hint), consumable | 3, 6, 9, … | reveals the correct question of one gate. Bought in the shop (kept in stock) or bought and used at once from the gate sheet | — |
+| Nastro veloce (fast belt) | 15 | faster Prova animations | (comfort) |
+
+Colour, type, soil and snail questions are free: you can see them. The former "calibro" (size gauge) is gone with the size feature; saves that had bought it get its 30 coins back.
 
 TODO(Dominik): prices, once it has been play-tested.
 
-**Map.** The weighing station is joined by "Lo smistamento" (the place previously shown as "Il frutteto", lesson 3). It unlocks by **paying coins** (e.g. 100, in config) instead of by lesson, so the money from minigame 1 buys the next place. TODO(Dominik): or unlock by a teacher code in class?
+**Map.** The weighing station is joined by "Lo smistamento" (the place previously shown as "Il frutteto", lesson 3). It unlocks by **paying coins** (100, in config) instead of by lesson, so the money from minigame 1 buys the next place. TODO(Dominik): or unlock by a teacher code in class? Once it is open, the shop has two tabs, "Pesatura" and "Smistamento".
+
+**Saves.** Minigame 2 progress is stored under `sort` with a `levelsVersion`. The levels were redesigned in version 2, so older saves start the levels again but keep the place, bought sensors, hints, lente and nastro veloce (and get the calibro refund).
 
 **Open questions**
 - TODO(Dominik): overfitting (L3). A later extension could give a level with a tiny training batch where a wrong tree also scores 100% on training but fails the test. This would deliberately break the "one correct tree" rule for that level only.
 - TODO(Dominik): an endless mode with randomly generated trees after the fixed levels?
-
-**As built (first version; deviations from the text above)**
-- **15 levels** in `js/sorting/levels.js`, following the progression above; level 6 also has a potato gate (2 gates), so size is not the only question. Levels 10–15 have 4, 4, 5, 6, 7 and 9 gates, depth 4–5, with shared trucks and crossing pipes. The deep levels use "grade" trucks (mercato / prima scelta, succo, passata, mangime per le galline) whose rule differs per product, e.g. apples go to the market by size and pears by weight. TODO(Dominik): check that these rules make agricultural sense.
-- **Uniqueness** is tested exhaustively over all 13 questions on every gate (not only the unlocked ones): a factorised count for all levels, and a literal one-by-one brute force for the levels with up to 6 gates.
-- **Labels are shown on the training batch:** under every training item a small tag shows its truck symbol (its etichetta). The grade trucks can't be guessed from the item alone, and a real training set is labelled too. The test batch has no tags.
-- **Extra sensor "Calibro" (size gauge)** for "È grande?". Sensor prices, in level order: naso 15 (level 3), rilevatore di vermi 25 (level 5), calibro 30 (level 6), bilancia 40 (level 7), sensore di vita 50 (level 9).
-- **Weight can't be seen**, apart from wrinkles on big-but-light (dried) fruit. Tapping an item shows every feature as a question icon with ✓/✗; features whose sensor isn't bought show a lock.
-- **Up to 6 trucks** (level 14). The per-row limit is enforced for gates (≤ 5 per row); level 15 has one row with 2 gates and 4 pipe mouths. The tests check spacing at 344–468 px instead, and that no pipe passes through a gate.
-- **Wrong items:** without the lente, a small red dot marks the guilty gate (the first gate after which the item's truck can no longer be reached), and tapping a wrong item draws its path in red and frames the right truck. The lente adds a red frame with the number of errors on the gate and a slow replay of the tapped item.
-- **Hints** can be bought in the shop (kept in stock) or bought and used at once from the gate sheet; the price rises with every hint bought (3, 6, 9, …).
-- **Pay:** a test batch contains only the training kinds, in a new mix, so the one correct tree always scores 100% and the first delivery pays the full 5 + 2 × level. The coins also count for the "Più ricchi" leaderboard, but not as farmers served.
-- **Shop:** once Lo smistamento is open, the shop has two tabs, "Pesatura" and "Smistamento".
-- **No emoji** anywhere on the Lo smistamento screen, including its top bar (map, help, shop and coin icons are SVG). The debug button reads "DEBUG +100" there.
 
 ## Minigame 3
 TODO(Dominik): sketch coming.
