@@ -6,6 +6,7 @@ import { FARMERS } from '../js/weighing/farmers.js';
 import { makeRound, takeUnit, measure, scoreLine, coinsForRatio, sliderToLine, startSliders, dataSlope, autoFit, lineToSliders, scannerOffer, isSmartScanner, scannerIndex, lineToEnds, endsToLine, clampEnds } from '../js/weighing/round.js';
 import { sanitize } from '../js/storage.js';
 import { leastSquares } from '../js/stats.js';
+import { readFileSync } from 'node:fs';
 import { LEVELS, TRUCKS } from '../js/sorting/levels.js';
 import { QUESTIONS, QUESTION_IDS, SENSORS, parseItem, itemKey, questionUnlocked } from '../js/sorting/questions.js';
 import { compile, solutionOf, trainingBatch, testBatch, runBatch, countSolutions, bruteForce, layoutTree, treeDepth, rng, route } from '../js/sorting/tree.js';
@@ -481,6 +482,28 @@ test('smistamento: saves migrate (old save without "sort") and are sanitised', (
   assert.deepEqual(s.hinted, { 'rosse-verdi': [0] });
   assert.deepEqual(sanitizeSort('garbage'), defaultSort());
   assert.deepEqual(sanitize(JSON.parse(JSON.stringify(sanitize({ ...base, sort: good })))).sort, s, 'round trip');
+});
+
+test('smistamento: no emoji in minigame 2; no L3 words in minigame 1; no "bias"', () => {
+  const emoji = /\p{Extended_Pictographic}/u;
+  const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+  for (const f of ['js/sorting/questions.js', 'js/sorting/levels.js', 'js/sorting/tree.js', 'js/sorting/progress.js', 'js/sorting/art.js', 'js/sorting/game.js', 'js/sorting/shop.js']) {
+    const src = read(f);
+    const m = src.match(emoji);
+    assert.ok(!m, `${f}: emoji ${m && m[0]}`);
+    assert.ok(!/\bbias\b/i.test(src), `${f}: says "bias"`);
+  }
+  const html = read('index.html');
+  const sortHtml = html.slice(html.indexOf('id="screen-sort"'), html.indexOf('SHEETS AND MODALS'));
+  assert.ok(sortHtml.length > 100 && !emoji.test(sortHtml), 'sorting screen HTML has no emoji');
+  const weighHtml = html.slice(html.indexOf('id="screen-weigh"'), html.indexOf('SORTING STATION'));
+  const L3 = /classificazione|etichett|albero di decisione|addestramento|accuratezza/i;
+  assert.ok(!L3.test(weighHtml), 'weighing screen HTML');
+  for (const f of ['js/weighing/game.js', 'js/weighing/farmers.js', 'js/weighing/round.js']) assert.ok(!L3.test(read(f)), `${f} uses an L3 word`);
+  // the weighing help text in main.js
+  const main = read('js/main.js');
+  const help = main.slice(main.indexOf('function showHelp'), main.indexOf('// ------------------------------------------------------------ shop'));
+  assert.ok(help.length > 100 && !L3.test(help), 'weighing help');
 });
 
 console.log(`\n${passed} checks passed`);

@@ -8,6 +8,10 @@ import { drawPreview } from './weighing/previews.js';
 import { scannerOffer, scannerIndex, isSmartScanner } from './weighing/round.js';
 import { VEHICLE_NAMES } from './weighing/vehicles.js';
 import { UNLOADER_NAMES } from './weighing/unloaders.js';
+import { SortingGame, helpHTML as sortHelpHTML } from './sorting/game.js';
+import { renderSortShop } from './sorting/shop.js';
+import { LEVELS as SORT_LEVELS } from './sorting/levels.js';
+import { ICON, svg40 } from './sorting/art.js';
 import { installDebugButton } from './debug.js'; // TODO(Dominik): remove before the course
 
 let state = loadState();
@@ -160,6 +164,28 @@ const game = new WeighingGame($('#screen-weigh'), {
   },
 });
 
+// Minigame 2: Lo smistamento
+const sortGame = new SortingGame($('#screen-sort'), {
+  getState: () => state,
+  save,
+  coinsChanged: () => renderCoins(false),
+  onDeliver: ({ levelIdx, coins, first }) => {
+    const lvId = sortLevelId(levelIdx);
+    if (first && !state.sort.solved.includes(lvId)) state.sort.solved.push(lvId);
+    state.coins += coins;
+    state.totalEarned += coins;
+    save();
+    setTimeout(() => renderCoins(true), 300);
+    pushScore();
+  },
+  openSheet: (title, render, onClose) => openSheet(title, render, onClose),
+  closeSheet: () => closeSheet(),
+  toast: (m) => toast(m),
+  openShop: () => openShop(() => sortGame.refresh(), 'sort'),
+  overlayOpen: () => !$('#sheet').hidden || !$('#modal').hidden,
+});
+const sortLevelId = (i) => SORT_LEVELS[i].id;
+
 async function daySummary() {
   const recent = state.fits.slice(-state.dayFarmers);
   const perfect = recent.filter((r) => r.c === CONFIG.MAX_PAY).length;
@@ -190,6 +216,7 @@ async function daySummary() {
 function showScreen(id) {
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== id;
   if (id === 'screen-weigh') game.show(); else game.hide();
+  if (id === 'screen-sort') sortGame.show(); else sortGame.hide();
   if (id === 'screen-map') renderMap();
 }
 
@@ -200,6 +227,38 @@ function renderMap() {
     : '';
   $('#map-player').textContent = who + stats;
   renderCoins(false);
+  const open = state.sort.unlocked;
+  const place = $('#place-sort');
+  place.classList.toggle('locked', !open);
+  place.classList.toggle('buyable', !open);
+  $('#place-sort-icon').innerHTML = svg40(open ? ICON.place : ICON.lock, 34);
+  $('#place-sort-lock').innerHTML = open ? '' : `Sblocca · ${CONFIG.SORT.UNLOCK_COST} ${svg40(ICON.coin, 14, 'coin-ic')}`;
+  place.setAttribute('aria-label', open ? 'Lo smistamento' : `Lo smistamento, si sblocca con ${CONFIG.SORT.UNLOCK_COST} monete`);
+}
+
+async function onSortPlace() {
+  if (!state.sort.unlocked) {
+    const cost = CONFIG.SORT.UNLOCK_COST;
+    if (state.coins < cost) {
+      toast(`Lo smistamento si sblocca con ${cost} monete. Ne hai ${state.coins}: guadagnale alla pesatura!`, 3200);
+      return;
+    }
+    const ok = await modal(`<h2>Lo smistamento</h2><p>Una nuova stazione della valle: qui il raccolto si divide nei camion giusti. La sblocchi con <b>${cost}</b> monete.</p>`, [
+      { label: `Sblocca · ${cost} monete`, value: true, cls: 'primary' },
+      { label: 'Non ora', value: false },
+    ]);
+    if (!ok || state.coins < cost) return;
+    state.coins -= cost;
+    state.sort.unlocked = true;
+    save();
+    renderMap();
+  }
+  showScreen('screen-sort');
+  if (!state.sort.seenHelp) { await showSortHelp(); state.sort.seenHelp = true; save(); }
+}
+
+function showSortHelp() {
+  return modal(sortHelpHTML(), [{ label: 'Capito, si parte!', value: 'ok', cls: 'primary' }]);
 }
 
 // ------------------------------------------------------------ help
@@ -252,12 +311,41 @@ const SHOP = [
   },
 ];
 
-function openShop(onClose) {
-  openSheet('🛒 Negozio', (body) => {
+function openShop(onClose, tab = 'weigh') {
+  let current = state.sort.unlocked ? tab : 'weigh';
+  openSheet(current === 'sort' ? 'Negozio' : '🛒 Negozio', (body) => {
     const draw = () => {
-      body.innerHTML =
+      body.innerHTML = '';
+      if (state.sort.unlocked) {
+        body.innerHTML =
+          '<div class="tabs" role="tablist">' +
+          `<button class="btn" role="tab" data-tab="weigh" aria-selected="${current === 'weigh'}">Pesatura</button>` +
+          `<button class="btn" role="tab" data-tab="sort" aria-selected="${current === 'sort'}">Smistamento</button>` +
+          '</div>';
+        body.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => {
+          current = b.dataset.tab;
+          $('#sheet-title').textContent = current === 'sort' ? 'Negozio' : '🛒 Negozio';
+          draw();
+        }));
+      }
+      if (current === 'sort') {
+        renderSortShop(body, {
+          state,
+          buy: (cost, apply) => {
+            if (state.coins < cost) return false;
+            state.coins -= cost;
+            apply();
+            save();
+            renderCoins(false);
+            return true;
+          },
+          redraw: draw,
+        });
+        return;
+      }
+      body.insertAdjacentHTML('beforeend',
         `<p class="sheet-note">Hai <b>${state.coins} 🪙</b>. Il livello <i>n</i> costa <i>n</i> monete. ` +
-        'Scanner e scarico valgono subito; il mezzo nuovo arriva con il prossimo agricoltore.</p>';
+        'Scanner e scarico valgono subito; il mezzo nuovo arriva con il prossimo agricoltore.</p>');
       for (const it of SHOP) {
         const lv = state.levels[it.key] || 0;
         const offer = it.offer(lv);
@@ -354,7 +442,7 @@ function openSettings() {
       '</div></div>' +
       '<div class="settings-row">I progressi restano solo su questo telefono (o computer). ' +
       'Nella classifica vanno solo il nome del gioco e il punteggio: niente nome vero, niente email.</div>' +
-      '<div class="settings-row">Ricomincia da zero: monete, migliorie e agricoltori serviti tornano a 0.' +
+      '<div class="settings-row">Ricomincia da zero: monete, migliorie e agricoltori serviti tornano a 0, lo smistamento si chiude di nuovo.' +
       '<button class="btn danger" id="set-reset">Ricomincia</button></div>';
     body.querySelectorAll('.choice[data-mode]').forEach((b) => b.addEventListener('click', () => {
       state.lineMode = b.dataset.mode;
@@ -378,6 +466,7 @@ function openSettings() {
       save();
       pushScore();
       game.reset();
+      sortGame.reset();
       closeSheet();
       renderMap();
       toast('Si ricomincia! 🌱');
@@ -390,7 +479,16 @@ $('#place-weigh').addEventListener('click', async () => {
   showScreen('screen-weigh');
   if (!state.seenHelp) { await showHelp(); state.seenHelp = true; save(); }
 });
-document.querySelectorAll('.place.locked').forEach((p) => p.addEventListener('click', () => {
+$('#place-sort').addEventListener('click', onSortPlace);
+$('#s-back').addEventListener('click', () => showScreen('screen-map'));
+$('#s-shop').addEventListener('click', () => openShop(() => sortGame.refresh(), 'sort'));
+$('#s-help').addEventListener('click', showSortHelp);
+$('#s-back').innerHTML = svg40(ICON.map, 26);
+$('#s-help').innerHTML = svg40(ICON.help, 26);
+$('#s-shop').innerHTML = svg40(ICON.shop, 26);
+$('#screen-sort .coin-ic-slot').innerHTML = svg40(ICON.coin, 18, 'coin-ic');
+$('#screen-sort .s-levels-ic').innerHTML = svg40(ICON.levels, 20);
+document.querySelectorAll('.place.locked[data-lesson]').forEach((p) => p.addEventListener('click', () => {
   toast(`🔒 Questo posto si sblocca nella lezione ${p.dataset.lesson}.`);
 }));
 $('#btn-shop').addEventListener('click', () => openShop(() => renderMap()));
@@ -413,10 +511,10 @@ async function boot() {
   pushScore();
 }
 boot();
-installDebugButton({ getState: () => state, save, renderCoins }); // TODO(Dominik): remove before the course
+installDebugButton({ getState: () => state, save, renderCoins: (a) => { renderCoins(a); sortGame.refresh(); } }); // TODO(Dominik): remove before the course
 
 // Debug handle for play-testing from the browser console: open the game with ?debug
-if (new URLSearchParams(location.search).has('debug')) window.fattoriaDebug = { game, getState: () => state };
+if (new URLSearchParams(location.search).has('debug')) window.fattoriaDebug = { game, sortGame, getState: () => state, save, renderMap };
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', () => {
