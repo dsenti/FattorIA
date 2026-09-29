@@ -204,76 +204,59 @@ TODO(Dominik): prices, once it has been play-tested.
 - TODO(Dominik): an endless mode with randomly generated trees after the fixed levels?
 
 ## Minigame 3: Il laboratorio (the analysis lab), working title
-**Lesson:** L3, as a second classification station next to the smistamento (it does not replace it). **Concepts:** classificazione (classification); etichetta (label): the colour of a point; albero di decisione (decision tree); confine di decisione (decision boundary), see the change request; caratteristica (feature), from L2; addestramento vs test (training vs test); accuratezza (accuracy); overfitting (imparare a memoria). Nothing from L4 (no distanza/somiglianza, KNN, clustering; a test checks the words).
+**Lesson:** L3, as a second classification station next to the smistamento. **Concepts:** classificazione (classification); etichetta (label): the colour of a point; albero di decisione (decision tree); confine di decisione (decision boundary), see the change request; caratteristica (feature), from L2; addestramento vs test (training vs test); accuratezza (accuracy); overfitting (imparare a memoria). Nothing from L4 (a test checks the words).
 
-**Idea (Dominik, 2026-09-29).** The smistamento shows a tree as questions. The laboratorio shows the same thing as a picture: every node of the tree is a **boundary line through a point cloud**, and each child node only sees the points on its side of its parent's line. Together the lines cut the field into coloured regions.
+**Idea (Dominik, 2026-09-29).** The smistamento shows a tree as questions. The laboratorio shows the same thing as a picture: every node of the tree is a **boundary line through a point cloud**, and each child node only sees the points on its side of its parent's line.
 
-**Story.** Samples from the valley's farms come into the lab, and each one is measured on two properties. Each point is one sample, its colour (the class) is its **etichetta (label)**, and the lab has to learn to tell the classes apart from the measurements alone. The themes per level are placeholders (see the level table). TODO(Dominik): pick the themes, classes and axes per level.
+**Round 2 (Dominik's feedback, 2026-09-29): the player builds the tree, and there is much less text.** "Make it more simple, less text, more intuitive. Make the tree adaptable: draw a decision boundary, then for both sides select a colour, or add a new node. Some tasks need simple trees, some complex ones."
 
-**Map.** A new place "Il laboratorio" (bottom right of the valley), unlocked with coins (`CONFIG.LAB.UNLOCK_COST` = 200), like the smistamento. "La stalla" stays locked for L4. Once it is open, the shop has a third tab "Laboratorio". The day summary suggests the next place to unlock once the player has 60% of its price. TODO(Dominik): the name of the station and its place on the map.
+**Map, unlock, shop.** "Il laboratorio" (bottom right of the valley), unlocked with 200 coins; a shop tab "Laboratorio". "La stalla" stays locked for L4. TODO(Dominik): the name and place.
 
-**Screen (portrait, top to bottom), as built:**
-1. **Level bar:** the levels button ("4/10", opens the level list), the title and a one-line story, and a round "ricomincia il livello" button (empty tree and new samples, after a confirmation).
-2. **Legend:** each class with its colour and shape.
-3. **Field (canvas):** the training samples. Axes like the pesatura's: the quantity name with its emoji, "−" and a small icon at the low end, "+", a big icon and an arrowhead at the high end, no numbers. The tree's regions are tinted softly in the colour they predict (live while editing; a branch whose node is still empty shows its colour faintly), and each line is drawn only inside its node's region, with the node number in a dark badge on top. Before the first line: "Tocca il nodo 1 qui sotto". The field takes the height the tree leaves free (at least 200 px; on small phones the tree scrolls).
-4. **Training accuracy:** "Addestramento (training) · accuratezza (accuracy): 64/70 giusti" with a bar, live.
-5. **Tree (SVG):** a fixed shape per level (1 to 5 nodes). A node is a rounded square with its number and a thumbnail: its region (the rest greyed), the two sides tinted with its two colours, and its line. Each branch carries a dot with its colour and shape; a leaf is a circle in the colour it predicts. Empty nodes show "?"; the ones that can be opened pulse, the ones whose parent is still empty are faded. Where both sides of a node are leaves, the leaves are drawn in the field's left-to-right order, so the tree and the field read the same way.
-6. **Bottom bar:** a message line, "Prova" (enabled when every node has a line) and "Avanti" (enabled once the level is passed; "Fine" on the last level).
+**Screen (portrait, top to bottom):**
+1. **Level bar:** levels button ("4/10"), the title, the legend (each class with its colour and shape), and a round ↻ button (new tree, new samples; icon-only confirmation). No story text.
+2. **Field (canvas):** the training samples; axes like the pesatura's (name + emoji, −/+, small/big icons, no numbers). The tree's regions tinted in the colour they predict, each line drawn inside its node's region with its node number on top. Before the first line one prompt: "Tocca ? e traccia un confine di decisione (decision boundary)".
+3. **Tree (SVG), built by the player:** it starts with one empty node "?" (pulsing). An applied node is a square with its number and a thumbnail (its region, the sides tinted, its line); a leaf is a circle with its colour and shape; a new node from "+" is a "?". Tapping a node (or a leaf, which opens its node) opens the pop-up. The tree reads left to right like the field: when a node is applied, its line is turned so that the side more to the left (then lower) is the left branch. At most `MAX_NODES` = 7 nodes (fits 360 px, tested for random trees); the tree grows downwards and scrolls.
+4. **Score (bottom):** one small line "accuratezza (accuracy) · addestramento (training) e test", then two bars with icons: addestramento (live, "64/70") and test (after Prova, "36/40", green if passed, red if not, with a green notch where the best tree is), the pay "+8" counting up with the coin icon, and ✓/✗ for the pass mark. Buttons Prova / Avanti.
 
-**Colours.** Okabe-Ito colour-blind-friendly colours, each with its own point shape as a second cue: blue circle, orange triangle, bluish green square, reddish purple diamond (`CLASS_COLOURS` in `js/lab/levels.js`).
+**Node pop-up (the whole interaction):**
+- Header: "Nodo N", the number of samples reaching it (icon), and "✓ right/total" for the coloured sides. ✕ (or a tap outside, or Escape) closes without applying.
+- The field shows only the points that reach the node; the rest is shaded (hatched) and the parent lines stay, with their numbers. The line has two round handles (any angle; grabbing the line slides it). A new node starts with a horizontal line through its region.
+- **Two rows, one per side:** a small picture of the node with that side darkened, then one button per class (shape in colour, with the number of that colour on that side) and a **+** button (a new node on that side). Defaults: the majority colour on each side; while the player has not chosen a side, it keeps following the majority as the line moves. On the field each side is tinted with its colour (a "+" side stays white) and marked with a round badge (its shape, or "+"). Points of a side's colour are vivid there, the others muted.
+- Buttons: **Suggerimento** (bulb + price), **delete** (trash: the node becomes a leaf of its majority colour; the root becomes "?" again), and the big green **✓ Applica**. Applying a colour where there was a subtree, or deleting a node with children, asks first with an icon-only confirmation ("trash −3 nodi", Sì / No). "+" is disabled when the tree would exceed `MAX_NODES`.
+- Removed from round 1: "pick two colours", "Scambia i colori", "Nodo N: altro lato", "Scambia i nodi", the "foglia / al nodo N" labels, the level stories and all result sentences.
 
-**Node pop-up.** Tapping a node opens a card over the screen with a larger field:
-- **Only the points that reach this node are shown.** Everything cut away by the parent lines is shaded out (grey with hatching), and the parent lines stay visible with their numbers. The header says how many samples arrive.
-- **Step 1, pick two colours:** one chip per class, with its count in this region (colours absent here are faded but can still be picked). The two picked colours are drawn vivid; the others are desaturated and a little smaller, still readable by their shape. With only two colours in the region both are picked at once. Once two are picked, tapping a third replaces the older pick, on the same side of the line.
-- **Step 2, place the line:** it starts horizontal through the middle of the region, with the colours on the sides where more of their points are (only the orientation is chosen, the line is not fitted). Two round handles at its ends move freely, at any angle (the line pivots on the other handle); grabbing the line itself slides it. The two sides are tinted with their colours; the line is solid inside the region and dashed outside it. Each side has a label: "foglia" (leaf, predicts its colour) or "al nodo N".
-- A live count: "Dalla parte giusta: 31 su 34 (● 17/18 · ▲ 14/16)".
-- Buttons: **Scambia i colori** (the colours trade sides, the line stays); for a node with children **Nodo N: altro lato** or **Scambia i nodi** (the next node(s) get the other side, the colours stay); **Suggerimento** (hint, see below); **Fatto**. A tap outside the card (on click, so the tap does not go on to the button underneath), ✕ or Escape also close it.
-- Touch: pointer events with capture, `touch-action: none` on the pop-up; the page does not scroll while dragging (checked at 390 × 844 and 360 × 640). Grab radius 28 px for a handle, 16 px for the line.
-- Lines at any angle are a deliberate choice (Dominik, 2026-09-29): this tree is "less standard" than a textbook tree, which asks about one measurement at a time and only cuts straight across. Angled lines let the regions become triangles, squares and L shapes.
+**Data and scoring (unchanged from round 1).** Each level has a true tree (`js/lab/levels.js`); a sample picks a region of it (weighted by √area), a noiseless position inside, the region's class as its etichetta, then measurement noise. "Prova" drops `TEST_SIZE` = 40 new samples into the field (✓/✗ on each). Pay 0–10 from the ratio of the player's test accuracy to the true tree's on the same samples (≥ 0.999 → 10, ≥ 0.97 → 9, ≥ 0.94 → 8, ≥ 0.91 → 7, …). ≥ 7 passes and opens the next level; after a passing Prova the true lines are shown dashed in green with "confine vero · N linee" (how many lines the true tree needed). One tree (until ↻) earns at most 10 per level (each Prova pays only the part above its record); a tree started on an already passed level pays half. TODO(Dominik): pay, pass mark, replay share.
 
-**Data.** Each level has a true tree with its true lines (`js/lab/levels.js`, field coordinates 0..1). A sample picks a region (leaf) of the true tree with probability ∝ area^0.5 (`REGION_WEIGHT_POWER`, so a small triangle still gets points), a noiseless position inside it, and the region's class as its etichetta; then the instrument adds Gaussian measurement noise (the level's `noise` × `NOISE_FACTOR[precision]`; resampled, not clamped, at the edges). Clean levels also keep noiseless positions at least `gap` away from any other class. Training samples are drawn when a level is entered, after "ricomincia il livello" and after an upgrade (the tree stays); they are not saved.
+**Overfitting (imparare a memoria).** No special level any more: it happens naturally when a player over-grows the tree on noisy data. After a Prova, if the player's tree beats the true tree on training by ≥ 2% and loses to it on test by ≥ 2.5%, a toast explains it once: "Imparato a memoria (overfitting): bene sull'addestramento, male sul test." Tested on level 7 (one noisy line): a tree grown to the cap around stray points wins on training and loses on test, and gets the note; careful players practically never.
 
-**Training vs test and scoring, as built.**
-- "Prova" draws `TEST_SIZE` = 40 new samples from the same distribution. They fall into the field one after another (about 1.5 s), each lands with a ✓ or ✗; the training points fade behind them. Editing a node afterwards removes the test samples; the next Prova draws new ones.
-- Pay: ratio = player's test accuracy ÷ the true tree's accuracy on the same 40 samples ("albero migliore: 37/40"). Coins by thresholds like the pesatura's: ≥ 0.999 → 10, ≥ 0.97 → 9, ≥ 0.94 → 8, ≥ 0.91 → 7, ≥ 0.87 → 6, ≥ 0.82 → 5, ≥ 0.76 → 4, ≥ 0.70 → 3, ≥ 0.62 → 2, ≥ 0.50 → 1. With 40 samples: one more mistake than the true tree → 9, two → 8, three → 7. Beating the true tree by luck pays 10.
-- **Pass:** a Prova worth ≥ 7 (`PASS_COINS`) passes the level and opens the next one; after a passing Prova the true lines are shown dashed in green ("confine vero").
-- **No farming with the same tree:** a tree (from empty until "ricomincia il livello") earns at most 10 coins per level: each Prova pays only what it adds to the tree's record ("questo albero aveva già 6"). A tree started on a level that was already passed pays half (`REPLAY_FACTOR`, "livello già superato: metà paga"). So replaying for coins means building a new tree on new samples, about as much work as a pesatura farmer. TODO(Dominik): pay per level, replay pay, pass mark.
-- **Overfitting (imparare a memoria):** after a Prova, if the player's tree beats the true tree on the training samples by ≥ 2% (`OVERFIT_TRAIN_GAIN`) and loses to it on the test by ≥ 2.5% (`OVERFIT_TEST_LOSS`), the result says "Meglio dell'albero migliore sull'addestramento, peggio sul test: ha imparato a memoria (overfitting)", and a toast explains it once per save. Measured in the tests: a tree that carves lines around stray training points on level 9 triggers it about half the time, a careful player practically never.
+**Upgrades.** Più campioni (70 → 150 samples), Strumento più preciso (noise × 1 → × 0.4), 2n coins for level n; both apply at once with new samples, the tree stays. Suggerimento: 3, 6, 9, … coins; for one level it shows yellow bands roughly where the true lines lie, in every pop-up of that level.
 
-**Economy.**
-- Unlock: 200 coins (`UNLOCK_COST`).
-- Upgrades (shop tab "Laboratorio", level n costs 2n, `upgradeCost`; each applies at once with new samples, the tree stays):
-  - *Più campioni* (more training samples): 70 → 150 over levels 0..10 (`SAMPLES`), times the level's `samplesFactor`.
-  - *Strumento più preciso* (a more precise instrument): measurement noise × 1 → × 0.4 (`NOISE_FACTOR`, never zero), so less class overlap.
-  - *Suggerimento* (hint): consumable, 3, 6, 9, … coins (`hintCost`, shared stock bought in the shop or at once in the pop-up). It shows a yellow band (`HINT_BAND` wide) roughly where one node's true line lies, and a note in the pop-up. For a spare node: "Questo nodo quasi non serve: il confine vero passa fuori dai punti."
-- Coins go to the shared wallet and count for the "Più ricchi" leaderboard (pushed after each Prova, like the smistamento), not as farmers served. TODO(Dominik): tune after play-testing.
+**Levels (10, placeholder themes; TODO(Dominik)).** "Lines" is the size of the true tree; accuracy is the true tree's on test samples at instrument level 0.
+| # | Level | Theme (x · y) | Colours | Lines | Shape | True tree |
+|---|---|---|---|---|---|---|
+| 1 | Due olive | grandezza · olio nel frutto | 2 | 1 | one tilted line, clean | 100% |
+| 2 | Tre latti | grasso · proteine | 3 | 2 | three bands | 100% |
+| 3 | Pallagrello o Casavecchia? | zucchero · acidità | 2 | 1 | one line, overlapping (noisy) | 95% |
+| 4 | Il triangolo del castagno | umidità · acidità del terreno | 2 | 3 | a clear triangle: gap 0.06, little noise | 100% |
+| 5 | Quattro mieli | colore · umidità | 4 | 3 | four tilted quadrants | 100% |
+| 6 | La grotta del caciocavallo | temperatura · umidità | 2 | 4 | a clear tilted square: gap 0.06, little noise | 100% |
+| 7 | La mosca dell'olivo | temperatura · umidità | 2 | 1 | one line, very noisy, fewer samples (tempts overfitting) | 92% |
+| 8 | Le arnie a forma di L | peso dell'arnia · temperatura | 3 | 3 | an L plus a strip | 100% |
+| 9 | Cinque formaggi | stagionatura · sale | 5 | 5 | bands on the left, a corner and a strip on the right; one class in two places | 100% |
+| 10 | Il gran finale | zucchero · acidità | 5 | 6 | an L, a corner, bands; two non-convex classes | 99% |
 
-**Levels (10, in `js/lab/levels.js`).** Placeholder themes. "Nodes" is the tree shape; accuracy is the true tree's average on test samples at instrument level 0 (from `node tests/run.mjs`).
-| # | Level | Theme (x · y) | Classes | Nodes, shape | True tree |
-|---|---|---|---|---|---|
-| 1 | Due olive | olive: grandezza · olio nel frutto | Caiazzana, Leccino | 1, one tilted line, clean (`gap`) | 100% |
-| 2 | Pallagrello o Casavecchia? | uva: zucchero · acidità | Pallagrello, Casavecchia | 1, one line, overlap | 95% |
-| 3 | Tre latti | latte: grasso · proteine | Mucca, Capra, Bufala | 2 in a chain, three bands | 99% |
-| 4 | Il triangolo del castagno | terreno: umidità · acidità | Non adatto, Adatto al castagno | 3 in a chain, a triangle | 99% |
-| 5 | Castagne in tre angoli | castagne: grandezza · dolcezza | Da farina, Da mercato, Marroni | 3, root + two children, two corners and a middle band | 98% |
-| 6 | La grotta del caciocavallo | temperatura · umidità | Si rovina, Stagiona bene | 4 in a chain, a tilted square | 99% |
-| 7 | Le arnie a forma di L | peso dell'arnia · temperatura | Sana, Da controllare | 3 in a chain, an L (the class in two leaves) | 100% |
-| 8 | Quattro mieli | miele: colore · umidità | Acacia, Millefiori, Castagno, Sulla | 3, root + two children, four tilted quadrants | 99% |
-| 9 | La mosca dell'olivo | giornate: temperatura · umidità | Niente mosca, Mosca | 5: one true line and 4 spare nodes; noise 0.1, 60% of the samples | 90% |
-| 10 | Il gran finale | uva: zucchero · acidità | Pallagrello bianco, Pallagrello nero, Casavecchia, Aglianico | 5: an L on the left, a corner and a band on the right | 98% |
+Levels 1, 3 and 7 need one line: a simple tree is enough, and more lines only help on training. The 5-colour levels get 20–30% more samples. Tests check: every true line cuts its region; the true tree has at most `MAX_NODES` − 1 lines; every region expects ≥ 7 training points; the true tree always pays 10, a careful copy (line ends within 0.015) passes ≥ 90%, one colour everywhere ≤ 2%; a clean triangle and square; ≥ 3 one-line levels, one of them among the harder ones; two 5-colour levels.
 
-A spare node (level 9) has its true line in a corner outside its region: the best answer is to put the line where it cuts nothing. `node tests/run.mjs` checks: every level is well formed (2–4 classes, 1–6 nodes, lines inside the field, two different true colours per node, the regions cover the field once); there is a triangle, a square, an L, a 4-colour and an overfitting level; every true region expects ≥ 7 training points at the base sample count; the true tree scores ≥ 85% and always pays 10; a careful player (line ends within about 0.015) passes in ≥ 90% of Provas on every level, one colour everywhere in ≤ 2%; the overfitting check above; the trees fit 360 px; saves migrate; no L4 words; no emoji outside the axis icons; `sw.js` caches every JS file.
+**Colours.** Okabe-Ito, each with its own shape: blue circle, orange triangle, bluish green square, reddish purple diamond, vermillion pentagon.
 
-**Saves.** Under `lab`: `levelsVersion` (bump `LAB_LEVELS_VERSION` when the levels change a lot: the level progress starts over, the place, upgrades and hints stay), `unlocked`, `passed`, `current`, `boards` (level id → `{ nodes: [spec or null], best, replay }`, a spec being `{ x1, y1, x2, y2, c: [colour of branch 0, colour of branch 1], flip }`), `hinted`, `hints`, `hintsBought`, `samples`, `precision`, `seenHelp`, `seenOverfit`. Old saves get an empty lab; invalid specs are dropped. "Ricomincia" in Impostazioni closes the laboratorio again and clears it.
+**Saves.** `lab.levelsVersion` = 2: boards are `{ tree, best, replay }` with the tree as nested `{ line, kids }` (`hinted` is now a list of level ids). Saves from round 1 (fixed shapes) drop their level progress, trees and hints on levels, and keep the place, upgrades, hints in stock and coins. Invalid trees (lines outside the field, unknown colours, more than `MAX_NODES`) are dropped.
 
-**Tech.** `js/lab/levels.js` (levels, colours), `model.js` (pure: geometry with convex polygon clipping, tree routing and regions, sampling, scoring, progress, layout; tested in node), `draw.js` (canvas field, SVG pieces and icons), `game.js` (the screen, pop-up, Prova), `shop.js`. The field is a canvas; the tree and the pop-up chrome are SVG and HTML. All tunables in `CONFIG.LAB`. No emoji in the lab's chrome or SVG art; the axes use emoji icons like the pesatura.
+**Tech.** `js/lab/levels.js` (levels, colours), `model.js` (pure: geometry, the tree as nested nodes, apply/delete/route/regions, sampling, scoring, progress, layout), `draw.js` (canvas and SVG pieces), `game.js` (screen, pop-up, Prova), `shop.js`. All tunables in `CONFIG.LAB`.
 
 **Open questions**
-- TODO(Dominik): the name of the station and its place on the map. ("La stalla" stays reserved for L4.)
-- TODO(Dominik): the themes, classes and axes of every level; whether the class names should match the lesson's examples.
-- TODO(Dominik): should MG3 later use SVG icons instead of emoji for the axes, like the smistamento?
-- TODO(Dominik): is the "Nodo N: altro lato" button clear enough, or should the side that goes on be chosen by tapping its label on the field?
-- TODO(Dominik): pay, pass mark, replay share and prices (all in `CONFIG.LAB`).
+- TODO(Dominik): name and place of the station; themes, classes and axes of every level.
+- TODO(Dominik): SVG icons instead of emoji for the axes, like the smistamento?
+- TODO(Dominik): pay, pass mark, replay share, prices, `MAX_NODES`.
 
 ---
 
