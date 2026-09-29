@@ -1,13 +1,13 @@
 // Minigame 3 (Il laboratorio): the model. Pure functions, no DOM (tested in tests/run.mjs).
 //
-// A tree of boundary lines. Every node is a line at any angle through the field (the unit
-// square); each side of it goes to a branch: another node, or a leaf that predicts one class.
-// The player's tree has the level's shape; each node's state is a "spec":
-//   { x1, y1, x2, y2, c: [colour of branch 0, colour of branch 1], flip }
-// The line runs through (x1, y1) and (x2, y2). Walking from the first point to the second, the
-// LEFT side goes to branch 0 (flip = false) or to branch 1 (flip = true). Branch 0 is drawn on
-// the left of the tree, branch 1 on the right. A node that has no spec yet is null.
-// The level's true tree uses the same specs (flip = false), built from levels.js.
+// A tree of boundary lines, built by the player. A node is { line, kids: [kid, kid] }:
+//   line  { x1, y1, x2, y2 }: the boundary through two points of the field (the unit square),
+//         or null while the node is still empty ("?")
+//   kids  one per side of the line. Walking from (x1, y1) to (x2, y2), kid 0 is the LEFT side,
+//         kid 1 the right side. A kid is a class number (a leaf that predicts that colour) or
+//         another node. An empty node has kids [null, null].
+// The level's true tree (levels.js) has the same shape. Nodes are numbered in pre-order
+// (root = 1) and found by their path: the list of kid indices from the root, e.g. [1, 0].
 import { CONFIG } from '../config.js';
 
 // ------------------------------------------------------------------ geometry
@@ -15,12 +15,9 @@ export const UNIT_SQUARE = [[0, 0], [1, 0], [1, 1], [0, 1]];   // counter-clockw
 
 // > 0 on the left of the line (walking from point 1 to point 2), < 0 on the right.
 export const sideValue = (s, x, y) => (s.x2 - s.x1) * (y - s.y1) - (s.y2 - s.y1) * (x - s.x1);
-// Branch number of the left side.
-const leftBranch = (s) => (s.flip ? 1 : 0);
-export const branchOf = (s, x, y) => (sideValue(s, x, y) > 0 ? leftBranch(s) : 1 - leftBranch(s));
+export const branchOf = (s, x, y) => (sideValue(s, x, y) > 0 ? 0 : 1);
 
 // Keeps the part of a convex polygon on one side of the line (Sutherland-Hodgman, one edge).
-// keepLeft: true keeps the left side. Returns a (possibly empty) polygon.
 export function clipPoly(poly, s, keepLeft) {
   const sg = keepLeft ? 1 : -1;
   const out = [];
@@ -36,8 +33,8 @@ export function clipPoly(poly, s, keepLeft) {
   return out.length >= 3 ? out : [];
 }
 
-// The part of polygon `poly` that goes to branch b of node spec s.
-export const clipBranch = (poly, s, b) => clipPoly(poly, s, b === leftBranch(s));
+// The part of polygon `poly` on side b (0 = left, 1 = right) of the line.
+export const clipBranch = (poly, s, b) => clipPoly(poly, s, b === 0);
 
 export function polyArea(poly) {
   let a = 0;
@@ -61,12 +58,12 @@ export function polyCentroid(poly) {
 }
 
 // Point inside a convex polygon (either orientation, boundary counts as inside).
-export function inPoly(poly, x, y) {
+export function inPoly(poly, x, y, eps = 1e-12) {
   let pos = false, neg = false;
   for (let i = 0; i < poly.length; i++) {
     const a = poly[i], b = poly[(i + 1) % poly.length];
     const c = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
-    if (c > 1e-12) pos = true; else if (c < -1e-12) neg = true;
+    if (c > eps) pos = true; else if (c < -eps) neg = true;
     if (pos && neg) return false;
   }
   return poly.length >= 3;
@@ -107,166 +104,167 @@ export function lineInPoly(s, poly) {
   return [[s.x1 + t0 * dx, s.y1 + t0 * dy], [s.x1 + t1 * dx, s.y1 + t1 * dy]];
 }
 
-// ------------------------------------------------------------------ compile
-// Returns { nodes, leaves, truth } for a level tree written with cut() in levels.js:
-//   node: { idx, depth, parent (idx or -1), pbranch (branch of the parent), kids: [kid, kid] }
-//         kid = { node: idx } or { leaf: leaf idx }
-//   leaf: { idx, node, branch, cls (the true class), depth }   (numbered left to right)
-//   truth: the true specs, one per node
-// Nodes are numbered in pre-order (root = 0), shown to the player as 1, 2, 3, ...
-export function compileLab(tree) {
-  const nodes = [], leaves = [], truth = [];
-  const walk = (n, depth, parent, pbranch) => {
-    const idx = nodes.length;
-    const node = { idx, depth, parent, pbranch, kids: [null, null] };
-    nodes.push(node);
-    truth.push({ ...n.line, flip: false, c: [null, null] });
-    ['left', 'right'].forEach((side, b) => {
-      const k = n[side];
-      if (typeof k === 'number') {
-        node.kids[b] = { leaf: -1, cls: k };
-        truth[idx].c[b] = k;
-      } else node.kids[b] = { node: walk(k, depth + 1, idx, b) };
-    });
-    return idx;
+// ------------------------------------------------------------------ trees
+export const emptyNode = () => ({ line: null, kids: [null, null] });
+export const isNode = (k) => !!k && typeof k === 'object';
+export const isApplied = (n) => isNode(n) && !!n.line;
+
+// Every node in pre-order: [{ node, path, depth, poly (its region), parent, branch }].
+export function listNodes(tree) {
+  const out = [];
+  const walk = (n, path, poly, parent, branch) => {
+    out.push({ node: n, path, depth: path.length, poly, parent, branch });
+    if (!n.line) return;
+    n.kids.forEach((k, b) => { if (isNode(k)) walk(k, [...path, b], clipBranch(poly, n.line, b), n, b); });
   };
-  walk(tree, 0, -1, 0);
-  // number the leaves left to right (branch 0 before branch 1)
-  const inorder = (i) => {
-    for (let b = 0; b < 2; b++) {
-      const k = nodes[i].kids[b];
-      if (k.node != null) inorder(k.node);
-      else { k.leaf = leaves.length; leaves.push({ idx: leaves.length, node: i, branch: b, cls: k.cls, depth: nodes[i].depth + 1 }); }
-    }
-  };
-  inorder(0);
-  // A true branch that goes on to another node gets a colour too (only a label, as the player's:
-  // the prediction always comes from the leaves): the most frequent class among its leaves that
-  // differs from the other branch's colour.
-  const leafClasses = (i) => nodes[i].kids.flatMap((k) => (k.node != null ? leafClasses(k.node) : [k.cls]));
-  const K = Math.max(...leaves.map((l) => l.cls)) + 1;
-  nodes.forEach((n, i) => n.kids.forEach((k, b) => {
-    if (k.node == null) return;
-    const other = truth[i].c[1 - b];
-    const cl = leafClasses(k.node);
-    const order = [...new Set(cl)].sort((p, q) => cl.filter((x) => x === q).length - cl.filter((x) => x === p).length);
-    truth[i].c[b] = order.find((c) => c !== other) ?? [...Array(K).keys()].find((c) => c !== other);
-  }));
-  return { nodes, leaves, truth };
+  walk(tree, [], UNIT_SQUARE, null, -1);
+  return out;
 }
 
-export const isSet = (s) => !!(s && s.c && s.c[0] != null && s.c[1] != null);
+export const countNodes = (tree) => listNodes(tree).length;
+export const isComplete = (tree) => listNodes(tree).every((e) => isApplied(e.node));
+export const nodeAt = (tree, path) => path.reduce((n, b) => n.kids[b], tree);
+export const samePath = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
-// ------------------------------------------------------------------ running a tree
-// Where a point ends up: { cls (predicted class or null), node (last node), branch, done }.
-// done = false if the path stops at a node without a spec; cls is then the colour of the branch
-// that led there (a provisional prediction), or null at the root.
-export function route(comp, specs, x, y) {
-  let i = 0, cls = null, branch = -1;
+// Nodes in a subtree (the node itself included).
+export const subtreeSize = (k) => (isNode(k) ? 1 + (k.line ? subtreeSize(k.kids[0]) + subtreeSize(k.kids[1]) : 0) : 0);
+
+// Where a point ends up: { cls (predicted class, or null if it stops at an empty node), done }.
+export function route(tree, x, y) {
+  let n = tree;
   for (;;) {
-    const s = specs[i];
-    if (!isSet(s)) return { cls, node: i, branch: -1, done: false };
-    branch = branchOf(s, x, y);
-    cls = s.c[branch];
-    const k = comp.nodes[i].kids[branch];
-    if (k.node == null) return { cls, node: i, branch, done: true };
-    i = k.node;
+    if (!isApplied(n)) return { cls: null, done: false };
+    const k = n.kids[branchOf(n.line, x, y)];
+    if (!isNode(k)) return { cls: k, done: true };
+    n = k;
   }
 }
 
-export const predict = (comp, specs, x, y) => route(comp, specs, x, y).cls;
+export const predict = (tree, x, y) => route(tree, x, y).cls;
 
-// Does the point reach node idx (every node above it has a spec)?
-export function reaches(comp, specs, idx, x, y) {
-  let i = 0;
-  while (i !== idx) {
-    const s = specs[i];
-    if (!isSet(s)) return false;
-    const k = comp.nodes[i].kids[branchOf(s, x, y)];
-    if (k.node == null) return false;
-    i = k.node;
+// Does the point reach the node at `path`?
+export function reaches(tree, path, x, y) {
+  let n = tree;
+  for (const b of path) {
+    if (!isApplied(n) || branchOf(n.line, x, y) !== b) return false;
+    n = n.kids[b];
   }
   return true;
 }
 
 // Share of points predicted as their own class. { right, total, acc, ok: [bool per point] }
-export function accuracy(comp, specs, pts) {
-  const ok = pts.map((p) => predict(comp, specs, p.x, p.y) === p.cls);
+export function accuracy(tree, pts) {
+  const ok = pts.map((p) => predict(tree, p.x, p.y) === p.cls);
   const right = ok.filter(Boolean).length;
   return { right, total: pts.length, acc: pts.length ? right / pts.length : 0, ok };
 }
 
-// The field cut into regions: [{ poly, cls, node, branch, done }], one per leaf that is reached
-// (an unfinished node gives one region, with the provisional colour of its branch).
-export function regions(comp, specs) {
+// The field cut into regions: [{ poly, cls (null: an empty node's region), path }].
+export function regions(tree) {
   const out = [];
-  const walk = (i, poly, cls) => {
-    if (!poly.length) return;
-    const s = specs[i];
-    if (!isSet(s)) { out.push({ poly, cls, node: i, branch: -1, done: false }); return; }
-    for (let b = 0; b < 2; b++) {
-      const p = clipBranch(poly, s, b);
-      const k = comp.nodes[i].kids[b];
-      if (k.node == null) { if (p.length) out.push({ poly: p, cls: s.c[b], node: i, branch: b, done: true }); }
-      else walk(k.node, p, s.c[b]);
-    }
-  };
-  walk(0, UNIT_SQUARE, null);
-  return out;
-}
-
-// The region that reaches node idx (clipped by all its ancestors), or null if an ancestor has
-// no spec yet. Also returns the ancestors, root first: [{ idx, branch }].
-export function nodeRegion(comp, specs, idx) {
-  const chain = [];
-  for (let i = idx; comp.nodes[i].parent >= 0; i = comp.nodes[i].parent) chain.unshift({ idx: comp.nodes[i].parent, branch: comp.nodes[i].pbranch });
-  let poly = UNIT_SQUARE;
-  for (const a of chain) {
-    if (!isSet(specs[a.idx])) return null;
-    poly = clipBranch(poly, specs[a.idx], a.branch);
+  for (const e of listNodes(tree)) {
+    const n = e.node;
+    if (!n.line) { if (e.poly.length) out.push({ poly: e.poly, cls: null, path: e.path }); continue; }
+    n.kids.forEach((k, b) => {
+      if (isNode(k)) return;
+      const p = clipBranch(e.poly, n.line, b);
+      if (p.length) out.push({ poly: p, cls: k, path: [...e.path, b] });
+    });
   }
-  return { poly, ancestors: chain };
+  return out;
 }
 
 // The drawn piece of every node's line: its part inside the node's own region.
-// [{ idx, seg: [[x, y], [x, y]] }] for the nodes that have a spec.
-export function nodeSegments(comp, specs) {
+// [{ num (1, 2, ...), path, seg }]
+export function nodeSegments(tree) {
   const out = [];
-  for (const n of comp.nodes) {
-    if (!isSet(specs[n.idx])) continue;
-    const r = nodeRegion(comp, specs, n.idx);
-    const seg = r && lineInPoly(specs[n.idx], r.poly);
-    if (seg) out.push({ idx: n.idx, seg });
-  }
+  listNodes(tree).forEach((e, i) => {
+    if (!e.node.line) return;
+    const seg = lineInPoly(e.node.line, e.poly);
+    if (seg) out.push({ num: i + 1, path: e.path, seg });
+  });
   return out;
 }
 
-// For one node: how many points of the two picked colours are on their own side.
-// pts: the points that reach the node. { right, total, per: { cls: [right, total] } }
-export function nodeCount(s, pts) {
-  const per = {};
-  let right = 0, total = 0;
-  if (!isSet(s)) return { right, total, per };
-  for (const c of s.c) per[c] = [0, 0];
-  for (const p of pts) {
-    if (!(p.cls in per)) continue;
-    total++; per[p.cls][1]++;
-    if (s.c[branchOf(s, p.x, p.y)] === p.cls) { right++; per[p.cls][0]++; }
-  }
-  return { right, total, per };
+// Majority class of the points on side b of a line (or of all points if line is null).
+export function majority(pts, line, b, fallback = 0) {
+  const n = {};
+  for (const p of pts) if (!line || branchOf(line, p.x, p.y) === b) n[p.cls] = (n[p.cls] || 0) + 1;
+  const best = Object.keys(n).sort((a, c) => n[c] - n[a] || a - c)[0];
+  return best == null ? fallback : Number(best);
 }
 
-// A starting line for a node: horizontal through the middle of its region, with the two colours
-// put on the sides where more of their points are (only the orientation is chosen; the line is
-// not fitted, that is the player's job).
-export function defaultSpec(poly, colours, pts) {
+// A starting line for an empty node: horizontal through the middle of its region.
+export function defaultLine(poly) {
   const m = polyCentroid(poly.length ? poly : UNIT_SQUARE);
   const y = Math.max(0.08, Math.min(0.92, m.y));
-  const x1 = Math.max(0.04, m.x - 0.32), x2 = Math.min(0.96, m.x + 0.32);
-  const a = { x1, y1: y, x2, y2: y, flip: false, c: [colours[0], colours[1]] };
-  const b = { ...a, c: [colours[1], colours[0]] };
-  return nodeCount(b, pts).right > nodeCount(a, pts).right ? b : a;
+  return { x1: Math.max(0.04, m.x - 0.32), y1: y, x2: Math.min(0.96, m.x + 0.32), y2: y };
 }
+
+// Points of the node that end up right if every coloured side were a leaf ("+" sides don't count).
+// choice[b] is a class number or '+'. { right, total }
+export function sideCount(line, choice, pts) {
+  let right = 0, total = 0;
+  for (const p of pts) {
+    const c = choice[branchOf(line, p.x, p.y)];
+    if (c === '+') continue;
+    total++;
+    if (c === p.cls) right++;
+  }
+  return { right, total };
+}
+
+// How many nodes applying `choice` to the node would remove (sides that were nodes and become colours).
+export const removedBy = (node, choice) => [0, 1].reduce((s, b) => s + (choice[b] !== '+' ? subtreeSize(node.kids[b]) : 0), 0);
+
+// How many new nodes applying `choice` would add ("+" sides that were not nodes yet).
+export const addedBy = (node, choice) => [0, 1].filter((b) => choice[b] === '+' && !isNode(node.kids[b])).length;
+
+// Apply a line and the two side choices to the node at `path` (in place). A "+" side keeps its
+// node or gets a new empty one; a colour side becomes a leaf (dropping any subtree there).
+// The line is then turned so that side 0 is the one more to the left (then lower) in its region,
+// so the tree reads left to right like the field.
+export function applyNode(tree, path, line, choice) {
+  const n = nodeAt(tree, path);
+  const kids = [0, 1].map((b) => (choice[b] === '+' ? (isNode(n.kids[b]) ? n.kids[b] : emptyNode()) : choice[b]));
+  n.line = { x1: line.x1, y1: line.y1, x2: line.x2, y2: line.y2 };
+  n.kids = kids;
+  const e = listNodes(tree).find((q) => samePath(q.path, path));
+  const m = [0, 1].map((b) => polyCentroid(clipBranch(e.poly, n.line, b)));
+  if (m[0] && m[1] && (m[0].x > m[1].x + 1e-6 || (Math.abs(m[0].x - m[1].x) <= 1e-6 && m[0].y > m[1].y))) {
+    n.line = { x1: line.x2, y1: line.y2, x2: line.x1, y2: line.y1 };
+    n.kids = [kids[1], kids[0]];
+  }
+  return tree;
+}
+
+// Delete the node at `path`: the root becomes empty again; any other node becomes a leaf of
+// class `cls` (the majority of its points).
+export function deleteNode(tree, path, cls) {
+  if (!path.length) return emptyNode();
+  const parent = nodeAt(tree, path.slice(0, -1));
+  parent.kids[path[path.length - 1]] = cls;
+  return tree;
+}
+
+// A cleaned copy of a saved tree for a level with K classes, or null if it is not valid.
+export function cleanTree(raw, K, maxNodes = CONFIG.LAB.MAX_NODES) {
+  let count = 0;
+  const u = (v) => Number.isFinite(v) && v >= 0 && v <= 1;
+  const node = (n, depth) => {
+    if (!n || typeof n !== 'object' || depth > maxNodes || ++count > maxNodes) return null;
+    if (n.line == null) return emptyNode();
+    const s = n.line;
+    if (![s.x1, s.y1, s.x2, s.y2].every(u) || Math.hypot(s.x2 - s.x1, s.y2 - s.y1) < 0.01) return null;
+    if (!Array.isArray(n.kids) || n.kids.length !== 2) return null;
+    const kids = n.kids.map((k) => (Number.isInteger(k) && k >= 0 && k < K ? k : isNode(k) ? node(k, depth + 1) : null));
+    if (kids.some((k) => k === null)) return null;
+    return { line: { x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2 }, kids };
+  };
+  return node(raw, 0);
+}
+
+export const copyTree = (t) => JSON.parse(JSON.stringify(t));
 
 // ------------------------------------------------------------------ data
 // Standard normal random number from a uniform generator.
@@ -277,21 +275,19 @@ export function gauss(random = Math.random) {
 }
 
 // The true regions of a level with their sampling weights.
-export function trueRegions(comp) {
-  const rs = regions(comp, comp.truth).map((r) => ({ ...r, area: polyArea(r.poly) }));
+export function trueRegions(truth) {
+  const rs = regions(truth).map((r) => ({ ...r, area: polyArea(r.poly) }));
   const pw = CONFIG.LAB.REGION_WEIGHT_POWER;
   const tot = rs.reduce((s, r) => s + r.area ** pw, 0);
   return rs.map((r) => ({ ...r, weight: (r.area ** pw) / tot }));
 }
 
 // n samples of a level: { x, y (measured, as drawn), tx, ty (noiseless), cls (the etichetta) }.
-// noise: standard deviation of the measurement noise (field units).
-export function makeSamples(level, comp, n, noise, random = Math.random) {
-  const rs = trueRegions(comp);
+export function makeSamples(level, n, noise, random = Math.random) {
+  const rs = trueRegions(level.tree);
   const gap = level.gap || 0;
   const pts = [];
   for (let i = 0; i < n; i++) {
-    // pick a region by weight
     let u = random(), r = rs[rs.length - 1];
     for (const q of rs) { if ((u -= q.weight) <= 0) { r = q; break; } }
     const xs = r.poly.map((p) => p[0]), ys = r.poly.map((p) => p[1]);
@@ -316,9 +312,8 @@ export function makeSamples(level, comp, n, noise, random = Math.random) {
   return pts;
 }
 
-// Measurement noise for a level at an instrument level (0..10).
+// Measurement noise and training samples for a level at the upgrade levels (0..10).
 export const labNoise = (level, precision) => level.noise * CONFIG.LAB.NOISE_FACTOR[precision];
-// Training samples for a level at a "Più campioni" level (0..10).
 export const labSamples = (level, samples) => Math.round(CONFIG.LAB.SAMPLES[samples] * (level.samplesFactor || 1));
 
 // ------------------------------------------------------------------ scoring
@@ -329,15 +324,15 @@ export function coinsForAccRatio(ratio) {
 }
 
 // Scores a finished tree on a test batch. { player, best (the true tree), ratio, coins }
-export function scoreTest(comp, specs, test) {
-  const player = accuracy(comp, specs, test);
-  const best = accuracy(comp, comp.truth, test);
+export function scoreTest(tree, truth, test) {
+  const player = accuracy(tree, test);
+  const best = accuracy(truth, test);
   const ratio = best.acc > 0 ? player.acc / best.acc : 1;
   return { player, best, ratio, coins: coinsForAccRatio(ratio) };
 }
 
-// Coins paid for a Prova: only the part above the record of this tree (see CONFIG.LAB), halved
-// (REPLAY_FACTOR) if the tree was started on a level that was already passed.
+// Coins paid for a Prova: only the part above the record of this tree, times REPLAY_FACTOR if the
+// tree was started on a level that was already passed.
 export function payFor(coins, board) {
   const gain = Math.max(0, coins - (board.best || 0));
   return board.replay ? Math.round(gain * CONFIG.LAB.REPLAY_FACTOR) : gain;
@@ -348,21 +343,13 @@ export function payFor(coins, board) {
 export const looksOverfit = (trainAcc, trainBest, testAcc, testBest) =>
   trainAcc - trainBest >= CONFIG.LAB.OVERFIT_TRAIN_GAIN && testBest - testAcc >= CONFIG.LAB.OVERFIT_TEST_LOSS;
 
-// A spare node of the true tree: its line does not cross its region.
-export function isSpare(comp, idx) {
-  const r = nodeRegion(comp, comp.truth, idx);
-  return !r || !lineInPoly(comp.truth[idx], r.poly);
-}
-
 // ------------------------------------------------------------------ progress
-// { passed, open (first level, or the previous one passed) }
 export function labLevelStatus(lab, levels, i) {
   const passed = lab.passed.includes(levels[i].id);
   const open = i === 0 || passed || lab.passed.includes(levels[i - 1].id);
   return { passed, open };
 }
 
-// The level to show when entering: the saved one if open, else the first open one not passed.
 export function labStartLevel(lab, levels) {
   const saved = levels.findIndex((lv) => lv.id === lab.current);
   if (saved >= 0 && labLevelStatus(lab, levels, saved).open) return saved;
@@ -374,22 +361,33 @@ export function labStartLevel(lab, levels) {
 }
 
 // ------------------------------------------------------------------ layout
-// Tree positions in a box `width` px wide: leaves get equal slots left to right, a node sits in
-// the middle of its leaves. Row r is at y = top + r * rowH. Sets x, y on nodes and leaves.
-export function layoutLab(comp, width, { top = 0, rowH = 64, pad = 8 } = {}) {
-  const slot = (width - 2 * pad) / comp.leaves.length;
-  const span = (i) => {
-    const n = comp.nodes[i];
-    const xs = n.kids.map((k, b) => {
-      if (k.node != null) { const s = span(k.node); return s; }
-      const leaf = comp.leaves[k.leaf];
-      leaf.x = pad + (leaf.idx + 0.5) * slot; leaf.y = top + leaf.depth * rowH;
-      return { lo: leaf.x, hi: leaf.x };
-    });
-    n.lo = xs[0].lo; n.hi = xs[1].hi; n.x = (n.lo + n.hi) / 2; n.y = top + n.depth * rowH;
-    return { lo: n.lo, hi: n.hi };
+// Tree layout in a box `width` px wide. Every leaf and every empty node gets one slot, left to
+// right; an applied node sits in the middle of its slots. Row r is at y = top + r * rowH.
+// Returns { items: [{ kind: 'node' | 'empty' | 'leaf', x, y, path, num, cls, parent: item }],
+// slot, depth, bottom }.
+export function layoutLab(tree, width, { top = 0, rowH = 70, pad = 6 } = {}) {
+  const items = [];
+  let slots = 0;
+  const count = (k) => (isApplied(k) ? count(k.kids[0]) + count(k.kids[1]) : 1);
+  const total = count(tree);
+  const slot = (width - 2 * pad) / total;
+  let num = 0;
+  const walk = (k, path, parent) => {
+    const y = top + path.length * rowH;
+    if (!isNode(k)) {
+      const it = { kind: 'leaf', x: pad + (slots++ + 0.5) * slot, y, path, cls: k, parent };
+      items.push(it);
+      return it;
+    }
+    const it = { kind: k.line ? 'node' : 'empty', x: 0, y, path, num: ++num, node: k, parent };
+    items.push(it);
+    if (!k.line) { it.x = pad + (slots++ + 0.5) * slot; return it; }
+    const a = walk(k.kids[0], [...path, 0], it), b = walk(k.kids[1], [...path, 1], it);
+    it.lo = a.lo ?? a.x; it.hi = b.hi ?? b.x;
+    it.x = (it.lo + it.hi) / 2;
+    return it;
   };
-  span(0);
-  const depth = Math.max(...comp.leaves.map((l) => l.depth));
-  return { slot, depth, bottom: top + depth * rowH };
+  walk(tree, [], null);
+  const depth = Math.max(...items.map((it) => it.path.length));
+  return { items, slot, depth, bottom: top + depth * rowH };
 }

@@ -188,8 +188,10 @@ export const CONFIG = {
     NOISE_FACTOR: [1, 0.92, 0.85, 0.78, 0.72, 0.66, 0.6, 0.55, 0.5, 0.45, 0.4],
     // Buying level n of either upgrade costs this.
     upgradeCost: (n) => 2 * n,
-    // Hints (suggerimento): the k-th hint bought (k = 0, 1, 2, ...) costs this. A hint shows
-    // roughly where the true line of one node lies, as a band this wide (field units).
+    // The player's tree has at most this many nodes (lines), so it stays readable on 360 px.
+    MAX_NODES: 7,
+    // Hints (suggerimento): the k-th hint bought (k = 0, 1, 2, ...) costs this. A hint shows, for
+    // one level, roughly where the true lines lie, as bands this wide (field units), in every node.
     hintCost: (k) => 3 + 3 * k,
     HINT_BAND: 0.07,
     // New, unseen test samples dropped into the field on "Prova".

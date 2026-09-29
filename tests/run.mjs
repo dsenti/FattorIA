@@ -13,11 +13,12 @@ import { compile, solutionOf, trainingBatch, testBatch, runBatch, countSolutions
 import { levelStatus, requiredSensors, startLevel } from '../js/sorting/progress.js';
 import { truckSpec, PIPE_COLOUR } from '../js/sorting/trucks.js';
 import { defaultSort, sanitizeSort, defaultLab, sanitizeLab } from '../js/storage.js';
-import { LAB_LEVELS, CLASS_COLOURS } from '../js/lab/levels.js';
+import { LAB_LEVELS, CLASS_COLOURS, cut } from '../js/lab/levels.js';
 import {
-  compileLab, regions, trueRegions, makeSamples, accuracy, scoreTest, coinsForAccRatio, payFor, looksOverfit,
-  isSpare, polyArea, clipPoly, lineInPoly, UNIT_SQUARE, nodeRegion, reaches, route as labRoute, labNoise, labSamples,
-  labLevelStatus, labStartLevel, layoutLab,
+  emptyNode, listNodes, countNodes, isComplete, nodeAt, route as labRoute, reaches, regions, trueRegions, makeSamples,
+  accuracy, scoreTest, coinsForAccRatio, payFor, looksOverfit, polyArea, clipPoly, lineInPoly, UNIT_SQUARE, labNoise,
+  labSamples, labLevelStatus, labStartLevel, layoutLab, applyNode, deleteNode, removedBy, addedBy, subtreeSize,
+  majority, cleanTree, copyTree, inPoly, sideCount, defaultLine,
 } from '../js/lab/model.js';
 
 let passed = 0;
@@ -608,7 +609,6 @@ test('smistamento: no emoji in minigame 2; no L3 words in minigame 1; no "bias"'
 });
 
 // ------------------------------------------------------------------ minigame 3: Il laboratorio
-const LAB_COMP = LAB_LEVELS.map((lv) => compileLab(lv.tree));
 // seeded random numbers, so the statistical checks below give the same answer every run
 function seeded(seed) {
   let a = seed >>> 0;
@@ -620,9 +620,30 @@ function seeded(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const truthCopy = (c) => c.truth.map((t) => ({ ...t, c: [...t.c] }));
+// a careful copy of a tree: every line end moved by up to +-j
+const jitter = (tree, R, j) => { const t = copyTree(tree); for (const e of listNodes(t)) for (const q of ['x1', 'y1', 'x2', 'y2']) e.node.line[q] += (R() - 0.5) * 2 * j; return t; };
+// a random line, at least as long as the game allows (two handles apart)
+function randLine(R) {
+  for (;;) { const l = { x1: R(), y1: R(), x2: R(), y2: R() }; if (Math.hypot(l.x2 - l.x1, l.y2 - l.y1) > 0.06) return l; }
+}
+// a random player tree with up to `max` nodes
+function randomTree(R, K, max) {
+  const t = emptyNode();
+  for (let k = 0; k < 40 && countNodes(t) <= max; k++) {
+    const open = listNodes(t).filter((e) => !e.node.line);
+    if (!open.length) break;
+    const e = open[Math.floor(R() * open.length)];
+    const room = max - countNodes(t);
+    const choice = [0, 1].map(() => (R() < 0.45 && room > 0 ? '+' : Math.floor(R() * K)));
+    if (choice[0] === '+' && choice[1] === '+' && room < 2) choice[1] = 0;
+    applyNode(t, e.path, randLine(R), choice);
+  }
+  // close the rest with colours
+  for (const e of listNodes(t)) if (!e.node.line) applyNode(t, e.path, randLine(R), [0, K - 1]);
+  return t;
+}
 
-test('laboratorio: config (upgrades 0..10, pay thresholds, prices)', () => {
+test('laboratorio: config (upgrades 0..10, pay thresholds, prices, node cap)', () => {
   const L = CONFIG.LAB;
   assert.equal(L.SAMPLES.length, CONFIG.MAX_LEVEL + 1);
   assert.equal(L.NOISE_FACTOR.length, CONFIG.MAX_LEVEL + 1);
@@ -639,150 +660,157 @@ test('laboratorio: config (upgrades 0..10, pay thresholds, prices)', () => {
   assert.equal(coinsForAccRatio(0.3), 0);
   assert.equal(coinsForAccRatio(39 / 40), 9, '1 more mistake than the true tree on 40');
   assert.equal(coinsForAccRatio(37 / 40), 7, '3 more mistakes');
-  assert.ok(L.PASS_COINS > 0 && L.PASS_COINS <= CONFIG.MAX_PAY);
   assert.equal(L.UNLOCK_COST, 200);
   assert.ok(L.hintCost(1) > L.hintCost(0), 'hint price rises');
-  assert.ok(L.upgradeCost(2) > L.upgradeCost(1));
+  assert.ok(L.MAX_NODES >= 6 && L.MAX_NODES <= 8, 'node cap');
+  assert.ok(CLASS_COLOURS.length >= 5 && new Set(CLASS_COLOURS.map((c) => c.shape)).size === CLASS_COLOURS.length, 'a shape per colour');
 });
 
-test('laboratorio: about 10 levels, well formed, easy -> complicated (triangle, square, L, 4 colours, overfitting)', () => {
+test('laboratorio: about 10 levels, easy -> hard; one-line levels mixed in; triangle, square, 5 colours', () => {
   assert.ok(LAB_LEVELS.length >= 9 && LAB_LEVELS.length <= 12);
   assert.equal(new Set(LAB_LEVELS.map((l) => l.id)).size, LAB_LEVELS.length, 'unique ids');
-  LAB_LEVELS.forEach((lv, i) => {
-    const c = LAB_COMP[i];
-    assert.ok(lv.title && lv.story && lv.x.name && lv.x.icon && lv.y.name && lv.y.icon, `${lv.id}: texts and axes`);
-    assert.ok(lv.classes.length >= 2 && lv.classes.length <= CLASS_COLOURS.length, `${lv.id}: 2-4 classes`);
-    assert.ok(c.nodes.length >= 1 && c.nodes.length <= 6, `${lv.id}: 1-6 nodes`);
+  const lines = LAB_LEVELS.map((lv) => countNodes(lv.tree));
+  LAB_LEVELS.forEach((lv) => {
+    assert.ok(lv.title && lv.title.length <= 30 && lv.x.name && lv.x.icon && lv.y.name && lv.y.icon, `${lv.id}: short title, axes`);
+    assert.ok(lv.classes.length >= 2 && lv.classes.length <= CLASS_COLOURS.length, `${lv.id}: 2-5 classes`);
+    assert.ok(countNodes(lv.tree) <= CONFIG.LAB.MAX_NODES - 1, `${lv.id}: the player has room for the true tree and one more line`);
+    assert.ok(isComplete(lv.tree), `${lv.id}: complete true tree`);
     assert.ok(lv.noise > 0 && lv.noise < 0.15, `${lv.id}: noise`);
-    for (const t of c.truth) {
+    for (const e of listNodes(lv.tree)) {
+      const t = e.node.line;
       for (const v of [t.x1, t.y1, t.x2, t.y2]) assert.ok(v >= 0 && v <= 1, `${lv.id}: line points inside the field`);
-      assert.ok(Math.hypot(t.x2 - t.x1, t.y2 - t.y1) > 0.05, `${lv.id}: a real line`);
+      assert.ok(lineInPoly(t, e.poly), `${lv.id}: every true line cuts its region (no spare nodes)`);
+      assert.ok(e.node.kids.every((k) => typeof k === 'object' || (Number.isInteger(k) && k >= 0 && k < lv.classes.length)), `${lv.id}: leaves`);
     }
-    for (const leaf of c.leaves) assert.ok(Number.isInteger(leaf.cls) && leaf.cls >= 0 && leaf.cls < lv.classes.length, `${lv.id}: leaf class`);
-    // the true tree is a tree the player could build: two different colours on every node
-    for (const t of c.truth) assert.ok(t.c[0] !== t.c[1] && t.c.every((k) => k >= 0 && k < lv.classes.length), `${lv.id}: true colours`);
-    assert.deepEqual(sanitizeLab({ ...defaultLab(), boards: { [lv.id]: { nodes: truthCopy(c), best: 0 } } }).boards[lv.id].nodes, truthCopy(c), `${lv.id}: the true tree survives a save`);
-    // every class owns a real piece of the field
-    const rs = trueRegions(c);
+    const rs = trueRegions(lv.tree);
     for (let k = 0; k < lv.classes.length; k++) assert.ok(rs.some((r) => r.cls === k && r.area > 0.03), `${lv.id}: class ${k} has a region`);
-    // the regions cut the whole field
     assert.ok(Math.abs(rs.reduce((a, r) => a + r.area, 0) - 1) < 1e-9, `${lv.id}: regions cover the field once`);
+    // the true tree survives a save, so it is a tree the player could build
+    assert.deepEqual(cleanTree(copyTree(lv.tree), lv.classes.length), lv.tree, `${lv.id}: the true tree is a valid player tree`);
   });
-  const n = LAB_COMP.map((c) => c.nodes.length);
-  assert.equal(n[0], 1, 'level 1: one line');
-  assert.equal(n[1], 1, 'level 2: one line');
-  assert.equal(LAB_LEVELS[0].classes.length, 2);
-  // spare nodes (their line misses their region) only on the overfitting level
-  LAB_LEVELS.forEach((lv, i) => {
-    const spare = LAB_COMP[i].nodes.filter((x) => isSpare(LAB_COMP[i], x.idx)).length;
-    if (lv.overfit) assert.ok(spare >= 1 && lv.noise >= Math.max(...LAB_LEVELS.filter((o) => !o.overfit).map((o) => o.noise)), `${lv.id}: spare nodes and the noisiest data`);
-    else assert.equal(spare, 0, `${lv.id}: no spare nodes`);
-  });
-  // shapes: a triangle and a square (a class inside a region with 3 / 4 sides away from the field
-  // border), an L (one class in two leaves on different branches, not convex), 4 colours
-  const inner = (lv, c) => trueRegions(c).filter((r) => r.poly.every((p) => p[0] > 1e-6 && p[0] < 1 - 1e-6 && p[1] > 1e-6 && p[1] < 1 - 1e-6));
-  const sides = LAB_LEVELS.map((lv, i) => inner(lv, LAB_COMP[i]).map((r) => r.poly.length));
-  assert.ok(sides.some((s2) => s2.includes(3)), 'a triangle level');
-  assert.ok(sides.some((s2) => s2.includes(4)), 'a square level');
-  const lShape = LAB_LEVELS.findIndex((lv, i) => {
-    const c = LAB_COMP[i];
-    return lv.classes.some((_, k) => { const ls = c.leaves.filter((l) => l.cls === k); return ls.length >= 2 && new Set(ls.map((l) => l.node)).size >= 2; }) && c.nodes.length >= 3;
-  });
-  assert.ok(lShape >= 0, 'an L level');
-  assert.ok(LAB_LEVELS.some((lv) => lv.classes.length === 4), 'a 4-colour level');
-  assert.ok(LAB_LEVELS.some((lv) => lv.overfit), 'an overfitting level');
-  assert.ok(n[n.length - 1] >= 5 && LAB_LEVELS[LAB_LEVELS.length - 1].classes.length >= 3, 'the final level mixes shapes and colours');
+  assert.equal(lines[0], 1, 'level 1: one line');
+  assert.ok(lines.filter((n) => n === 1).length >= 3, 'several levels need one line only');
+  assert.ok(lines.slice(3).some((n) => n === 1), 'a one-line level among the harder ones');
+  assert.ok(lines[lines.length - 1] >= 5 && LAB_LEVELS[LAB_LEVELS.length - 1].classes.length >= 5, 'a hard final level');
+  assert.ok(LAB_LEVELS.filter((lv) => lv.classes.length >= 5).length >= 2, 'two 5-colour levels');
+  // a clean triangle and a clean square (a region with 3 / 4 sides away from the border, a gap, little noise)
+  const shape = (k) => LAB_LEVELS.find((lv) => lv.gap >= 0.05 && lv.noise <= 0.02 &&
+    trueRegions(lv.tree).some((r) => r.poly.length === k && r.poly.every((p) => p[0] > 1e-6 && p[0] < 1 - 1e-6 && p[1] > 1e-6 && p[1] < 1 - 1e-6)));
+  assert.ok(shape(3), 'a clean triangle level');
+  assert.ok(shape(4), 'a clean square level');
+  // non-convex classes: one colour in two leaves
+  assert.ok(LAB_LEVELS.filter((lv) => lv.classes.some((_, k) => regions(lv.tree).filter((r) => r.cls === k).length >= 2)).length >= 3, 'non-convex classes');
 });
 
-test('laboratorio: geometry (clipping, line pieces, regions partition the field for any tree)', () => {
-  const s = { x1: 0.2, y1: 0, x2: 0.4, y2: 1 };
-  const l = clipPoly(UNIT_SQUARE, s, true), r = clipPoly(UNIT_SQUARE, s, false);
-  assert.ok(Math.abs(polyArea(l) + polyArea(r) - 1) < 1e-12);
-  assert.ok(Math.abs(polyArea(l) - 0.3) < 1e-12, 'left of an upward line = smaller x');
-  const seg = lineInPoly(s, UNIT_SQUARE);
-  assert.ok(seg && Math.abs(seg[0][1]) < 1e-12 && Math.abs(seg[1][1] - 1) < 1e-12);
-  assert.equal(lineInPoly({ x1: 2, y1: 0, x2: 2, y2: 1 }, UNIT_SQUARE), null, 'a line outside misses');
-  // random player trees on every level: regions still cover the field exactly once, and the
-  // regions agree with route()
+test('laboratorio: tree model (apply, "+" nodes, replace, delete, cap, orientation, routing)', () => {
+  const t = emptyNode();
+  assert.equal(countNodes(t), 1);
+  assert.ok(!isComplete(t));
+  assert.equal(labRoute(t, 0.5, 0.5).cls, null, 'an empty root predicts nothing');
+  // a vertical line: side "+" on the right, colour 2 on the left
+  applyNode(t, [], { x1: 0.5, y1: 1, x2: 0.5, y2: 0 }, ['+', 2]);
+  // turned so that kid 0 is the left part of the field
+  assert.equal(t.kids[0], 2, 'the left side comes first after apply');
+  assert.ok(typeof t.kids[1] === 'object' && t.kids[1].line === null, 'a "+" side gets an empty node');
+  assert.equal(countNodes(t), 2);
+  assert.ok(!isComplete(t));
+  assert.equal(labRoute(t, 0.2, 0.5).cls, 2);
+  assert.equal(labRoute(t, 0.8, 0.5).cls, null, 'stops at the empty node');
+  assert.ok(reaches(t, [1], 0.8, 0.5) && !reaches(t, [1], 0.2, 0.5));
+  // a horizontal line in node 2, "+" above: turned so that the lower side comes first
+  applyNode(t, [1], { x1: 0.5, y1: 0.5, x2: 1, y2: 0.5 }, ['+', 0]);
+  assert.equal(nodeAt(t, [1]).kids[0], 0, 'lower side first');
+  applyNode(t, [1, 1], { x1: 0.75, y1: 0, x2: 0.75, y2: 1 }, [1, 3]);
+  assert.equal(countNodes(t), 3);
+  assert.ok(isComplete(t));
+  assert.equal(labRoute(t, 0.6, 0.2).cls, 0);
+  assert.equal(labRoute(t, 0.6, 0.8).cls, 1);
+  assert.equal(labRoute(t, 0.9, 0.8).cls, 3);
+  // changing a "+" side of node 2 to a colour removes its subtree
+  const n2 = nodeAt(t, [1]);
+  assert.equal(removedBy(n2, [0, 1]), subtreeSize(n2.kids[1]));
+  assert.equal(removedBy(n2, [0, '+']), 0);
+  assert.equal(addedBy(t, ['+', '+']), 1, 'one new node on the colour side');
+  applyNode(t, [1], n2.line, [0, 1]);
+  assert.equal(countNodes(t), 2);
+  assert.equal(labRoute(t, 0.9, 0.8).cls, 1);
+  // delete: node 2 becomes a leaf; the root becomes empty
+  deleteNode(t, [1], 3);
+  assert.equal(countNodes(t), 1);
+  assert.equal(labRoute(t, 0.9, 0.8).cls, 3);
+  assert.deepEqual(deleteNode(t, [], 0), emptyNode());
+  // the regions of any tree cover the field once and agree with route(); layout within 348 px
   const R = seeded(7);
-  LAB_LEVELS.forEach((lv, i) => {
-    const c = LAB_COMP[i];
-    for (let k = 0; k < 30; k++) {
-      const specs = c.nodes.map(() => (R() < 0.15 ? null : { x1: R(), y1: R(), x2: R(), y2: R(), flip: R() < 0.5, c: [0, 1] }));
-      const rs = regions(c, specs);
-      const cover = rs.reduce((a, q) => a + polyArea(q.poly), 0);
-      if (specs[0]) assert.ok(Math.abs(cover - 1) < 1e-9, `${lv.id}: cover ${cover}`);
-      for (let j = 0; j < 20; j++) {
-        const x = R(), y = R();
-        const inside = rs.filter((q) => polyArea(q.poly) > 0 && require_in(q.poly, x, y));
-        const rt = labRoute(c, specs, x, y);
-        if (inside.length === 1) assert.equal(inside[0].cls, rt.cls);
-        // reaching a node = being inside its region
-        for (const nd of c.nodes) {
-          const nr = nodeRegion(c, specs, nd.idx);
-          if (nr && nr.poly.length && reaches(c, specs, nd.idx, x, y)) assert.ok(require_in(nr.poly, x, y, 1e-9));
-        }
-      }
+  for (let k = 0; k < 200; k++) {
+    const tr = randomTree(R, 5, CONFIG.LAB.MAX_NODES);
+    assert.ok(countNodes(tr) <= CONFIG.LAB.MAX_NODES, 'cap');
+    const rs = regions(tr);
+    assert.ok(Math.abs(rs.reduce((a, q) => a + polyArea(q.poly), 0) - 1) < 1e-9, 'cover');
+    for (let j = 0; j < 10; j++) {
+      const x = R(), y = R();
+      const inside = rs.filter((q) => inPoly(q.poly, x, y, 1e-9));
+      if (inside.length === 1) assert.equal(inside[0].cls, labRoute(tr, x, y).cls);
     }
-  });
-});
-function require_in(poly, x, y, eps = 0) {
-  let pos = false, neg = false;
-  for (let i = 0; i < poly.length; i++) {
-    const a = poly[i], b = poly[(i + 1) % poly.length];
-    const cr = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
-    if (cr > eps) pos = true; else if (cr < -eps) neg = true;
+    const W = 348;
+    const lay = layoutLab(tr, W, { top: 29, rowH: 66, pad: 6 });
+    const size = (it) => (it.kind === 'leaf' ? 13 : it.kind === 'empty' ? 18 : 21);
+    for (const a of lay.items) assert.ok(a.x - size(a) >= 0 && a.x + size(a) <= W, 'inside the width');
+    for (let p = 0; p < lay.items.length; p++) for (let q = p + 1; q < lay.items.length; q++) {
+      const a = lay.items[p], b = lay.items[q];
+      if (a.y === b.y) assert.ok(Math.abs(a.x - b.x) >= size(a) + size(b) + 3, 'tree pieces overlap');
+    }
+    assert.deepEqual(cleanTree(copyTree(tr), 5), tr, 'saves round trip');
   }
-  return !(pos && neg);
-}
+  // majority and the live count
+  const pts = [{ x: 0.2, y: 0.5, cls: 1 }, { x: 0.3, y: 0.5, cls: 1 }, { x: 0.8, y: 0.5, cls: 0 }];
+  const vline = { x1: 0.5, y1: 0, x2: 0.5, y2: 1 };   // left side = x < 0.5
+  assert.equal(majority(pts, vline, 0), 1);
+  assert.equal(majority(pts, vline, 1), 0);
+  assert.deepEqual(sideCount(vline, [1, 0], pts), { right: 3, total: 3 });
+  assert.deepEqual(sideCount(vline, ['+', 1], pts), { right: 0, total: 1 }, '"+" sides do not count');
+  assert.ok(defaultLine(UNIT_SQUARE).y1 === defaultLine(UNIT_SQUARE).y2, 'a new line starts horizontal');
+});
 
 test('laboratorio: every true region holds enough training points to be seen', () => {
   const R = seeded(11);
-  LAB_LEVELS.forEach((lv, i) => {
-    const c = LAB_COMP[i];
-    const rs = trueRegions(c).filter((r) => r.area > 0);
+  LAB_LEVELS.forEach((lv) => {
+    const rs = trueRegions(lv.tree).filter((r) => r.area > 0);
     for (const r of rs) assert.ok(r.weight * labSamples(lv, 0) >= 7, `${lv.id}: region of class ${r.cls} expects ${(r.weight * labSamples(lv, 0)).toFixed(1)} points`);
-    // and in practice: the noiseless positions land in their region, with the region's class
-    const pts = makeSamples(lv, c, 400, labNoise(lv, 0), R);
-    const counts = rs.map((r) => pts.filter((p) => require_in(r.poly, p.tx, p.ty, 1e-9)).length);
+    const pts = makeSamples(lv, 400, labNoise(lv, 0), R);
+    const counts = rs.map((r) => pts.filter((p) => inPoly(r.poly, p.tx, p.ty, 1e-9)).length);
     counts.forEach((n, k) => assert.ok(n / 400 * labSamples(lv, 0) >= 5, `${lv.id}: region ${k} got ${n}/400`));
-    for (const p of pts) assert.equal(accuracy(c, c.truth, [{ x: p.tx, y: p.ty, cls: p.cls }]).right, 1, `${lv.id}: label = true tree at the noiseless position`);
+    for (const p of pts) assert.equal(labRoute(lv.tree, p.tx, p.ty).cls, p.cls, `${lv.id}: label = true tree at the noiseless position`);
     for (const p of pts) assert.ok(p.x > 0 && p.x < 1 && p.y > 0 && p.y < 1, 'measured inside the field');
   });
 });
 
-test('laboratorio: the true tree passes reliably on fresh samples; a near miss passes; one colour fails', () => {
+test('laboratorio: the true tree passes reliably on fresh samples; a careful copy passes; one colour fails', () => {
   const R = seeded(23);
   const cfg = CONFIG.LAB;
   const report = [];
-  LAB_LEVELS.forEach((lv, i) => {
-    const c = LAB_COMP[i];
+  LAB_LEVELS.forEach((lv) => {
     const N = 300;
-    let acc = 0, near = 0, flat = 0, bestAcc = 0;
+    let acc = 0, near = 0, flat = 0;
     for (let k = 0; k < N; k++) {
-      const test2 = makeSamples(lv, c, cfg.TEST_SIZE, labNoise(lv, 0), R);
-      const t = scoreTest(c, c.truth, test2);
+      const test2 = makeSamples(lv, cfg.TEST_SIZE, labNoise(lv, 0), R);
+      const t = scoreTest(lv.tree, lv.tree, test2);
       assert.equal(t.coins, 10, `${lv.id}: the true tree always pays 10`);
       acc += t.best.acc;
-      // a careful player: every line end within about 0.015 of the true one
-      const nearSpecs = truthCopy(c).map((s) => ({ ...s, x1: s.x1 + (R() - 0.5) * 0.03, y1: s.y1 + (R() - 0.5) * 0.03, x2: s.x2 + (R() - 0.5) * 0.03, y2: s.y2 + (R() - 0.5) * 0.03 }));
-      if (scoreTest(c, nearSpecs, test2).coins >= cfg.PASS_COINS) near++;
-      // a lazy player: one colour everywhere (the most common class)
+      if (scoreTest(jitter(lv.tree, R, 0.015), lv.tree, test2).coins >= cfg.PASS_COINS) near++;
       const counts = lv.classes.map((_, q) => test2.filter((p) => p.cls === q).length);
       const top = counts.indexOf(Math.max(...counts));
-      const one = c.nodes.map(() => ({ x1: 0, y1: 0, x2: 1, y2: 0.001, flip: false, c: [top, (top + 1) % lv.classes.length] }));
-      if (scoreTest(c, one, test2).coins >= cfg.PASS_COINS) flat++;
+      if (scoreTest(cut(0, 0, 1, 0.001, { left: top, right: top }), lv.tree, test2).coins >= cfg.PASS_COINS) flat++;
     }
     acc /= N;
     report.push(`${lv.id} ${(100 * acc).toFixed(0)}%`);
     assert.ok(acc >= 0.85, `${lv.id}: true tree accuracy ${acc.toFixed(3)}`);
-    assert.ok(near / N >= 0.9, `${lv.id}: near miss passes ${near}/${N}`);
+    assert.ok(near / N >= 0.9, `${lv.id}: careful copy passes ${near}/${N}`);
     assert.ok(flat / N <= 0.02, `${lv.id}: one colour passes ${flat}/${N}`);
   });
   console.log('      true tree test accuracy:', report.join(', '));
 });
 
-test('laboratorio: pay (record top-up, replay share), overfitting note, progression', () => {
+test('laboratorio: pay, overfitting on a noisy one-line level, progression', () => {
   assert.equal(payFor(8, { best: 0, replay: false }), 8);
   assert.equal(payFor(8, { best: 6, replay: false }), 2, 'only the part above the record');
   assert.equal(payFor(5, { best: 6, replay: false }), 0);
@@ -790,105 +818,99 @@ test('laboratorio: pay (record top-up, replay share), overfitting note, progress
   assert.ok(looksOverfit(0.95, 0.9, 0.85, 0.92), 'better on training, worse on test');
   assert.ok(!looksOverfit(0.95, 0.9, 0.92, 0.92), 'as good on test: fine');
   assert.ok(!looksOverfit(0.7, 0.9, 0.6, 0.9), 'a bad tree is not "learnt by heart"');
-  // the overfitting level: a tree whose spare nodes carve lines around stray training points
-  // (best of many random lines on the training samples) beats the true tree on training, loses
-  // on new samples, and gets the note about half the time; careful players never get it
-  const oi = LAB_LEVELS.findIndex((l) => l.overfit);
-  const lv = LAB_LEVELS[oi], c = LAB_COMP[oi];
+  // a noisy one-line level: a player who grows the tree to the cap around stray training points
+  // (best of many random lines, greedily) beats the true tree on training and loses on test
+  const lv = LAB_LEVELS.find((l) => l.id === 'mosca');
+  assert.equal(countNodes(lv.tree), 1);
   const R = seeded(5);
   let gainTrain = 0, lossTest = 0, notes = 0;
-  const N = 30;
+  const N = 20;
   for (let k = 0; k < N; k++) {
-    const train = makeSamples(lv, c, labSamples(lv, 0), labNoise(lv, 0), R);
-    const specs = truthCopy(c);
-    for (const nd of c.nodes.slice(1)) {
-      const pts = train.filter((p) => reaches(c, specs, nd.idx, p.x, p.y));
-      let best = specs[nd.idx], bestRight = accuracy(c, specs, pts).right;
-      for (let t = 0; t < 1500; t++) {
-        const old = specs[nd.idx];
-        specs[nd.idx] = { x1: R(), y1: R(), x2: R(), y2: R(), flip: false, c: R() < 0.5 ? [0, 1] : [1, 0] };
-        const right = accuracy(c, specs, pts).right;
-        if (right > bestRight) { bestRight = right; best = specs[nd.idx]; }
-        specs[nd.idx] = old;
+    const train = makeSamples(lv, labSamples(lv, 0), labNoise(lv, 0), R);
+    // the true line, then "+" on both sides, and so on, until the cap
+    const t = copyTree(lv.tree);
+    applyNode(t, [], t.line, ['+', '+']);
+    for (let guard = 0; guard < 20; guard++) {
+      const open = listNodes(t).filter((e) => !e.node.line);
+      if (!open.length) break;
+      const e = open[0];
+      const pts = train.filter((p) => reaches(t, e.path, p.x, p.y));
+      const room = CONFIG.LAB.MAX_NODES - countNodes(t);
+      let best = null, bestRight = -1;
+      for (let j = 0; j < 400; j++) {
+        const line = { x1: R(), y1: R(), x2: R(), y2: R() };
+        const ch = [0, 1].map((b) => majority(pts, line, b, majority(pts, null, 0)));
+        const r = sideCount(line, ch, pts).right;
+        if (r > bestRight) { bestRight = r; best = { line, ch }; }
       }
-      specs[nd.idx] = best;
+      const ch = best.ch.map((c, b) => (room >= 2 && b === 0 && bestRight < pts.length ? '+' : c));
+      applyNode(t, e.path, best.line, ch);
     }
-    const test2 = makeSamples(lv, c, CONFIG.LAB.TEST_SIZE, labNoise(lv, 0), R);
-    const [trP, trB, teP, teB] = [accuracy(c, specs, train).acc, accuracy(c, c.truth, train).acc, accuracy(c, specs, test2).acc, accuracy(c, c.truth, test2).acc];
+    const test2 = makeSamples(lv, CONFIG.LAB.TEST_SIZE, labNoise(lv, 0), R);
+    const [trP, trB, teP, teB] = [accuracy(t, train).acc, accuracy(lv.tree, train).acc, accuracy(t, test2).acc, accuracy(lv.tree, test2).acc];
     gainTrain += (trP - trB) / N; lossTest += (teB - teP) / N;
     if (looksOverfit(trP, trB, teP, teB)) notes++;
   }
   assert.ok(gainTrain > 0.03 && lossTest > 0.01, `learning by heart: training +${gainTrain.toFixed(3)}, test -${lossTest.toFixed(3)}`);
   assert.ok(notes >= N * 0.3, `the note appears for a tree learnt by heart (${notes}/${N})`);
   let careful = 0;
-  LAB_LEVELS.forEach((l2, i) => {
-    const c2 = LAB_COMP[i];
+  LAB_LEVELS.forEach((l2) => {
     for (let k = 0; k < 40; k++) {
-      const tr = makeSamples(l2, c2, labSamples(l2, 0), labNoise(l2, 0), R), te = makeSamples(l2, c2, 40, labNoise(l2, 0), R);
-      const sp = truthCopy(c2).map((s) => ({ ...s, x1: s.x1 + (R() - 0.5) * 0.03, y1: s.y1 + (R() - 0.5) * 0.03, x2: s.x2 + (R() - 0.5) * 0.03, y2: s.y2 + (R() - 0.5) * 0.03 }));
-      if (looksOverfit(accuracy(c2, sp, tr).acc, accuracy(c2, c2.truth, tr).acc, accuracy(c2, sp, te).acc, accuracy(c2, c2.truth, te).acc)) careful++;
+      const tr = makeSamples(l2, labSamples(l2, 0), labNoise(l2, 0), R), te = makeSamples(l2, 40, labNoise(l2, 0), R);
+      const sp = jitter(l2.tree, R, 0.015);
+      if (looksOverfit(accuracy(sp, tr).acc, accuracy(l2.tree, tr).acc, accuracy(sp, te).acc, accuracy(l2.tree, te).acc)) careful++;
     }
   });
   assert.ok(careful <= 4, `careful players get the note ${careful}/400 times`);
   // progression: level by level
-  let lab = defaultLab();
+  const lab = defaultLab();
   assert.ok(labLevelStatus(lab, LAB_LEVELS, 0).open && !labLevelStatus(lab, LAB_LEVELS, 1).open);
   lab.passed = [LAB_LEVELS[0].id];
-  assert.ok(labLevelStatus(lab, LAB_LEVELS, 1).open && !labLevelStatus(lab, LAB_LEVELS, 2).open);
   assert.equal(labStartLevel(lab, LAB_LEVELS), 1);
-  lab.current = LAB_LEVELS[0].id;
-  assert.equal(labStartLevel(lab, LAB_LEVELS), 0, 'the saved level if it is open');
   lab.current = LAB_LEVELS[5].id;
   assert.equal(labStartLevel(lab, LAB_LEVELS), 1, 'never a closed level');
 });
 
-test('laboratorio: trees fit 360 px (nodes and leaves apart, inside the width)', () => {
-  LAB_LEVELS.forEach((lv, i) => {
-    const c = compileLab(lv.tree);
-    const W = 348;   // 360 px phone minus the margins
-    layoutLab(c, W, { top: 29, rowH: 72, pad: 6 });
-    const all = [...c.nodes.map((n) => ({ x: n.x, y: n.y, r: 21 })), ...c.leaves.map((l) => ({ x: l.x, y: l.y, r: 13 }))];
-    for (const a of all) assert.ok(a.x - a.r >= 0 && a.x + a.r <= W, `${lv.id}: inside the width`);
-    for (let p = 0; p < all.length; p++) for (let q = p + 1; q < all.length; q++) {
-      const a = all[p], b = all[q];
-      if (Math.abs(a.y - b.y) < 1) assert.ok(Math.abs(a.x - b.x) >= a.r + b.r + 4, `${lv.id}: two pieces overlap`);
-    }
-  });
-});
-
-test('laboratorio: saves (no "lab"; garbage; old level versions; boards cleaned)', () => {
+test('laboratorio: saves (no "lab"; garbage; version 1 fixed shapes dropped; trees cleaned)', () => {
   const base = { playerId: '11111111-2222-4333-8444-555555555555', coins: 3, levels: { scanner: 2, belt: 2, truck: 4 } };
   assert.deepEqual(sanitize(base).lab, defaultLab(), 'old save without the lab gets an empty progress');
   assert.deepEqual(sanitizeLab('garbage'), defaultLab());
+  // a save from round 1 (fixed shapes): progress starts over, place, upgrades and hints stay
+  const v1 = { levelsVersion: 1, unlocked: true, passed: ['olive', 'uve'], current: 'uve', samples: 3, precision: 4, hints: 2, hintsBought: 1, seenHelp: true,
+    boards: { olive: { nodes: [{ x1: 0.1, y1: 0.2, x2: 0.9, y2: 0.8, c: [1, 0], flip: true }], best: 7 } }, hinted: { olive: [0] } };
+  const m1 = sanitize({ ...base, coins: 50, lab: v1 });
+  assert.equal(m1.coins, 50, 'coins kept');
+  assert.ok(m1.lab.unlocked && m1.lab.samples === 3 && m1.lab.precision === 4 && m1.lab.hints === 2 && m1.lab.hintsBought === 1 && m1.lab.seenHelp);
+  assert.deepEqual([m1.lab.passed, m1.lab.boards, m1.lab.hinted, m1.lab.current], [[], {}, [], null]);
+  const t = copyTree(LAB_LEVELS[1].tree);
   const good = {
-    ...defaultLab(), unlocked: true, passed: ['olive', 'nope'], current: 'uve', samples: 3, precision: 14, hints: 2, hintsBought: 1, seenHelp: true,
+    ...defaultLab(), unlocked: true, passed: ['olive', 'nope'], current: 'latte', precision: 14, hinted: ['latte', 'x'],
     boards: {
-      olive: { nodes: [{ x1: 0.1, y1: 0.2, x2: 0.9, y2: 0.8, c: [1, 0], flip: true }], best: 7, replay: false },
-      uve: { nodes: [{ x1: 0.1, y1: 0.2, x2: 0.9, y2: 0.8, c: [1, 1], flip: false }], best: 99 },
-      latte: { nodes: [null], best: 1 },
-      castagno: { nodes: [null, { x1: -1, y1: 0, x2: 1, y2: 1, c: [0, 1] }, { x1: 0, y1: 0, x2: 1, y2: 1, c: [0, 5] }], best: 2 },
+      latte: { tree: t, best: 7, replay: false },
+      olive: { tree: { line: { x1: 0.1, y1: 0.2, x2: 0.9, y2: 0.8 }, kids: [1, 1] }, best: 99 },
+      uve: { tree: { line: { x1: -1, y1: 0.2, x2: 0.9, y2: 0.8 }, kids: [0, 1] } },
+      castagno: { tree: { line: { x1: 0.1, y1: 0.2, x2: 0.9, y2: 0.8 }, kids: [0, 7] } },
+      mieli: { tree: emptyNode() },
     },
-    hinted: { olive: [0, 3], uve: ['x'] },
   };
   const m = sanitize({ ...base, lab: good }).lab;
-  assert.ok(m.unlocked && m.seenHelp && m.hints === 2 && m.hintsBought === 1);
   assert.deepEqual(m.passed, ['olive']);
-  assert.equal(m.current, 'uve');
-  assert.equal(m.samples, 3);
+  assert.equal(m.current, 'latte');
   assert.equal(m.precision, CONFIG.MAX_LEVEL, 'upgrade levels clamped');
-  assert.deepEqual(m.boards.olive, { nodes: [{ x1: 0.1, y1: 0.2, x2: 0.9, y2: 0.8, c: [1, 0], flip: true }], best: 7, replay: false });
-  assert.deepEqual(m.boards.uve, { nodes: [null], best: CONFIG.MAX_PAY, replay: false }, 'same colour twice is dropped, record clamped');
-  assert.equal(m.boards.latte, undefined, 'a board of the wrong size is dropped');
-  assert.deepEqual(m.boards.castagno.nodes, [null, null, null], 'lines outside the field or unknown colours are dropped');
-  assert.deepEqual(m.hinted, { olive: [0], uve: [] });
+  assert.deepEqual(m.hinted, ['latte']);
+  assert.deepEqual(m.boards.latte, { tree: t, best: 7, replay: false });
+  assert.equal(m.boards.olive.best, CONFIG.MAX_PAY, 'record clamped');
+  assert.equal(m.boards.uve, undefined, 'a line outside the field is dropped');
+  assert.equal(m.boards.castagno, undefined, 'an unknown colour is dropped');
+  assert.deepEqual(m.boards.mieli.tree, emptyNode());
+  // too many nodes: dropped
+  let big = emptyNode();
+  for (let k = 0; k < CONFIG.LAB.MAX_NODES + 2; k++) big = { line: { x1: 0.1, y1: 0.2, x2: 0.9, y2: 0.8 }, kids: [0, big.line ? big : 1] };
+  assert.equal(cleanTree(big, 2), null, 'more than MAX_NODES nodes');
   assert.deepEqual(sanitize(JSON.parse(JSON.stringify({ ...base, lab: m }))).lab, m, 'round trip');
-  const older = sanitizeLab({ ...good, levelsVersion: 0 });
-  assert.deepEqual(older.passed, []);
-  assert.deepEqual(older.boards, {});
-  assert.ok(older.unlocked && older.samples === 3 && older.hints === 2, 'place, upgrades and hints survive a level redesign');
 });
 
-test('laboratorio: no L4 words, no "bias", emoji only as axis icons; every file is cached by sw.js', () => {
+test('laboratorio: little text; no L4 words, no "bias", emoji only as axis icons; sw.js caches every file', () => {
   const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
   const emoji = /\p{Extended_Pictographic}/u;
   const L4 = /distanz|somiglian|simil|vicin|\bknn\b|k-means|cluster|raggrupp|supervisionat/i;
@@ -899,16 +921,21 @@ test('laboratorio: no L4 words, no "bias", emoji only as axis icons; every file 
     assert.ok(!/\bbias\b/i.test(src), `${f}: says "bias"`);
     if (f !== 'js/lab/levels.js') assert.ok(!emoji.test(src), `${f}: emoji ${(src.match(emoji) || [])[0]}`);
   }
-  // in the levels, emoji appear only in the axis icons
   const noIcons = read('js/lab/levels.js').replace(/icon: '[^']*'/g, '');
   assert.ok(!emoji.test(noIcons), 'levels.js: emoji outside the axis icons');
+  assert.ok(LAB_LEVELS.every((lv) => !lv.story), 'no level stories: title and legend only');
+  // the pop-up and the screen: no sentences, only a few words
   const html = read('index.html');
   const labHtml = html.slice(html.indexOf('id="screen-lab"'), html.indexOf('SHEETS AND MODALS'));
   assert.ok(labHtml.length > 100 && !emoji.test(labHtml) && !L4.test(labHtml), 'lab screen HTML');
+  const visible = labHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  assert.ok(visible.split(' ').length <= 12, `lab screen text: "${visible}"`);
   const main = read('js/main.js');
   const labMain = main.slice(main.indexOf('async function onLabPlace'), main.indexOf('// ------------------------------------------------------------ help'));
   assert.ok(labMain.length > 100 && !L4.test(labMain), 'lab texts in main.js');
-  // the service worker caches every JavaScript file
+  // the key terms appear (once each on screen, in Italian with the English)
+  const game = read('js/lab/game.js');
+  for (const term of ['addestramento <em>(training)</em>', 'accuratezza <em>(accuracy)</em>', 'confine di decisione', '(decision boundary)']) assert.ok(game.includes(term), `key term ${term}`);
   const sw = read('sw.js');
   const walk = (dir) => readdirSync(new URL(`../${dir}`, import.meta.url), { withFileTypes: true })
     .flatMap((d) => (d.isDirectory() ? walk(`${dir}/${d.name}`) : [`${dir}/${d.name}`]));

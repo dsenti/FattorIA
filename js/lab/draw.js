@@ -2,7 +2,7 @@
 // SVG pieces (class shapes, node thumbnails, icons). No emoji in the SVG art; the axes use emoji
 // icons like the pesatura.
 import { CLASS_COLOURS } from './levels.js';
-import { UNIT_SQUARE, clipBranch, isSet, lineInPoly } from './model.js';
+import { UNIT_SQUARE, clipBranch, lineInPoly, isNode } from './model.js';
 
 export const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 export const C = {
@@ -120,8 +120,13 @@ export function shapePath(ctx, shape, x, y, r) {
   } else if (shape === 'diamond') {
     const k = r * 1.25;
     ctx.moveTo(x, y - k); ctx.lineTo(x + k, y); ctx.lineTo(x, y + k); ctx.lineTo(x - k, y); ctx.closePath();
+  } else if (shape === 'pentagon') {
+    pentagon(r * 1.15).forEach(([dx, dy], i) => (i ? ctx.lineTo(x + dx, y + dy) : ctx.moveTo(x + dx, y + dy)));
+    ctx.closePath();
   } else ctx.arc(x, y, r, 0, Math.PI * 2);
 }
+
+const pentagon = (k) => Array.from({ length: 5 }, (_, i) => [k * Math.sin(i * 2 * Math.PI / 5), -k * Math.cos(i * 2 * Math.PI / 5)]);
 
 // Points. opts: { r, style(p) -> { fill, alpha, outline } | null (skip) }
 export function drawPoints(ctx, g, pts, { r = 4.5, style } = {}) {
@@ -227,6 +232,7 @@ export function shapeSVG(cls, x, y, r, extra = '') {
   if (sh === 'triangle') { const k = r * 1.3; return `<path d="M${n(x)} ${n(y - k)}L${n(x + k * 0.866)} ${n(y + k * 0.5)}L${n(x - k * 0.866)} ${n(y + k * 0.5)}Z" fill="${f}" ${extra}/>`; }
   if (sh === 'square') { const k = r * 0.88; return `<rect x="${n(x - k)}" y="${n(y - k)}" width="${n(2 * k)}" height="${n(2 * k)}" fill="${f}" ${extra}/>`; }
   if (sh === 'diamond') { const k = r * 1.25; return `<path d="M${n(x)} ${n(y - k)}L${n(x + k)} ${n(y)}L${n(x)} ${n(y + k)}L${n(x - k)} ${n(y)}Z" fill="${f}" ${extra}/>`; }
+  if (sh === 'pentagon') return `<path d="M${pentagon(r * 1.15).map(([dx, dy]) => `${n(x + dx)} ${n(y + dy)}`).join('L')}Z" fill="${f}" ${extra}/>`;
   return `<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" fill="${f}" ${extra}/>`;
 }
 
@@ -234,25 +240,32 @@ export function shapeSVG(cls, x, y, r, extra = '') {
 export const shapeIcon = (cls, size = 14) =>
   `<svg class="l-shape" width="${size}" height="${size}" viewBox="0 0 20 20" aria-hidden="true" focusable="false">${shapeSVG(cls, 10, 10.6, 6.2, 'stroke="#fff" stroke-width="1"')}</svg>`;
 
-// Node thumbnail: the node's region inside the field (the rest greyed), the two sides tinted
-// with the node's colours, and its line. `size` px square, top-left at (x, y).
-export function thumbSVG(region, spec, x, y, size) {
+// Node thumbnail: the node's region inside the field (the rest greyed), each side tinted with
+// its colour (a "+" side stays white), and its line. `size` px square, top-left at (x, y).
+// sides: [colour or '+', colour or '+']; highlight: a side index to frame (the pop-up pickers).
+export function thumbSVG(region, line, sides, x, y, size, highlight = -1) {
   const P = (p) => `${(x + p[0] * size).toFixed(1)} ${(y + (1 - p[1]) * size).toFixed(1)}`;
   const path = (poly) => (poly.length ? `M${poly.map(P).join('L')}Z` : '');
   let s = `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="3" fill="#D9D2C3"/>`;
-  const poly = region || UNIT_SQUARE;
+  const poly = region && region.length ? region : UNIT_SQUARE;
   s += `<path d="${path(poly)}" fill="#fff"/>`;
-  if (isSet(spec)) {
+  if (line) {
     for (let b = 0; b < 2; b++) {
-      const p = clipBranch(poly, spec, b);
-      if (p.length) s += `<path d="${path(p)}" fill="${colourOf(spec.c[b])}" fill-opacity=".38"/>`;
+      const p = clipBranch(poly, line, b);
+      if (!p.length) continue;
+      const c = sides[b];
+      if (highlight >= 0) s += `<path d="${path(p)}" fill="${b === highlight ? (c === '+' ? C.soil : colourOf(c)) : '#fff'}" fill-opacity="${b === highlight ? 0.55 : 1}"/>`;
+      else if (c !== '+' && c != null) s += `<path d="${path(p)}" fill="${colourOf(c)}" fill-opacity=".38"/>`;
     }
-    const seg = lineInPoly(spec, poly);
+    const seg = lineInPoly(line, poly);
     if (seg) s += `<path d="M${P(seg[0])}L${P(seg[1])}" stroke="${C.ink}" stroke-width="2" stroke-linecap="round"/>`;
   }
   s += `<rect x="${x}" y="${y}" width="${size}" height="${size}" rx="3" fill="none" stroke="${C.soil}" stroke-opacity=".35"/>`;
   return s;
 }
+
+// The two sides of a tree node as shown in the thumbnail: a colour, or '+' for a child node.
+export const sidesOf = (node) => node.kids.map((k) => (isNode(k) ? '+' : k));
 
 // Icons (40 x 40 art, like the smistamento's ICON).
 export const LAB_ICON = {
@@ -262,15 +275,17 @@ export const LAB_ICON = {
     `<path d="M4 30L36 9" stroke="${C.soil}" stroke-width="2.4" stroke-linecap="round"/>` +
     `<g fill="#0072B2"><circle cx="10" cy="11" r="2.6"/><circle cx="17" cy="15" r="2.6"/><circle cx="9" cy="20" r="2.6"/><circle cx="24" cy="9" r="2.6"/></g>` +
     `<g fill="#E69F00"><path d="M27 20L30 25H24Z"/><path d="M19 27L22 32H16Z"/><path d="M30 29L33 34H27Z"/><path d="M12 31L15 36H9Z"/></g>`,
-  // swap the two colours: a circle and a triangle trading places
-  swap: `<circle cx="8" cy="20" r="5.5" fill="#0072B2"/><path d="M32 14L38 24H26Z" fill="#E69F00"/>` +
-    `<path d="M13 12Q20 5 27 11M24 7.5L27.5 11.5L22.5 12.5" fill="none" stroke="${C.soil}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>` +
-    `<path d="M27 29Q20 36 13 30M16 33.5L12.5 29.5L17.5 28.5" fill="none" stroke="${C.soil}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`,
-  // the next nodes trade sides: two small node boxes and arrows across a dashed line
-  turn: `<path d="M20 3V37" stroke="${C.soil}" stroke-width="2" stroke-dasharray="3 3"/>` +
-    `<rect x="2" y="14" width="12" height="12" rx="3" fill="#fff" stroke="${C.soil}" stroke-width="2"/><rect x="26" y="14" width="12" height="12" rx="3" fill="#fff" stroke="${C.soil}" stroke-width="2"/>` +
-    `<path d="M8 11Q20 1 32 11M28 6.5L32.5 11L27 12" fill="none" stroke="${C.tomato}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>` +
-    `<path d="M32 29Q20 39 8 29M12 33.5L7.5 29L13 28" fill="none" stroke="${C.tomato}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`,
+  // a new node goes here
+  plus: `<path d="M20 8V32M8 20H32" stroke="${C.soil}" stroke-width="4.5" stroke-linecap="round"/>`,
+  // delete this node
+  trash: `<path d="M9 12H31M16 12V8H24V12" fill="none" stroke="${C.soil}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<path d="M11 12L13 34H27L29 12" fill="none" stroke="${C.soil}" stroke-width="3" stroke-linejoin="round"/><path d="M17.5 17V29M22.5 17V29" stroke="${C.soil}" stroke-width="2.4" stroke-linecap="round"/>`,
+  // apply: a big tick on white
+  apply: `<path d="M8 21L17 30L33 11" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>`,
+  // training samples and test samples (the score rows)
+  train: `<g fill="#0072B2"><circle cx="9" cy="12" r="4"/><circle cx="17" cy="26" r="4"/><circle cx="9" cy="31" r="4"/></g><g fill="#E69F00"><path d="M27 6L32 14H22Z"/><path d="M30 20L35 28H25Z"/></g>`,
+  test: `<g fill="#0072B2" stroke="${C.ink}" stroke-width="1.6"><circle cx="11" cy="24" r="5"/></g><g fill="#E69F00" stroke="${C.ink}" stroke-width="1.6"><path d="M27 17L33 27H21Z"/></g>` +
+    `<path d="M5 9L8 12L13 6M22 5L25 8L30 2" fill="none" stroke="${C.ok}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`,
   // start the level again: a circular arrow
   restart: `<path d="M31 21A11 11 0 1 1 27.5 12.5" fill="none" stroke="${C.soil}" stroke-width="3.4" stroke-linecap="round"/><path d="M29 5L28.5 13.5L20 13" fill="none" stroke="${C.soil}" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>`,
   // more samples: a rack of test tubes

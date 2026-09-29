@@ -52,7 +52,7 @@ export function renderLabShop(body, ctx) {
   box.className = 'shop-item';
   box.innerHTML =
     `<div class="shop-top">${svg40(ICON.hint, 40, 'shop-svg')}<div><div class="shop-name">Suggerimento <em>(hint)</em></div><div>${hc} ${coin()}</div></div></div>` +
-    `<div class="shop-desc">Mostra più o meno dove passa il confine vero di un nodo (lo usi nel nodo). Ogni suggerimento costa un po' di più. Ne hai: <b>${lab.hints}</b>.</div>`;
+    `<div class="shop-desc">In un livello mostra più o meno dove passano i confini veri (lo usi in un nodo). Ogni suggerimento costa un po' di più. Ne hai: <b>${lab.hints}</b>.</div>`;
   const btn = document.createElement('button');
   btn.className = 'btn primary';
   btn.innerHTML = `Compra · ${hc} ${coin()}`;

@@ -303,7 +303,7 @@ async function onLabPlace() {
       toast(`Il laboratorio si sblocca con ${cost} monete. Ne hai ${state.coins}: guadagnale nelle altre stazioni!`, 3200);
       return;
     }
-    const ok = await modal(`<h2>Il laboratorio</h2><p>Qui arrivano i campioni delle fattorie della valle: olive, uva, latte, miele. Ogni campione è misurato due volte, e tu impari a riconoscerne la classe. Lo sblocchi con <b>${cost}</b> monete.</p>`, [
+    const ok = await modal(`<h2>Il laboratorio</h2><p>Campioni dalle fattorie della valle: impara a riconoscerli tracciando linee. Lo sblocchi con <b>${cost}</b> monete.</p>`, [
       { label: `Sblocca · ${cost} monete`, value: true, cls: 'primary' },
       { label: 'Non ora', value: false },
     ]);
@@ -562,8 +562,8 @@ $('#l-back').innerHTML = svg40(ICON.map, 26);
 $('#l-help').innerHTML = svg40(ICON.help, 26);
 $('#l-shop').innerHTML = svg40(ICON.shop, 26);
 $('#l-restart').innerHTML = svg40(LAB_ICON.restart, 24);
+$('#l-del').innerHTML = svg40(LAB_ICON.trash, 24);
 $('#l-pop-x').innerHTML = svg40(ICON.no, 22);
-$('#l-swap').innerHTML = `${svg40(LAB_ICON.swap, 22)}<span>Scambia i colori</span>`;
 $('#screen-lab .coin-ic-slot').innerHTML = svg40(ICON.coin, 18, 'coin-ic');
 $('#screen-lab .l-levels-ic').innerHTML = svg40(ICON.levels, 20);
 document.querySelectorAll('.place.locked[data-lesson]').forEach((p) => p.addEventListener('click', () => {

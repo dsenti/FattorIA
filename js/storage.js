@@ -5,7 +5,7 @@ import { LEVELS, LEVELS_VERSION } from './sorting/levels.js';
 import { SENSORS, QUESTION_IDS } from './sorting/questions.js';
 import { compile } from './sorting/tree.js';
 import { LAB_LEVELS, LAB_LEVELS_VERSION } from './lab/levels.js';
-import { compileLab } from './lab/model.js';
+import { cleanTree } from './lab/model.js';
 
 const MAX_HISTORY = 50;
 
@@ -68,8 +68,8 @@ export function defaultLab() {
     unlocked: false,       // the place was bought on the map
     passed: [],            // level ids passed at least once (a Prova paid >= CONFIG.LAB.PASS_COINS)
     current: null,         // level id being played
-    boards: {},            // level id -> { nodes: [spec or null], best: coins (record of this tree), replay }
-    hinted: {},            // level id -> node indices shown by a hint
+    boards: {},            // level id -> { tree (see lab/model.js), best: coins (record of this tree), replay }
+    hinted: [],            // level ids whose hint was used (the true lines show as bands)
     hints: 0,              // hints in stock
     hintsBought: 0,        // hints bought so far (the price rises)
     samples: 0,            // "Più campioni" level 0..10
@@ -79,51 +79,32 @@ export function defaultLab() {
   };
 }
 
-const LAB_NODES = new Map(LAB_LEVELS.map((lv) => [lv.id, compileLab(lv.tree).nodes.length]));
 const LAB_CLASSES = new Map(LAB_LEVELS.map((lv) => [lv.id, lv.classes.length]));
 
-// A node spec from a save, or null if it is not valid for a level with K classes.
-function cleanSpec(s, K) {
-  if (!s || typeof s !== 'object') return null;
-  const u = (v) => Number.isFinite(v) && v >= 0 && v <= 1;
-  if (![s.x1, s.y1, s.x2, s.y2].every(u)) return null;
-  if (!Array.isArray(s.c) || s.c.length !== 2) return null;
-  if (!s.c.every((c) => Number.isInteger(c) && c >= 0 && c < K) || s.c[0] === s.c[1]) return null;
-  if (Math.hypot(s.x2 - s.x1, s.y2 - s.y1) < 0.01) return null;
-  return { x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, c: [s.c[0], s.c[1]], flip: s.flip === true };
-}
-
-// Returns the cleaned minigame 3 progress. If the save is from an older version of the levels,
-// the level progress (passed, boards, hints on nodes) starts over, but the place, the upgrades
-// and the hints in stock stay.
+// Returns the cleaned minigame 3 progress. If the save is from an older version of the levels
+// (version 1: fixed tree shapes), the level progress (passed, trees, hints) starts over, but the
+// place, the upgrades and the hints in stock stay.
 export function sanitizeLab(raw) {
   const d = defaultLab();
   if (!raw || typeof raw !== 'object') return d;
   const n = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
   const lvl = (v) => Math.max(0, Math.min(CONFIG.MAX_LEVEL, n(v)));
   const same = raw.levelsVersion === LAB_LEVELS_VERSION;
-  const boards = {}, hinted = {};
-  if (same) {
-    for (const [id, N] of LAB_NODES) {
-      const b = raw.boards && raw.boards[id];
-      if (b && Array.isArray(b.nodes) && b.nodes.length === N) {
-        boards[id] = {
-          nodes: b.nodes.map((s) => cleanSpec(s, LAB_CLASSES.get(id))),
-          best: Math.min(CONFIG.MAX_PAY, n(b.best)),
-          replay: b.replay === true,
-        };
-      }
-      const h = raw.hinted && raw.hinted[id];
-      if (Array.isArray(h)) hinted[id] = [...new Set(h.filter((i) => Number.isInteger(i) && i >= 0 && i < N))];
+  const boards = {};
+  if (same && raw.boards && typeof raw.boards === 'object') {
+    for (const [id, K] of LAB_CLASSES) {
+      const b = raw.boards[id];
+      const tree = b && cleanTree(b.tree, K);
+      if (tree) boards[id] = { tree, best: Math.min(CONFIG.MAX_PAY, n(b.best)), replay: b.replay === true };
     }
   }
   return {
     levelsVersion: LAB_LEVELS_VERSION,
     unlocked: raw.unlocked === true,
-    passed: same && Array.isArray(raw.passed) ? [...new Set(raw.passed.filter((id) => LAB_NODES.has(id)))] : [],
-    current: same && LAB_NODES.has(raw.current) ? raw.current : null,
+    passed: same && Array.isArray(raw.passed) ? [...new Set(raw.passed.filter((id) => LAB_CLASSES.has(id)))] : [],
+    current: same && LAB_CLASSES.has(raw.current) ? raw.current : null,
     boards,
-    hinted,
+    hinted: same && Array.isArray(raw.hinted) ? [...new Set(raw.hinted.filter((id) => LAB_CLASSES.has(id)))] : [],
     hints: n(raw.hints),
     hintsBought: n(raw.hintsBought),
     samples: lvl(raw.samples),

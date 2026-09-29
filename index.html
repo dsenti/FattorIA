@@ -172,17 +172,15 @@
     </header>
     <div class="s-levelbar">
       <button class="btn s-levels" id="l-levels" aria-label="Livelli"><span class="l-levels-ic"></span><span id="l-level-no">1/10</span></button>
-      <div class="s-level-text"><div class="s-level-title" id="l-title"></div><div class="s-story" id="l-story"></div></div>
+      <div class="s-level-text"><div class="s-level-title" id="l-title"></div><div class="l-legend" id="l-legend"></div></div>
       <button class="btn icon l-restart" id="l-restart" aria-label="Ricomincia il livello: albero vuoto, campioni nuovi"></button>
     </div>
     <div class="l-scroll" id="l-scroll">
-      <div class="l-legend" id="l-legend"></div>
       <div class="l-field-wrap" id="l-field-wrap"><canvas id="l-field" aria-label="Il campo: ogni punto è un campione, il colore è la sua etichetta"></canvas></div>
-      <div class="s-acc l-acc" id="l-acc"></div>
-      <svg id="l-tree" class="l-tree" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="L'albero di decisione: tocca un nodo per mettere il suo confine"></svg>
+      <svg id="l-tree" class="l-tree" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Il tuo albero di decisione: tocca un nodo"></svg>
     </div>
     <div class="s-bottom">
-      <div class="s-result" id="l-result"></div>
+      <div class="l-score" id="l-score"></div>
       <div class="s-actions">
         <button class="btn olive big" id="l-try" disabled>Prova</button>
         <button class="btn primary big" id="l-next" disabled>Avanti</button>
@@ -191,21 +189,17 @@
     <div class="l-pop" id="l-pop" hidden>
       <div class="l-card" id="l-card" role="dialog" aria-modal="true" aria-labelledby="l-pop-title">
         <div class="l-card-head">
-          <div><b id="l-pop-title">Nodo 1</b> <span class="l-pop-sub" id="l-pop-sub"></span></div>
+          <b id="l-pop-title">Nodo 1</b>
+          <span class="l-pop-n" id="l-pop-n"></span>
+          <span class="l-pop-ok" id="l-pop-ok"></span>
           <button class="btn icon" id="l-pop-x" aria-label="Chiudi"></button>
         </div>
-        <div class="l-step"><b>1</b> Scegli i due colori da separare</div>
-        <div class="l-chips" id="l-chips"></div>
-        <div class="l-step" id="l-step2"><b>2</b> Trascina i due pallini, o la linea</div>
-        <canvas id="l-pop-canvas" class="l-pop-canvas" aria-label="Il campo del nodo: trascina i due pallini della linea"></canvas>
-        <div class="l-count" id="l-count"></div>
+        <canvas id="l-pop-canvas" class="l-pop-canvas" aria-label="Trascina i due pallini della linea"></canvas>
+        <div class="l-sides" id="l-sides"></div>
         <div class="l-pop-actions">
-          <button class="btn" id="l-swap"></button>
-          <button class="btn" id="l-turn"></button>
-        </div>
-        <div class="l-pop-actions">
-          <button class="btn" id="l-hint"></button>
-          <button class="btn primary" id="l-done">Fatto</button>
+          <button class="btn l-hint" id="l-hint" aria-label="Suggerimento"></button>
+          <button class="btn l-del" id="l-del" aria-label="Elimina il nodo"></button>
+          <button class="btn olive l-apply" id="l-apply"></button>
         </div>
       </div>
     </div>
