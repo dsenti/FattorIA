@@ -9,7 +9,7 @@ const TRUCK_FACTOR = 1.5;
 
 export const CONFIG = {
   // TODO(Dominik): remove before the course. Shows a "+100" coins button on the weighing
-  // station and on Lo smistamento (see js/debug.js). Those coins don't count for the leaderboard.
+  // station, Lo smistamento and Il laboratorio (see js/debug.js). Those coins don't count for the leaderboard.
   DEBUG_COINS_BUTTON: true,
 
   // Bump when the saved-state format changes in an incompatible way.
@@ -174,6 +174,61 @@ export const CONFIG = {
     FAST_FACTOR: 2.2,        // nastro veloce multiplies the speed and divides the pauses by this
     REPLAY_FACTOR: 0.4,      // lente: slow replay speed
     DRIVE_OFF_MS: 1100,      // "Avanti": the loaded trucks drive away before the next level
+  },
+
+  // ---------------------------------------------------------------- minigame 3: Il laboratorio
+  // TODO(Dominik): all prices, pay and data sizes below are first guesses; tune after play-testing.
+  LAB: {
+    // Coins to unlock the place on the map (after the other two stations).
+    UNLOCK_COST: 200,
+    // Training samples per level of "Più campioni" (0..10): 70 -> 150.
+    SAMPLES: [70, 78, 86, 94, 102, 110, 118, 126, 134, 142, 150],
+    // "Strumento più preciso" (0..10): the level's measurement noise is multiplied by this.
+    // Never zero: the classes always overlap a little near the boundaries.
+    NOISE_FACTOR: [1, 0.92, 0.85, 0.78, 0.72, 0.66, 0.6, 0.55, 0.5, 0.45, 0.4],
+    // Buying level n of either upgrade costs this.
+    upgradeCost: (n) => 2 * n,
+    // Hints (suggerimento): the k-th hint bought (k = 0, 1, 2, ...) costs this. A hint shows
+    // roughly where the true line of one node lies, as a band this wide (field units).
+    hintCost: (k) => 3 + 3 * k,
+    HINT_BAND: 0.07,
+    // New, unseen test samples dropped into the field on "Prova".
+    TEST_SIZE: 40,
+    // Coins from ratio = player's test accuracy / true tree's test accuracy (same samples).
+    // First matching row wins; below the last row pays 0. Like the pesatura: only matching the
+    // true tree pays 10, a little worse drops quickly to 9 or 8. With 40 test samples:
+    // 1 more mistake than the true tree -> 9, 2 -> 8, 3 -> 7.
+    SCORE_THRESHOLDS: [
+      { minRatio: 0.999, coins: 10 },
+      { minRatio: 0.97, coins: 9 },
+      { minRatio: 0.94, coins: 8 },
+      { minRatio: 0.91, coins: 7 },
+      { minRatio: 0.87, coins: 6 },
+      { minRatio: 0.82, coins: 5 },
+      { minRatio: 0.76, coins: 4 },
+      { minRatio: 0.70, coins: 3 },
+      { minRatio: 0.62, coins: 2 },
+      { minRatio: 0.50, coins: 1 },
+    ],
+    // A Prova that pays at least this passes the level and opens the next one.
+    PASS_COINS: 7,
+    // Pay: one tree (from empty until "Ricomincia il livello") earns at most 10 coins on a level:
+    // each Prova pays only what it adds to the tree's record. A tree started on a level that was
+    // already passed pays this share (replaying for coins).
+    REPLAY_FACTOR: 0.5,
+    // Sampling: each region of the true tree gets samples in proportion to area ^ this power
+    // (0 = the same for every region, 1 = by area), so small regions (a triangle) still show.
+    REGION_WEIGHT_POWER: 0.5,
+    // "Imparare a memoria" (overfitting) note after a Prova: the player's tree beats the true tree
+    // on the training samples by at least OVERFIT_TRAIN_GAIN, and loses to it on the test samples
+    // by at least OVERFIT_TEST_LOSS (accuracy shares). Tuned in tests/run.mjs: a tree that carves
+    // lines around stray training points on the overfitting level triggers it about half the
+    // time, a careful player (lines within ~0.015 of the true ones) practically never.
+    OVERFIT_TRAIN_GAIN: 0.02,
+    OVERFIT_TEST_LOSS: 0.025,
+    // Prova animation: each test sample falls for DROP_MS; one starts every DROP_STAGGER_MS.
+    DROP_MS: 520,
+    DROP_STAGGER_MS: 26,
   },
 
   // ---------------------------------------------------------------- leaderboard
