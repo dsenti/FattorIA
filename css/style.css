@@ -252,6 +252,7 @@ canvas.preview { flex: 1; min-width: 0; height: 84px; background: #F4ECD8; borde
 .tabs { display: flex; gap: 6px; margin: 6px 0 10px; }
 .tabs .btn { flex: 1; }
 .tabs .btn[aria-selected="true"] { background: var(--soil); color: var(--cream); }
+.tabs.three .btn { min-width: 0; padding: 0 4px; font-size: 14px; }
 .board { list-style: none; margin: 0; padding: 0; }
 .board li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #fff; margin-bottom: 6px; font-size: 15px; }
 .board li.me { border: 2px solid var(--tomato); }
@@ -290,6 +291,7 @@ canvas.preview { flex: 1; min-width: 0; height: 84px; background: #F4ECD8; borde
 
 /* ---------------------------------------------------------------- map: Lo smistamento */
 .place-svg { display: block; height: 36px; line-height: 0; }
+#place-lab .place-name, #place-lab .place-lock { white-space: nowrap; }
 .place-svg svg { display: block; }
 .place-lock svg, .coin-ic { vertical-align: -3px; }
 .place.locked.buyable { opacity: 0.92; filter: none; }
@@ -391,6 +393,72 @@ svg.dim { opacity: 0.4; }
   .s-card { bottom: 118px; }
 }
 
+/* ---------------------------------------------------------------- lab (minigame 3) */
+#place-lab:not(.locked) { animation: glow 2.2s ease-in-out infinite; animation-delay: 0.6s; }
+.l-levels-ic { display: inline-block; line-height: 0; }
+.l-restart { flex: none; margin-left: auto; border-color: var(--wheat) !important; }
+.l-restart svg { display: block; margin: auto; }
+.l-scroll {
+  flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; touch-action: pan-y; padding: 0 0 8px; position: relative;
+}
+.l-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 0 12px 2px; font-size: 12.5px; font-weight: 700; }
+.l-leg { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+svg.l-shape { display: inline-block; flex: none; vertical-align: -2px; }
+.l-field-wrap { padding: 0 6px; height: 280px; }
+.l-field-wrap canvas { touch-action: pan-y; }
+.l-acc { padding: 4px 12px 2px; font-size: 13px; line-height: 1.3; }
+.l-tree { display: block; width: 100%; height: auto; margin-top: 4px; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.l-tree text { font-family: inherit; }
+.l-node { cursor: pointer; }
+.l-node .box { fill: var(--cream); stroke: var(--soil); stroke-width: 2.5; }
+.l-node.filled .box { fill: #fff; }
+.l-node .qmark { font-size: 26px; font-weight: 800; fill: var(--soil); }
+.l-node .num { font-size: 11.5px; font-weight: 800; fill: #fff; }
+.l-node.empty.ready .box { stroke: var(--tomato); stroke-dasharray: 5 4; animation: gatepulse 1.6s ease-in-out infinite; }
+.l-node.waiting { opacity: 0.45; }
+.l-small { font-size: 12px; opacity: 0.8; }
+
+.l-pop { position: absolute; inset: 0; z-index: 6; background: rgba(58, 37, 25, 0.45); display: flex; align-items: flex-end; justify-content: center; touch-action: none; }
+.l-card {
+  width: calc(100% - 12px); max-height: calc(100% - 12px); margin: 0 6px calc(6px + env(safe-area-inset-bottom));
+  overflow-y: auto; overscroll-behavior: contain; background: var(--cream); border: 2px solid var(--soil);
+  border-radius: var(--radius); padding: 6px 10px 10px; box-shadow: 0 6px 18px rgba(58, 37, 25, 0.3);
+  animation: slideup 0.15s ease-out;
+}
+.l-card-head { display: flex; align-items: center; justify-content: space-between; font-size: 17px; }
+.l-card-head .btn.icon svg { display: block; margin: auto; }
+.l-pop-sub { font-size: 12.5px; font-weight: 500; opacity: 0.75; }
+.l-step { font-size: 13px; font-weight: 700; margin: 2px 0 4px; display: flex; align-items: center; gap: 6px; }
+.l-step b { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--soil); color: #fff; font-size: 12px; }
+.l-step.off { opacity: 0.4; }
+.l-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.l-chip {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 40px; padding: 0 10px 0 8px; font-size: 14px;
+  background: #fff; border-color: var(--wheat); font-weight: 700;
+}
+.l-chip.on { border-color: var(--cc); border-width: 3px; background: color-mix(in srgb, var(--cc) 14%, white); }
+.l-chip.none { opacity: 0.55; }
+.l-chip-n { font-size: 12px; font-weight: 600; opacity: 0.7; font-variant-numeric: tabular-nums; }
+.l-pop-canvas { display: block; width: 100%; height: 280px; touch-action: none; margin: 2px 0 0; background: var(--cream); }
+.l-count { font-size: 13.5px; min-height: 22px; margin: 2px 0 6px; line-height: 1.3; }
+.l-per { font-size: 12.5px; white-space: nowrap; }
+.l-hint-note { font-size: 12.5px; margin-top: 3px; padding: 4px 8px; border-radius: 8px; background: #FDF1CC; line-height: 1.3; }
+.l-hint-note svg { vertical-align: -3px; }
+.l-pop-actions { display: flex; gap: 6px; margin-top: 6px; }
+.l-pop-actions .btn { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 0 6px; font-size: 14.5px; line-height: 1.15; }
+.l-pop-actions .btn svg { flex: none; }
+.l-pop-actions .btn span { min-width: 0; }
+#l-next.ready { animation: glow 1.8s ease-in-out infinite; }
+
+@media (max-height: 700px) {
+  .l-chip { min-height: 38px; font-size: 13.5px; }
+  .l-step { margin: 0 0 3px; }
+  .l-count { margin-bottom: 3px; }
+  .l-pop-actions { margin-top: 4px; }
+  .l-pop-actions .btn { min-height: 42px; }
+}
+
 /* ---------------------------------------------------------------- small / short screens */
 @media (max-height: 700px) {
   .bubble { margin-top: 4px; padding: 5px 8px; }
@@ -408,8 +476,8 @@ svg.dim { opacity: 0.4; }
   .btn.big { min-height: 46px; }
 }
 @media (max-width: 380px) {
-  #screen-sort .topbar .title { display: none; }
-  #screen-sort .topbar .coins { margin-left: auto; }
+  #screen-sort .topbar .title, #screen-lab .topbar .title { display: none; }
+  #screen-sort .topbar .coins, #screen-lab .topbar .coins { margin-left: auto; }
   .info-row { font-size: 12px; padding: 3px 8px; }
   .info-row span { white-space: nowrap; }
 }
