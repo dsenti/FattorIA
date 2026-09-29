@@ -203,8 +203,59 @@ TODO(Dominik): prices, once it has been play-tested.
 - TODO(Dominik): overfitting (L3). A later extension could give a level with a tiny training batch where a wrong tree also scores 100% on training but fails the test. This would deliberately break the "one correct tree" rule for that level only.
 - TODO(Dominik): an endless mode with randomly generated trees after the fixed levels?
 
-## Minigame 3
-TODO(Dominik): sketch coming.
+## Minigame 3: Il laboratorio (the analysis lab), working title
+**Lesson:** L3, as a second classification station next to the smistamento (it does not replace it). **Concepts:** classificazione (classification); etichetta (label): the colour of a point; albero di decisione (decision tree); confine di decisione (decision boundary), see the change request; caratteristica (feature), from L2; addestramento vs test (training vs test); accuratezza (accuracy); overfitting (imparare a memoria).
+
+**Idea (Dominik, 2026-09-29).** The smistamento shows a tree as questions. The laboratorio shows the same thing as a picture: every node of the tree is a **boundary line through a point cloud**, and each child node only sees the points on its side of its parent's line. Together the lines cut the field into coloured regions.
+
+**Story.** Samples from the valley's farms come into the lab, and each one is measured on two properties. Examples: olives measured on size and ripeness, with the colour showing the cultivar (e.g. Caiazzana vs Leccino); grapes measured on sugar and acidity, with the colour showing the variety (Pallagrello, Casavecchia); milk measured on fat and protein. Each point is one sample, its colour (the class) is its **etichetta (label)**, and the lab has to learn to tell the classes apart from the measurements alone. TODO(Dominik): pick the themes and classes per level; the ones above are placeholders.
+
+**Screen (portrait, top to bottom):**
+1. **Field:** the point cloud of the level's **training** samples, with 2 to 4 colours (classes). The axes look like the pesatura's: an emoji and a label with −/+ markers and small/big icons at the ends, and no numbers. The finished parts of the tree are drawn onto the field: each region is softly tinted in the colour it predicts, and every line is labelled with its node's number. The field updates live while you edit. An "accuratezza (accuracy)" readout shows the share of training points that fall in a region of their own colour.
+2. **Tree:** a fixed shape per level (1 node, then 2, 3, … up to about 6), drawn below the field like the smistamento tree. Every node shows its two picked colour dots and a small thumbnail of its line. Each side of a node is either another node or a **leaf**, which predicts the colour chosen for that side. Empty nodes show a "?" and pulse gently.
+3. **Buttons:** "Prova" (test) and "Avanti" (next).
+
+**Node pop-up.** Tapping a node opens a pop-up with a larger field:
+- **Only the points that reach this node are shown.** Everything cut away by the parent lines is shaded out, and the parent lines stay visible.
+- **Step 1, pick two colours:** chips for the colours still present in this region. The two picked colours are drawn vivid, and the others are desaturated but still distinguishable. If only two colours are left, both are picked automatically.
+- **Step 2, place the line:** a line with two round handles at its ends, as in the pesatura's drag mode. It can sit at **any angle**. The two sides are faintly tinted with the two picked colours, and a swap button flips which colour goes on which side. A live counter shows how many of the two picked colours are on their correct side.
+- Tapping outside the card, or "Fatto", closes the pop-up.
+- Lines at any angle are a deliberate choice (Dominik, 2026-09-29): this tree is "less standard" than a textbook tree, which asks about one measurement at a time and only cuts straight across. Angled lines let the regions become triangles, squares and L shapes.
+
+**Training vs test and scoring.**
+- The visible points are the **training** set. A level starts with plenty of them (about 60–80; tunable).
+- "Prova" drops a batch of new, unseen **test** samples from the same farms into the field. Each one lands in a region and turns ✓ or ✗. You are paid for **test accuracy**, not training accuracy.
+- The classes overlap a little (measurement noise), so 100% is usually impossible. Pay is set by the ratio of the player's test accuracy to the accuracy of the level's true boundary on the same test samples (0–10 coins, with thresholds like the pesatura's). This means a perfect score is possible even with noise.
+- Every Prova samples fresh training and test points, so levels can be replayed for coins as long as the player likes. Passing a level (e.g. ≥ 7 coins) unlocks the next one. TODO(Dominik): pay per level, replay pay, pass mark.
+- **Overfitting (imparare a memoria):** some levels have more nodes than the true boundary needs and noisier data. Squeezing a line around every stray training point raises training accuracy but lowers test accuracy. After such a Prova a short toast explains it once, using the lesson's words ("L'albero ha imparato a memoria i campioni…").
+
+**Economy.**
+- The place on the map unlocks for coins (about 200; tunable), so players arrive after the other two stations.
+- **Upgrades:**
+  - *Più campioni* (more training points), for example 60 → 150 over 10 levels;
+  - *Strumento più preciso* (a more precise instrument), which lowers the measurement noise: less overlap between the classes;
+  - *Suggerimento* (hint), which shows roughly where one node's true line lies, with a rising price like the smistamento.
+- The prices follow the scheme of the other stations. TODO(Dominik): tune after play-testing.
+
+**Levels (about 10, from easy to complicated; Dominik, 2026-09-29).**
+1. One node, two colours, cleanly separated by one tilted line.
+2. One node, two colours, a little overlap.
+3. Two nodes, three colours (two lines cutting the field into bands or a wedge).
+4. A **triangle**: three nodes in a chain, one colour inside the triangle, one outside.
+5. Three colours in three wedges or corners.
+6. A **square** (or tilted rectangle): four nodes in a chain.
+7. A **non-convex L shape**: one colour in an L, the other colour fills the rest (the tree needs both branches).
+8. Four colours.
+9. An overfitting level: spare nodes, noisy data, where a simple answer wins the test.
+10. A final mix: a non-convex shape plus several colours.
+
+Each level stores its tree shape, its true lines (in field coordinates 0..1) and its themes. The data comes from the true tree plus noise. A test checks that the true tree beats every level's pass mark reliably, and that every true region holds enough points to be seen.
+
+**Tech.** The field is drawn on a canvas, like the pesatura (points and regions are drawn best there). The tree and the pop-up chrome use SVG and HTML, like the smistamento. Code goes in `js/lab/`, the settings in `CONFIG.LAB`, and saves under `lab`.
+
+**Open questions**
+- TODO(Dominik): the name of the station and its place on the map. ("La stalla" stays reserved for L4.)
+- TODO(Dominik): should MG3 later use SVG icons instead of emoji for the axes, like the smistamento?
 
 ---
 
@@ -212,4 +263,4 @@ TODO(Dominik): sketch coming.
 |---|---|---|---|
 | 1. La stazione di pesatura | L2 | regressione lineare, errore, valore anomalo, qualità dei dati | designed |
 | 2. Lo smistamento | L3 | classificazione, etichetta, albero di decisione, addestramento vs test, accuratezza | built (first version) |
-| 3. | | | waiting for sketch |
+| 3. Il laboratorio (working title) | L3 | classificazione, confine di decisione, albero di decisione, addestramento vs test, accuratezza, overfitting | spec draft |
