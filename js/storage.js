@@ -4,6 +4,8 @@ import { isValidName } from './names.js';
 import { LEVELS, LEVELS_VERSION } from './sorting/levels.js';
 import { SENSORS, QUESTION_IDS } from './sorting/questions.js';
 import { compile } from './sorting/tree.js';
+import { LAB_LEVELS, LAB_LEVELS_VERSION } from './lab/levels.js';
+import { compileLab } from './lab/model.js';
 
 const MAX_HISTORY = 50;
 
@@ -36,6 +38,7 @@ export function defaultState() {
     seenFlip: false,       // "axis reversed" warning shown once
     lineMode: 'sliders',   // how the line is moved: 'sliders' or 'drag' (a setting; kept on restart)
     sort: defaultSort(),   // minigame 2 (Lo smistamento)
+    lab: defaultLab(),     // minigame 3 (Il laboratorio)
   };
 }
 
@@ -55,6 +58,78 @@ export function defaultSort() {
     hinted: {},            // level id -> gate indices revealed by a hint
     fails: {},             // level id -> failed Provas since it was last solved (3 -> wrong gates marked)
     seenHelp: false,
+  };
+}
+
+// Minigame 3 progress. Old saves without it get this.
+export function defaultLab() {
+  return {
+    levelsVersion: LAB_LEVELS_VERSION,  // saved progress belongs to this version of the levels
+    unlocked: false,       // the place was bought on the map
+    passed: [],            // level ids passed at least once (a Prova paid >= CONFIG.LAB.PASS_COINS)
+    current: null,         // level id being played
+    boards: {},            // level id -> { nodes: [spec or null], best: coins (record of this tree), replay }
+    hinted: {},            // level id -> node indices shown by a hint
+    hints: 0,              // hints in stock
+    hintsBought: 0,        // hints bought so far (the price rises)
+    samples: 0,            // "Più campioni" level 0..10
+    precision: 0,          // "Strumento più preciso" level 0..10
+    seenHelp: false,
+    seenOverfit: false,    // the "imparare a memoria" toast was shown once
+  };
+}
+
+const LAB_NODES = new Map(LAB_LEVELS.map((lv) => [lv.id, compileLab(lv.tree).nodes.length]));
+const LAB_CLASSES = new Map(LAB_LEVELS.map((lv) => [lv.id, lv.classes.length]));
+
+// A node spec from a save, or null if it is not valid for a level with K classes.
+function cleanSpec(s, K) {
+  if (!s || typeof s !== 'object') return null;
+  const u = (v) => Number.isFinite(v) && v >= 0 && v <= 1;
+  if (![s.x1, s.y1, s.x2, s.y2].every(u)) return null;
+  if (!Array.isArray(s.c) || s.c.length !== 2) return null;
+  if (!s.c.every((c) => Number.isInteger(c) && c >= 0 && c < K) || s.c[0] === s.c[1]) return null;
+  if (Math.hypot(s.x2 - s.x1, s.y2 - s.y1) < 0.01) return null;
+  return { x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, c: [s.c[0], s.c[1]], flip: s.flip === true };
+}
+
+// Returns the cleaned minigame 3 progress. If the save is from an older version of the levels,
+// the level progress (passed, boards, hints on nodes) starts over, but the place, the upgrades
+// and the hints in stock stay.
+export function sanitizeLab(raw) {
+  const d = defaultLab();
+  if (!raw || typeof raw !== 'object') return d;
+  const n = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
+  const lvl = (v) => Math.max(0, Math.min(CONFIG.MAX_LEVEL, n(v)));
+  const same = raw.levelsVersion === LAB_LEVELS_VERSION;
+  const boards = {}, hinted = {};
+  if (same) {
+    for (const [id, N] of LAB_NODES) {
+      const b = raw.boards && raw.boards[id];
+      if (b && Array.isArray(b.nodes) && b.nodes.length === N) {
+        boards[id] = {
+          nodes: b.nodes.map((s) => cleanSpec(s, LAB_CLASSES.get(id))),
+          best: Math.min(CONFIG.MAX_PAY, n(b.best)),
+          replay: b.replay === true,
+        };
+      }
+      const h = raw.hinted && raw.hinted[id];
+      if (Array.isArray(h)) hinted[id] = [...new Set(h.filter((i) => Number.isInteger(i) && i >= 0 && i < N))];
+    }
+  }
+  return {
+    levelsVersion: LAB_LEVELS_VERSION,
+    unlocked: raw.unlocked === true,
+    passed: same && Array.isArray(raw.passed) ? [...new Set(raw.passed.filter((id) => LAB_NODES.has(id)))] : [],
+    current: same && LAB_NODES.has(raw.current) ? raw.current : null,
+    boards,
+    hinted,
+    hints: n(raw.hints),
+    hintsBought: n(raw.hintsBought),
+    samples: lvl(raw.samples),
+    precision: lvl(raw.precision),
+    seenHelp: raw.seenHelp === true,
+    seenOverfit: raw.seenOverfit === true,
   };
 }
 
@@ -133,6 +208,7 @@ export function sanitize(raw) {
     seenFlip: raw.seenFlip === true,
     lineMode: raw.lineMode === 'drag' ? 'drag' : 'sliders',
     sort,
+    lab: sanitizeLab(raw.lab),
   };
 }
 

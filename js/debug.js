@@ -1,4 +1,4 @@
-// TEMPORARY debug helper for play-testing: a "+100" button on the weighing station and on Lo smistamento that adds
+// TEMPORARY debug helper for play-testing: a "+100" button on the weighing station, Lo smistamento and Il laboratorio that adds
 // 100 coins to the wallet. These coins do NOT count as earned (no effect on the leaderboard:
 // total earned and average per farmer stay the same).
 // TODO(Dominik): remove before the course. To remove: delete this file, the import and the
@@ -7,8 +7,8 @@ import { CONFIG } from './config.js';
 
 export function installDebugButton({ getState, save, renderCoins }) {
   if (!CONFIG.DEBUG_COINS_BUTTON) return;
-  // Minigame 1 keeps its bug emoji; minigame 2 uses no emoji at all.
-  for (const [sel, label] of [['#screen-weigh .topbar', '🐞 +100'], ['#screen-sort .topbar', 'DEBUG +100']]) {
+  // Minigame 1 keeps its bug emoji; minigames 2 and 3 use no emoji in their chrome.
+  for (const [sel, label] of [['#screen-weigh .topbar', '🐞 +100'], ['#screen-sort .topbar', 'DEBUG +100'], ['#screen-lab .topbar', 'DEBUG +100']]) {
     const bar = document.querySelector(sel);
     const coins = bar && bar.querySelector('.coins');
     if (!coins) continue;
