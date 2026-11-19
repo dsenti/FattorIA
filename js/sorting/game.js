@@ -7,8 +7,9 @@ import { LEVELS, TRUCKS } from './levels.js';
 import { QUESTIONS, Q, SENSOR_BY_ID, questionUnlocked } from './questions.js';
 import { COMPILED, levelStatus, startLevel, hintCost } from './progress.js';
 import { layoutTree, runBatch, trainingBatch, testBatch, solutionOf, treeDepth, wrongGates } from './tree.js';
-import { pxSymbolHTML, pxImageSVG } from '../pixel.js';
-import { P, questionArt, truckArt, truckSpecArt, ICON, svg40, itemArt, itemSymbolId, ensureItemSymbols } from './art.js';
+import { pxImageSVG } from '../pixel.js';
+import { spritesReady, onSpritesReady } from '../weighing/sprites.js';
+import { P, questionArt, truckArt, truckSpecArt, ICON, svg40, itemArt, itemSymbolId, ensureItemSymbols, symbolHTML } from './art.js';
 import { truckSpec, PIPE_COLOUR } from './trucks.js';
 
 const GS = 23;           // half size of a gate square
@@ -261,6 +262,7 @@ export class SortingGame {
 
   // ------------------------------------------------------------ SVG
   render() {
+    if (!spritesReady() && !this.waitSprites) { this.waitSprites = true; onSpritesReady(() => this.render()); }
     if (this.li < 0) return;
     const W = Math.max(280, Math.floor(this.el.scroll.clientWidth || 360));
     const lv = this.level, c = this.c, items = this.batch;
@@ -308,9 +310,9 @@ export class SortingGame {
     const marked = this.phase === 'run' ? new Set() : this.markWrong;
 
     let s = `<defs id="s-defs">`;
-    for (const q of QUESTIONS) s += pxSymbolHTML(`q-${q.id}`, questionArt(q.id), 36);
-    for (const id of lv.trucks) s += pxSymbolHTML(`tr-${id}`, truckSpecArt(this.specs[id]), 24);
-    s += pxSymbolHTML('ic-yes', ICON.yes, 16) + pxSymbolHTML('ic-no', ICON.noRed, 16) + pxSymbolHTML('ic-hint', ICON.hint, 18);
+    for (const q of QUESTIONS) s += symbolHTML(`q-${q.id}`, questionArt(q.id), 36);
+    for (const id of lv.trucks) s += symbolHTML(`tr-${id}`, truckSpecArt(this.specs[id]), 24);
+    s += symbolHTML('ic-yes', ICON.yes, 16) + symbolHTML('ic-no', ICON.noRed, 16) + symbolHTML('ic-hint', ICON.hint, 18);
     s += '</defs>';
     // hopper and funnel
     const rx = c.root.x;
@@ -366,7 +368,7 @@ export class SortingGame {
       const x = truckAt[id];
       const t = truckArt(truckSpecArt(this.specs[id]), slotW);
       const tw = -2 * t.bedX + 2;
-      const tsvg = pxImageSVG(t.svg, t.bedX - 1, -1, tw, t.height + 2, `${t.bedX - 1} -1 ${tw} ${t.height + 2}`);
+      const tsvg = t.pixel ? t.svg : pxImageSVG(t.svg, t.bedX - 1, -1, tw, t.height + 2, `${t.bedX - 1} -1 ${tw} ${t.height + 2}`);
       // truck and its load in one group, so "Avanti" can drive them off together
       s += `<g class="s-tg" data-tg="${id}"><g class="s-truck" data-truck="${id}" transform="translate(${x} ${g.bedTop})" aria-label="${esc(TRUCKS[id].name)}">${tsvg}</g><g class="s-tp" data-tp="${id}"></g></g>`;
     }
@@ -387,7 +389,7 @@ export class SortingGame {
       h += `<g class="s-item${gone ? ' gone' : ''}" data-i="${i}" transform="translate(${p.x} ${p.y})">` +
         `<rect x="${-CELL_W / 2}" y="-19" width="${CELL_W}" height="${cellH - 2}" fill="transparent"/>` +
         `<circle class="ring" r="17" fill="none" stroke="${P.tomato}" stroke-width="3"/>` +
-        `<use href="#${itemSymbolId(it)}" x="-16" y="-16" width="32" height="32"/>` +
+        `<use href="#${itemSymbolId(it)}" x="-15" y="-15" width="30" height="30"/>` +
         (tags ? `<rect x="-12" y="18" width="24" height="18" rx="5" fill="#fff" stroke="${P.wheat}" stroke-width="1.5"/><use href="#tr-${it.label}" x="-8" y="19" width="16" height="16"/>` : '') +
         '</g>';
     });

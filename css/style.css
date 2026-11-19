@@ -683,3 +683,8 @@ canvas.px-text { position: absolute; pointer-events: none; image-rendering: auto
 canvas.sharp { image-rendering: auto; }
 img.ic-px { height: 1.2em; width: auto; vertical-align: -0.2em; image-rendering: pixelated; }
 .shop-icon img.shop-px { display: block; height: 36px; width: auto; max-width: 64px; object-fit: contain; image-rendering: pixelated; }
+
+/* backgrounds for the other minigames: inside the barn (sorting), the lab's tiled wall */
+#screen-sort .s-scroll { background: url('../assets/ui/barnwall.png') repeat; background-size: 54px 54px; image-rendering: pixelated; }
+#screen-lab .l-scroll { background: url('../assets/ui/labwall.png') repeat; background-size: 36px 36px; image-rendering: pixelated; }
+#screen-sort .s-caption { color: #F3EADB; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45); }

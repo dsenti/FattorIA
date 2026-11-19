@@ -1,4 +1,14 @@
 import { fitSharpCanvas } from '../pixel.js';
+import { drawIcon } from '../weighing/scene.js';
+import { has } from '../weighing/sprites.js';
+import { registerSprite } from '../sorting/art.js';
+// The axis icons (emoji in levels.js) as pixel sprites from tools/pixelart/uigen.py; the emoji
+// stay as the fallback. Written as code points so this file has no emoji.
+const AXIS_SPRITE = Object.fromEntries([
+  ['\u{1FAD2}', 'i_olive'], ['\u{1F4A7}', 'i_drop'], ['\u{1F9C8}', 'i_butter'], ['\u{1F9C0}', 'i_cheese'], ['\u{1F36C}', 'i_sugar'],
+  ['\u{1F34B}', 'i_lemon'], ['\u{1F321}\u{FE0F}', 'i_thermo'], ['\u{1F9EA}', 'i_tube'], ['\u{1F36F}', 'i_honey'], ['\u{1F41D}', 'i_bee'], ['\u{1F9C2}', 'i_salt'],
+]);
+
 // Minigame 3: canvas drawing of the field (axes, regions, points, lines, handles) and the small
 // SVG pieces (class shapes, node thumbnails, icons). No emoji in the SVG art; the axes use emoji
 // icons like the pesatura.
@@ -72,7 +82,11 @@ export function drawAxes(ctx, g, level) {
     ctx.closePath(); ctx.fill();
   };
   const sign = (txt, x, y) => { ctx.font = `800 15px ${FONT}`; ctx.fillText(txt, x, y); };
-  const icon = (big, ch, x, y) => { ctx.font = `${big ? 18 : 11}px ${FONT}`; ctx.fillText(ch, x, y); };
+  const icon = (big, ch, x, y) => {
+    const sp = AXIS_SPRITE[ch];
+    if (sp && has(sp)) drawIcon(ctx, sp, x, y, big);
+    else { ctx.font = `${big ? 18 : 11}px ${FONT}`; ctx.fillText(ch, x, y); }
+  };
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineWidth = 2;
@@ -96,9 +110,9 @@ export function drawAxes(ctx, g, level) {
   // quantity names
   ctx.font = `600 13px ${FONT}`;
   ctx.textAlign = 'left';
-  ctx.fillText(`${level.y.name} ${level.y.icon}`, L + 2, T - 13);
+  ctx.fillText(level.y.name, L + 2, T - 13);
   ctx.textAlign = 'center';
-  ctx.fillText(`${level.x.name} ${level.x.icon}`, (L + R) / 2, row);
+  ctx.fillText(level.x.name, (L + R) / 2, row);
   ctx.textBaseline = 'alphabetic';
 }
 
@@ -290,3 +304,7 @@ export const LAB_ICON = {
   precision: `<circle cx="17" cy="17" r="11" fill="#CFE6EC" stroke="${C.soil}" stroke-width="3.2"/><circle cx="17" cy="17" r="5.5" fill="none" stroke="${C.tomato}" stroke-width="2"/><circle cx="17" cy="17" r="1.8" fill="${C.tomato}"/>` +
     `<path d="M25 25L35 35" stroke="${C.soil}" stroke-width="5" stroke-linecap="round"/>`,
 };
+
+for (const k of ['train', 'test', 'restart', 'trash', 'plus', 'apply', 'samples', 'precision']) {
+  if (LAB_ICON[k]) registerSprite(LAB_ICON[k], `u_${k}`);
+}

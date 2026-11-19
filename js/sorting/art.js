@@ -1,4 +1,12 @@
 import { pxArt, pxSymbolHTML } from '../pixel.js';
+import { spriteImgHTML, spritesReady, portrait } from '../weighing/sprites.js';
+import { itemURL, symbolURL, truckPix } from '../uiart.js';
+
+// Pixel sprites for vector art: markup -> a sprite name or a function returning a data URL.
+// svg40() and symbolHTML() use them when the sprite sheet has loaded, the SVG art otherwise.
+const SPRITE_OF = new Map();
+export const registerSprite = (inner, src) => { SPRITE_OF.set(inner, src); return inner; };
+const urlOf = (src) => (typeof src === 'function' ? src() : portrait(src, 1));
 // Minigame 2: all drawings as inline SVG strings in the course palette (no emoji).
 // Items, question icons and truck symbols are drawn in a 40 x 40 box.
 import { itemKey } from './questions.js';
@@ -98,6 +106,9 @@ const miniSnail = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})">
 
 // One item kind drawn in a 40 x 40 box. Small produce is scaled down around the centre.
 export function itemArt(it) {
+  return registerSprite(itemArtSVG(it), () => itemURL(it));
+}
+function itemArtSVG(it) {
   if (it.alive) return animalBody(it);
   const fill = (FILL[it.t] || FILL.mela)[it.c];
   let s = produceBody(it, fill);
@@ -171,9 +182,8 @@ const QICON = {
 };
 
 export function questionArt(qid) {
-  if (PAINT[qid]) return splat(qid);
-  if (SHAPE[qid]) return silhouette(qid);
-  return QICON[qid] || '';
+  const svg = PAINT[qid] ? splat(qid) : SHAPE[qid] ? silhouette(qid) : (QICON[qid] || '');
+  return registerSprite(svg, `q_${qid}`);
 }
 
 // ------------------------------------------------------------------ truck symbols (etichette)
@@ -227,6 +237,9 @@ const DEFAULT_SHOW = {
 };
 // The symbol of a truck from its spec (see trucks.js): exactly the produce that goes in.
 export function truckSpecArt(spec) {
+  return registerSprite(truckSpecArtSVG(spec), () => symbolURL(spec));
+}
+function truckSpecArtSVG(spec) {
   const show = spec.show.length ? spec.show : (DEFAULT_SHOW[spec.truck] || []);
   switch (spec.kind) {
     case 'produce': return group(show);
@@ -249,6 +262,12 @@ export const truckSymbolArt = (sym) => truckSpecArt({ truck: sym, kind: KIND_OF[
 // symInner: the symbol markup (40 x 40) painted on its side.
 // Returns { svg, bedW, height }.
 export function truckArt(symInner, w) {
+  const src = SPRITE_OF.get(symInner);
+  const pix = truckPix(src ? urlOf(src) : null, w);
+  if (pix) return pix;
+  return truckArtSVG(symInner, w);
+}
+function truckArtSVG(symInner, w) {
   const tw = Math.min(w - 6, 76);
   const bedW = Math.round(tw * 0.66), cabW = tw - bedW - 2;
   const x0 = -tw / 2;
@@ -291,7 +310,17 @@ export const ICON = {
 };
 
 // Wraps 40 x 40 art into a standalone inline <svg>.
-export const svg40 = (inner, size = 40, cls = '') => pxArt(inner, size, size, cls);
+export const svg40 = (inner, size = 40, cls = '') => {
+  const src = SPRITE_OF.get(inner);
+  return src ? spriteImgHTML(src, size, size, cls) : pxArt(inner, size, size, cls);
+};
+// A <symbol> (viewBox 0 0 40 40) showing the pixel sprite of `inner`, or the rasterised SVG art.
+export function symbolHTML(id, inner, size) {
+  const src = SPRITE_OF.get(inner);
+  const url = src && spritesReady() ? urlOf(src) : null;
+  if (url) return `<symbol id="${id}" viewBox="0 0 40 40"><image href="${url}" x="0" y="0" width="40" height="40" preserveAspectRatio="none" style="image-rendering:pixelated"/></symbol>`;
+  return pxSymbolHTML(id, inner, size);
+}
 
 // <symbol> definitions for every item kind in a batch, so moving items can be cheap <use> elements.
 export const itemSymbolId = (it) => `it-${itemKey(it)}`;
@@ -302,7 +331,12 @@ export function ensureItemSymbols(defs, items) {
     const id = itemSymbolId(it);
     if (have.has(id)) continue;
     have.add(id);
-    add += pxSymbolHTML(id, itemArt(it), 32);
+    add += symbolHTML(id, itemArt(it), 32);
   }
   if (add) defs.insertAdjacentHTML('beforeend', add);
+}
+
+// the UI icons drawn as pixel sprites
+for (const k of ['yes', 'no', 'noRed', 'coin', 'lock', 'map', 'help', 'shop', 'levels', 'hint', 'lente', 'fast', 'clear', 'place', 'trophy', 'cog', 'sun', 'moon']) {
+  if (ICON[k]) registerSprite(ICON[k], `u_${k}`);
 }

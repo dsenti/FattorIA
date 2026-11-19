@@ -165,3 +165,4 @@ export const LAB_LEVELS = [
     noise: 0.02, gap: 0.03, samplesFactor: 1.3,
   },
 ];
+

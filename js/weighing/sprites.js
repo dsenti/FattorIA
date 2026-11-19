@@ -3,21 +3,30 @@
 // crisp: blit() takes integer backing coordinates; withPixels() switches a context to them.
 import { VERSION } from '../version.js';
 
-let img = null, shedImg = null, M = null;
+let img = null, uiImg = null, shedImg = null, M = null;
 let ready = false;
 const waiting = [];
 
 export function loadSprites() {
   if (img) return;
   img = new Image();
+  uiImg = new Image();
   shedImg = new Image();
   const v = `?v=${VERSION}`;
   const pic = (im, src) => new Promise((res) => { im.onload = res; im.onerror = res; im.src = src; });
   Promise.all([
     fetch(`assets/weigh/sprites.json${v}`).then((r) => r.json()),
+    fetch(`assets/ui/sprites.json${v}`).then((r) => r.json()),
     pic(img, `assets/weigh/sprites.png${v}`),
+    pic(uiImg, `assets/ui/sprites.png${v}`),
     pic(shedImg, `assets/weigh/shed.png${v}`),
-  ]).then(([m]) => { M = m; ready = true; waiting.splice(0).forEach((f) => f()); }).catch(() => {});
+  ]).then(([m, u]) => {
+    for (const k of Object.keys(u)) u[k].ui = true;
+    M = Object.assign({}, m, u);
+    ready = true;
+    swapWaiting();
+    waiting.splice(0).forEach((f) => f());
+  }).catch(() => {});
 }
 
 export const spritesReady = () => ready;
@@ -40,14 +49,15 @@ export function blit(ctx, name, x, y, flip = false, scale = 1) {
   const s = M && M[name];
   if (!s || !ready) return;
   const [sx, sy, sw, sh] = s.r;
+  const src = s.ui ? uiImg : img;
   x = Math.round(x); y = Math.round(y);
   if (flip) {
     ctx.save();
     ctx.translate(x + sw * scale, y);
     ctx.scale(-1, 1);
-    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw * scale, sh * scale);
+    ctx.drawImage(src, sx, sy, sw, sh, 0, 0, sw * scale, sh * scale);
     ctx.restore();
-  } else ctx.drawImage(img, sx, sy, sw, sh, x, y, sw * scale, sh * scale);
+  } else ctx.drawImage(src, sx, sy, sw, sh, x, y, sw * scale, sh * scale);
 }
 
 // The shed interior, floor line at backing y = floorY; repeats the plank wall to the right.
@@ -78,8 +88,43 @@ export function portrait(name, k = 3) {
   c.width = sw * k; c.height = sh * k;
   const x = c.getContext('2d');
   x.imageSmoothingEnabled = false;
-  x.drawImage(img, sx, sy, sw, sh, 0, 0, sw * k, sh * k);
+  x.drawImage(s.ui ? uiImg : img, sx, sy, sw, sh, 0, 0, sw * k, sh * k);
   const url = c.toDataURL('image/png');
   portraits.set(key, url);
   return url;
+}
+
+// ------------------------------------------------------------------ pictures for HTML and SVG
+// A canvas of w x h art pixels, drawn by fn(ctx), returned as a data URL (cached by key).
+const composed = new Map();
+export function composeURL(key, w, h, fn) {
+  if (composed.has(key)) return composed.get(key);
+  if (!ready) return null;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d');
+  x.imageSmoothingEnabled = false;
+  fn(x);
+  const url = c.toDataURL('image/png');
+  composed.set(key, url);
+  return url;
+}
+
+// <img> for a picture source: a sprite name or a function returning a data URL. Until the sheet
+// has loaded, a placeholder that is swapped in place when it arrives.
+let uidN = 0;
+const pending = new Map();
+export function spriteImgHTML(src, w, h = w, cls = '') {
+  const url = ready ? (typeof src === 'function' ? src() : portrait(src, 1)) : null;
+  if (url) return `<img class="px ${cls}" src="${url}" width="${w}" height="${h}" alt="" aria-hidden="true" draggable="false">`;
+  const id = `s${uidN++}`;
+  pending.set(id, { src, w, h, cls });
+  return `<span class="px-wait ${cls}" data-spr="${id}" style="width:${w}px;height:${h}px"></span>`;
+}
+function swapWaiting() {
+  for (const el of document.querySelectorAll('[data-spr]')) {
+    const p = pending.get(el.dataset.spr);
+    if (p) el.outerHTML = spriteImgHTML(p.src, p.w, p.h, p.cls);
+  }
+  pending.clear();
 }
