@@ -63,7 +63,10 @@ js/lab/shop.js          the "Laboratorio" tab of the shop (più campioni, strume
 sw.js                   service worker (offline cache, VERSION constant)
 manifest.webmanifest    "add to home screen" metadata
 assets/                 icons; fonts/ (Pixelify Sans, OFL); map/ (valley pictures, day and dusk, per unlock state; places.json)
-tools/pixelart/         Python + Pillow generator for the map pictures (dev only, not shipped): .venv/bin/python Game/tools/pixelart/mapgen.py
+tools/pixelart/         Python + Pillow generators (dev only, not shipped): mapgen.py (map pictures), weighgen.py (weighing sprites + shed), preview.py (contact sheets)
+assets/weigh/           sprites.png + sprites.json (atlas with meta: wheels, beds, seats...) and shed.png, made by weighgen.py
+js/weighing/sprites.js  loads the weighing sprite sheet; blit() draws a sprite 1:1 in a pixel canvas's backing pixels
+js/weighing/scene.js    the pixel-art weighing scene: shed, belt, vehicles + load, scanner + beam, products, people/tools/herders
 tests/run.mjs           node checks for the model and the name lists
 ```
 

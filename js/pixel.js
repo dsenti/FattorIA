@@ -79,6 +79,62 @@ function schedule(canvas) {
   queueMicrotask(() => { pending.delete(canvas); cleanCanvas(canvas); });
 }
 
+// Text stays sharp: fillText / strokeText on a pixel canvas draw on a full-resolution overlay
+// canvas laid over it (same position and transform), so words are never pixelated.
+function textLayer(canvas, r) {
+  let ov = canvas.__txt;
+  if (!ov && canvas.parentElement) {
+    ov = document.createElement('canvas');
+    ov.className = 'px-text';
+    ov.setAttribute('aria-hidden', 'true');
+    canvas.insertAdjacentElement('afterend', ov);
+    canvas.__txt = ov;
+  }
+  if (!ov) return null;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (ov.width !== w || ov.height !== h) { ov.width = w; ov.height = h; }
+  const st = ov.style;
+  st.left = `${canvas.offsetLeft}px`; st.top = `${canvas.offsetTop}px`;
+  st.width = `${r.width}px`; st.height = `${r.height}px`;
+  const o = ov.getContext('2d');
+  o.setTransform(1, 0, 0, 1, 0, 0);
+  o.clearRect(0, 0, w, h);
+  return ov;
+}
+
+function hookText(ctx, canvas) {
+  if (ctx.__pxText) return;
+  ctx.__pxText = true;
+  const via = (method) => function (t, x, y, maxW) {
+    const ov = canvas.__txt;
+    if (!ov) return;
+    const o = ov.getContext('2d');
+    const k = ov.width / canvas.width;
+    const m = ctx.getTransform();
+    o.setTransform(m.a * k, m.b * k, m.c * k, m.d * k, m.e * k, m.f * k);
+    o.font = ctx.font; o.fillStyle = ctx.fillStyle; o.strokeStyle = ctx.strokeStyle;
+    o.lineWidth = ctx.lineWidth; o.lineJoin = ctx.lineJoin; o.globalAlpha = ctx.globalAlpha;
+    o.textAlign = ctx.textAlign; o.textBaseline = ctx.textBaseline;
+    if (maxW === undefined) o[method](t, x, y); else o[method](t, x, y, maxW);
+  };
+  ctx.fillText = via('fillText');
+  ctx.strokeText = via('strokeText');
+}
+
+// A sharp canvas at the screen's resolution (charts, the lab field): drawing in CSS px.
+export function fitSharpCanvas(canvas) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const r = canvas.getBoundingClientRect();
+  const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  canvas.classList.add('sharp');
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  return { ctx, W: r.width, H: r.height };
+}
+
 // Size a canvas to its CSS box at one backing pixel per art pixel; drawing stays in CSS px.
 export function fitPixelCanvas(canvas) {
   const r = canvas.getBoundingClientRect();
@@ -88,6 +144,8 @@ export function fitPixelCanvas(canvas) {
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.setTransform(w / Math.max(1, r.width), 0, 0, h / Math.max(1, r.height), 0, 0);
   ctx.imageSmoothingEnabled = false;
+  textLayer(canvas, r);
+  hookText(ctx, canvas);
   schedule(canvas);
   return { ctx, W: r.width, H: r.height };
 }

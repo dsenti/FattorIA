@@ -1,4 +1,4 @@
-import { fitPixelCanvas } from '../pixel.js';
+import { fitPixelCanvas, fitSharpCanvas } from '../pixel.js';
 // Minigame 1: La stazione di pesatura (the weighing station).
 // Owns the weighing screen: plot canvas, scene canvas (truck, farmer, belt, scanner),
 // the two sliders and the result panel.
@@ -12,6 +12,8 @@ import { drawScanner, drawScannerBeam, drawFitter, drawUpgradeFx, drawFinaleFx, 
 import { drawVehicle, VEHICLE_NAMES } from './vehicles.js';
 import { drawUnloader, UNLOADER_NAMES, HERDER_NAMES } from './unloaders.js';
 import { drawPile } from './pile.js';
+import { loadSprites, onSpritesReady, portrait } from './sprites.js';
+import { drawShed, drawBelt, drawVehicleS, drawPileS, drawUnitS, drawScannerS, drawBeamS, drawFitterS, drawUnloaderS, drawLabels, axisIcon, drawIcon, farmerKind, unitSprite, crateSprite } from './scene.js';
 
 const UNLOADER_LABEL = (animal, level) => `${(animal ? HERDER_NAMES : UNLOADER_NAMES)[level]}!`;
 
@@ -37,6 +39,7 @@ export class WeighingGame {
       result: $('w-result'), resTitle: $('w-res-title'), resCoins: $('w-res-coins'),
       barMe: $('w-bar-me'), barBest: $('w-bar-best'), resNote: $('w-res-note'), next: $('w-next'),
     };
+    loadSprites();
     const s0 = startSliders();
     this.slope = new Slider($('w-slope'), { value: s0.slope, label: 'pendenza', onInput: () => this.onSlider() });
     this.intercept = new Slider($('w-intercept'), { value: s0.intercept, label: 'intercetta', onInput: () => this.onSlider() });
@@ -110,12 +113,13 @@ export class WeighingGame {
     this.el.controls.hidden = false;
 
     const f = this.round.farmer;
-    this.el.face.textContent = f.face;
+    this.setFace(f);
     this.el.who.textContent = `${f.person}, ${f.role}`;
     this.el.text.textContent = f.question;
     this.el.sub.innerHTML =
-      `<span class="chip">caratteristica <em>(feature)</em>: ${xLabel(f)}</span>` +
-      `<span class="chip">obiettivo da prevedere <em>(target)</em>: ${yLabel(f)}</span>`;
+      `<span class="chip">caratteristica <em>(feature)</em>: ${f.x} ${this.icon(axisIcon(f, 'x'))}</span>` +
+      `<span class="chip">obiettivo da prevedere <em>(target)</em>: ${f.y} ${this.icon(axisIcon(f, 'y'))}</span>`;
+    if (!portrait('crate')) onSpritesReady(() => { if (this.round && this.round.farmer === f) { this.setFace(f); this.updateInfo(); this.el.sub.querySelectorAll('.chip')[0] && (this.el.sub.innerHTML = `<span class="chip">caratteristica <em>(feature)</em>: ${f.x} ${this.icon(axisIcon(f, 'x'))}</span><span class="chip">obiettivo da prevedere <em>(target)</em>: ${f.y} ${this.icon(axisIcon(f, 'y'))}</span>`); } });
     this.updateInfo();
     const ax = this.round.axes;
     if ((ax.flipX || ax.flipY) && this.app.onAxesFlipped) this.app.onAxesFlipped(ax);
@@ -381,9 +385,10 @@ export class WeighingGame {
     if (!r) return;
     const f = r.farmer;
     const k = r.unitsPerBox;
-    this.el.crates.textContent = f.animal
-      ? `🚚 ${f.unit} ${r.cratesLeft * k}/${r.cratesTotal * k} · ${r.unloadAll ? 'tutti in un colpo' : `${r.perTrip * k} per viaggio`}`
-      : `📦 cassette: ${r.cratesLeft}/${r.cratesTotal} · ${r.unloadAll ? 'tutte in un colpo' : `${r.perTrip} per viaggio`}`;
+    const ic = (name) => { const u = portrait(name, 2); return u ? `<img class="ic-px" src="${u}" alt="">` : ''; };
+    this.el.crates.innerHTML = f.animal
+      ? `${ic(unitSprite(f))} ${r.cratesLeft * k}/${r.cratesTotal * k} · ${r.unloadAll ? 'tutti in un colpo' : `${r.perTrip * k} per viaggio`}`
+      : `${ic(crateSprite(f))} cassette: ${r.cratesLeft}/${r.cratesTotal} · ${r.unloadAll ? 'tutte in un colpo' : `${r.perTrip} per viaggio`}`;
     this.el.count.innerHTML = `dati <em>(data)</em>: ${r.sample.length}`;
     // Scanner 100 fits and locks by itself: sliders and Blocca are disabled.
     const smart = !!r.smart;
@@ -468,7 +473,7 @@ export class WeighingGame {
   }
 
   drawPlot(now) {
-    const { ctx, W, H } = fitCanvas(this.el.plot);
+    const { ctx, W, H } = fitSharpCanvas(this.el.plot);
     const r = this.round;
     const f = r.farmer;
     ctx.clearRect(0, 0, W, H);
@@ -592,7 +597,7 @@ export class WeighingGame {
       ctx.fillStyle = 'rgba(91,58,41,0.55)';
       ctx.font = `500 14px ${FONT}`;
       ctx.textAlign = 'center';
-      ctx.fillText('Ancora nessun dato: tocca il camion 🚚', (L + R) / 2, (T + B) / 2 - 30);
+      ctx.fillText('Ancora nessun dato: tocca il camion', (L + R) / 2, (T + B) / 2 - 30);
     }
   }
 
@@ -602,7 +607,7 @@ export class WeighingGame {
   drawAxes(ctx, { L, R, T, B }, f, axes) {
     const ax = L - 16;            // x of the vertical axis
     const ay = B + 10;            // y of the horizontal axis
-    const xIcon = f.xIcon || f.unit, yIcon = f.yIcon || f.unit;
+    const xIcon = axisIcon(f, 'x'), yIcon = axisIcon(f, 'y');
     const arrow = (x, y, dx, dy) => {   // arrowhead with its tip at (x, y), pointing along (dx, dy)
       ctx.beginPath();
       ctx.moveTo(x, y);
@@ -611,7 +616,7 @@ export class WeighingGame {
       ctx.closePath(); ctx.fill();
     };
     const sign = (txt, x, y) => { ctx.font = `800 15px ${FONT}`; ctx.fillText(txt, x, y); };
-    const icon = (big, ch, x, y) => { ctx.font = `${big ? 18 : 11}px ${FONT}`; ctx.fillText(ch, x, y); };
+    const icon = (big, name, x, y) => drawIcon(ctx, name, x, y, big);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.lineWidth = 2;
@@ -644,9 +649,9 @@ export class WeighingGame {
     ctx.fillStyle = C.soil;
     ctx.font = `600 13px ${FONT}`;
     ctx.textAlign = 'left';
-    ctx.fillText(yLabel(f), L + 2, T - 14);
+    ctx.fillText(f.y, L + 2, T - 14);
     ctx.textAlign = 'center';
-    ctx.fillText(xLabel(f), (L + R) / 2, row);
+    ctx.fillText(f.x, (L + R) / 2, row);
     ctx.textBaseline = 'alphabetic';
   }
 
@@ -661,43 +666,27 @@ export class WeighingGame {
     ctx.clearRect(0, 0, W, H);
     this.checkUpgrades(now, lv);
 
-    // ground
-    ctx.fillStyle = '#DCC792';
-    ctx.fillRect(0, ground, W, H - ground);
-    ctx.fillStyle = 'rgba(107,127,42,0.35)';
-    ctx.fillRect(0, ground, W, 3);
-
-    // belt
+    // the shed, the belt
+    drawShed(ctx, W, H, ground);
     const bx0 = g.beltStart * W, bx1 = g.beltEnd * W, by = ground - 14;
-    ctx.fillStyle = '#3F2A1E';
-    ctx.fillRect(bx0, by, bx1 - bx0, 9);
-    ctx.strokeStyle = 'rgba(233,216,166,0.55)'; ctx.lineWidth = 2;
-    const off = ((now / 1000) * CONFIG.BELT_SPEED * W) % 14;
-    ctx.save(); ctx.beginPath(); ctx.rect(bx0, by, bx1 - bx0, 9); ctx.clip();
-    for (let x = bx0 - 14 + off; x < bx1; x += 14) { ctx.beginPath(); ctx.moveTo(x, by); ctx.lineTo(x + 5, by + 9); ctx.stroke(); }
-    ctx.restore();
-    ctx.fillStyle = C.soil;
-    for (let x = bx0 + 8; x < bx1; x += 30) { ctx.fillRect(x, by + 9, 4, ground - by - 9); }
+    drawBelt(ctx, bx0, bx1, by, ground, now, W);
+    const hopOf = (key) => (upgradePop(now - (this.fx[key] ?? -1e9)) - 1) * 60;
 
-    // scanner body, then the products passing through it, then the scan beam on top
+    // scanner, then the products passing through it, then the scan beam on top
     const sc = {
       cx: g.scanner * W, ground, H, level: scannerIndex(lv.scanner), smart: isSmartScanner(lv.scanner), now, beltY: by,
-      flashAge: now - (this.scanFlash || -1e9), upgradeAge: now - (this.fx.scanner ?? -1e9),
+      flashAge: now - (this.scanFlash || -1e9), upgradeAge: now - (this.fx.scanner ?? -1e9), hop: hopOf('scanner'),
     };
-    drawScanner(ctx, sc);
-    const us = Math.min(26, H * 0.24);
-    ctx.font = `${us}px ${FONT}`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    const sgeo = drawScannerS(ctx, sc);
     for (const u of this.units) {
       if (now < u.spawnAt || u.gone) continue;
-      const bob = f.animal ? Math.abs(Math.sin(now / 90 + u.idx)) * 3 : 0;
-      ctx.fillText(f.unit, u.x * W, by - 1 - bob);
+      drawUnitS(ctx, f, u.x * W, by, now, u.idx);
     }
-    drawScannerBeam(ctx, sc);
+    drawBeamS(ctx, sc, sgeo);
     if (sc.smart) {
       // scanner 100: the small computer on top, busy while dots arrive
       const busy = this.phase === 'collect' && now - (this.scanFlash || -1e9) < 600;
-      drawFitter(ctx, { ...sc, scannerUpgradeAge: sc.upgradeAge, upgradeAge: Infinity, fitting: busy ? ((now / 600) % 1) : null });
+      drawFitterS(ctx, sc, sgeo, busy ? ((now / 600) % 1) : null);
     }
 
     // vehicle: drives in from the left, and drives back out to the left when sent away
@@ -710,12 +699,8 @@ export class WeighingGame {
     }
     if (!this.truckGone) {
       const tappable = this.truckTappable(now) && r.sample.length === 0;
-      const pulse = tappable ? 1 + 0.025 * Math.sin(now / 160) : 1;
-      const tPop = upgradePop(now - (this.fx.truck ?? -1e9));
-      ctx.save();
-      const ax = g.truckRear * W + tOff;
-      ctx.translate(ax, ground); ctx.scale(pulse * tPop, pulse * tPop); ctx.translate(-ax, -ground);
-      const bed = drawVehicle(ctx, { level: r.truckLevel, xRear: g.truckRear * W, ground, W, H, now, off: tOff });
+      const nudge = tappable ? Math.max(0, Math.sin(now / 160)) * 2 : 0;
+      const bed = drawVehicleS(ctx, { level: r.truckLevel, xRear: g.truckRear * W, ground, now, off: tOff, hop: hopOf('truck') + nudge });
       // While the farmer walks to the truck, the boxes being fetched are still on the pile.
       let shown = r.cratesLeft;
       if (this.carry && this.carry.all) {
@@ -724,8 +709,8 @@ export class WeighingGame {
         for (let i = started; i < c.trips; i++) shown += c.shares[i];
       } else if (this.carry && now - this.carry.t0 < CONFIG.CARRY_MS * 0.35) shown += this.carry.boxes;
       const per = f.animal ? r.unitsPerBox : 1;   // animals are drawn one by one
-      drawPile(ctx, f.unit, f.animal, r.cratesTotal * per, shown * per, bed.bx, bed.bw, bed.floorY, bed.maxH);
-      ctx.restore();
+      drawPileS(ctx, f, r.cratesTotal * per, shown * per, bed);
+      if (bed) bed.lip();
     }
 
     // unloading: farmer, helpers or tools, moving between truck and belt
@@ -755,21 +740,18 @@ export class WeighingGame {
       }
     }
     if (this.phase !== 'arriving') {
-      const uPop = upgradePop(now - (this.fx.belt ?? -1e9));
-      ctx.save();
-      ctx.translate(x, ground); ctx.scale(uPop, uPop); ctx.translate(-x, -ground);
-      drawUnloader(ctx, {
-        level: lv.belt, animal: f.animal, x, ground, H, now, carrying, walking,
-        boxes: load, unitsPerBox: r.unitsPerBox, unit: f.unit, face: f.face,
-        tripP, pickX, dropX, idleX,
+      drawUnloaderS(ctx, {
+        level: lv.belt, f, x, ground, now, carrying, walking,
+        boxes: load, unitsPerBox: r.unitsPerBox, tripP, pickX, dropX, idleX, hop: hopOf('belt'),
       });
-      ctx.restore();
     }
+    drawLabels(ctx);
 
     // upgrade moments: sparkles and a label
     const scAge = now - (this.fx.scanner ?? -1e9);
-    if (sc.smart) drawFinaleFx(ctx, sc.cx, ground - scannerMetrics(sc.level, H).heightPx * 0.55, scAge, W, H);
-    else drawUpgradeFx(ctx, sc.cx, ground - scannerMetrics(sc.level, H).heightPx * 0.6, scAge, `Scanner ${lv.scanner}!`);
+    const scTop = sgeo ? sgeo.top / sgeo.k : ground - H * 0.5;
+    if (sc.smart) drawFinaleFx(ctx, sc.cx, (scTop + ground) / 2, scAge, W, H);
+    else drawUpgradeFx(ctx, sc.cx, scTop + (ground - scTop) * 0.35, scAge, `Scanner ${lv.scanner}!`);
     drawUpgradeFx(ctx, idleX, ground - H * 0.45, now - (this.fx.belt ?? -1e9), UNLOADER_LABEL(f.animal, lv.belt));
     if (!this.truckGone) drawUpgradeFx(ctx, g.truckRear * W * 0.55, H * 0.3, now - (this.fx.truck ?? -1e9), `${VEHICLE_NAMES[r.truckLevel]}!`);
 
@@ -789,9 +771,21 @@ export class WeighingGame {
     };
     const finale = sc.smart && scAge < 2600;   // keep the level-100 finale readable
     if (!finale && this.truckTappable(now) && r.sample.length === 0 && this.units.length === 0) {
-      hint('👈 Tocca il camion!', `rgba(217,80,43,${0.6 + 0.4 * Math.sin(now / 250)})`, 14);
+      hint('← Tocca il camion!', `rgba(217,80,43,${0.6 + 0.4 * Math.sin(now / 250)})`, 14);
     }
     ctx.textBaseline = 'alphabetic';
+  }
+
+  icon(name) {
+    const u = portrait(name, 2);
+    return u ? `<img class="ic-px" src="${u}" alt="">` : '';
+  }
+
+  // The farmer's pixel portrait in the speech bubble (emoji until the sprites have loaded).
+  setFace(f) {
+    const url = portrait(`${farmerKind(f)}_bust`, 3);
+    if (url) this.el.face.innerHTML = `<img class="face-px" src="${url}" alt="">`;
+    else { this.el.face.textContent = f.face; onSpritesReady(() => { if (this.round && this.round.farmer === f) this.setFace(f); }); }
   }
 
   // Detect bought upgrades and start their "upgrade moment" (only while no sheet covers the scene).

@@ -5,7 +5,7 @@ export const C = {
   tomato: '#E07A63', sky: '#5E909B', sun: '#F4C95D', ink: '#2E2A26', glass: '#CFE3E8',
   wood: '#A0703F', harvest: '#B89A5E', grid: 'rgba(58,72,80,0.10)',
 };
-export const FONT = '"Pixelify Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji"';
+export const FONT = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji"';
 
 export function rrect(ctx, x, y, w, h, r) {
   ctx.beginPath();

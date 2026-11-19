@@ -1,11 +1,11 @@
-import { fitPixelCanvas } from '../pixel.js';
+import { fitSharpCanvas } from '../pixel.js';
 // Minigame 3: canvas drawing of the field (axes, regions, points, lines, handles) and the small
 // SVG pieces (class shapes, node thumbnails, icons). No emoji in the SVG art; the axes use emoji
 // icons like the pesatura.
 import { CLASS_COLOURS } from './levels.js';
 import { UNIT_SQUARE, clipBranch, lineInPoly, isNode } from './model.js';
 
-export const FONT = '"Pixelify Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+export const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 export const C = {
   soil: '#3A4850', olive: '#5F9C6A', wheat: '#EFE2C4', cream: '#FBF7EF', tomato: '#E07A63', sky: '#5E909B',
   ink: '#22313A', grid: 'rgba(58,72,80,0.10)', ok: '#3E7D32', gold: '#F5CA63',
@@ -28,7 +28,7 @@ export function muted(hex) {
 }
 
 export function fitCanvas(canvas) {
-  return fitPixelCanvas(canvas);
+  return fitSharpCanvas(canvas);
 }
 
 // Field geometry in CSS pixels: the plot area, with room for the axes (as in the pesatura).

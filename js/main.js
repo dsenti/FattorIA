@@ -13,6 +13,13 @@ import { renderSortShop } from './sorting/shop.js';
 import { LEVELS as SORT_LEVELS } from './sorting/levels.js';
 import { ICON, svg40 } from './sorting/art.js';
 import { VERSION } from './version.js';
+import { portrait } from './weighing/sprites.js';
+
+// The shop's machine icons: pixel portraits from the weighing sprites (emoji until they load).
+function shopIcon(it) {
+  const u = it.sprite && portrait(it.sprite, it.sprite.startsWith('veh') ? 1 : 2);
+  return u ? `<img class="shop-px" src="${u}" alt="">` : it.icon;
+}
 import { LabGame, helpHTML as labHelpHTML } from './lab/game.js';
 import { renderLabShop } from './lab/shop.js';
 import { LAB_ICON } from './lab/draw.js';
@@ -359,7 +366,7 @@ const normalOffer = (lv) => (lv < CONFIG.MAX_LEVEL ? { kind: 'level', level: lv 
 const SHOP = [
   {
     // Levels 0..10, then (only after 10) a surprise: the secret level 100 "Scanner intelligente".
-    key: 'scanner', icon: '📡', name: (lv) => (isSmartScanner(lv) ? 'Scanner intelligente' : 'Scanner'),
+    key: 'scanner', icon: '📡', sprite: 'scanner_4', name: (lv) => (isSmartScanner(lv) ? 'Scanner intelligente' : 'Scanner'),
     desc: (lv) => (isSmartScanner(lv)
       ? 'Lo scanner impara da solo la retta migliore dai punti che misura: la retta si sistema mentre arrivano i dati, poi si blocca da sola. Il raccolto intero non lo vede.'
       : 'Misure con meno rumore e meno valori anomali <em>(outlier)</em>: migliore qualità dei dati <em>(data quality)</em>.'),
@@ -374,7 +381,7 @@ const SHOP = [
   },
   {
     // Stored as "belt" in the save file (the old name); shown as "Scarico" (unloading).
-    key: 'belt', icon: '🦾', name: () => 'Scarico',
+    key: 'belt', icon: '🦾', sprite: 'man_carry', name: () => 'Scarico',
     desc: () => 'Chi scarica il camion: prima aiutanti, poi attrezzi e macchine. Più cassette (o più animali) a ogni viaggio: scarichi più in fretta. Non dà più dati, fa risparmiare tempo.',
     offer: normalOffer,
     effect: (lv) => (lv >= CONFIG.UNLOAD_ALL_LEVEL
@@ -382,7 +389,7 @@ const SHOP = [
       : `${UNLOADER_NAMES[lv]}: ${CONFIG.BELT_BOXES[lv]} ${CONFIG.BELT_BOXES[lv] === 1 ? 'cassetta' : 'cassette'} per viaggio`),
   },
   {
-    key: 'truck', icon: '🚚', name: () => 'Camion',
+    key: 'truck', icon: '🚚', sprite: 'veh_1', name: () => 'Camion',
     desc: () => 'Un mezzo più grande porta più cassette: più dati <em>(data)</em> per ogni agricoltore.',
     offer: normalOffer,
     effect: (lv) => `${VEHICLE_NAMES[lv]}: ${CONFIG.TRUCK_CRATES[lv]} cassette = ${CONFIG.TRUCK_CRATES[lv] * CONFIG.UNITS_PER_BOX} dati`,
@@ -439,7 +446,7 @@ function openShop(onClose, tab = 'weigh') {
         const next = !offer ? '' : secret ? ' → <b>Una sorpresa… 🎁</b>' : ` → <b>${it.effect(offer.level)}</b>`;
         const levelText = it.levelText ? it.levelText(lv) : `Livello ${lv}/${CONFIG.MAX_LEVEL}`;
         box.innerHTML =
-          `<div class="shop-top"><span class="shop-icon">${it.icon}</span><div><div class="shop-name">${it.name(lv)}</div>` +
+          `<div class="shop-top"><span class="shop-icon">${shopIcon(it)}</span><div><div class="shop-name">${it.name(lv)}</div>` +
           `<div>${levelText}${secret ? ' · <b>Livello ???</b>' : ''}</div></div></div>` +
           `<div class="pips">${pips}</div>` +
           `<div class="preview-row"><canvas class="preview" data-key="${it.key}" data-lv="${lv}" aria-hidden="true"></canvas>` +
