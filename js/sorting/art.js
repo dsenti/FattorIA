@@ -1,10 +1,11 @@
+import { pxArt, pxSymbolHTML } from '../pixel.js';
 // Minigame 2: all drawings as inline SVG strings in the course palette (no emoji).
 // Items, question icons and truck symbols are drawn in a 40 x 40 box.
 import { itemKey } from './questions.js';
 
 export const P = {
-  soil: '#5B3A29', olive: '#6B7F2A', wheat: '#E9D8A6', cream: '#FBF7EF', tomato: '#D9502B', sky: '#4A8FA3',
-  ink: '#3A2519', leaf: '#6B7F2A', worm: '#CC2F24', wormDark: '#7E1A14', gold: '#F4C95D', mud: '#6E4A30',
+  soil: '#3A4850', olive: '#5F9C6A', wheat: '#EFE2C4', cream: '#FBF7EF', tomato: '#E07A63', sky: '#5E909B',
+  ink: '#22313A', leaf: '#6B7F2A', worm: '#CC2F24', wormDark: '#7E1A14', gold: '#F5CA63', mud: '#6E4A30',
 };
 
 // Fill colours per item type and colour token (shades of the palette).
@@ -272,22 +273,25 @@ export const ICON = {
   noRed: `<path d="M11 11L29 29M29 11L11 29" fill="none" stroke="${P.tomato}" stroke-width="5" stroke-linecap="round"/>`,
   coin: `<circle cx="20" cy="20" r="16" fill="${P.gold}" stroke="#B8892B" stroke-width="2.5"/><circle cx="20" cy="20" r="10.5" fill="none" stroke="#B8892B" stroke-width="2"/><path d="M20 13V27" stroke="#B8892B" stroke-width="2.5" stroke-linecap="round"/>`,
   lock: `<rect x="9" y="18" width="22" height="17" rx="3" fill="${P.soil}"/><path d="M13 18V13A7 7 0 0 1 27 13V18" fill="none" stroke="${P.soil}" stroke-width="3.5"/><circle cx="20" cy="26" r="2.6" fill="${P.wheat}"/>`,
-  map: `<path d="M5 9L14 6L26 10L35 7V31L26 34L14 30L5 33Z" fill="${P.cream}" stroke="${P.cream}" stroke-width="2" stroke-linejoin="round"/><path d="M14 6V30M26 10V34" stroke="${P.olive}" stroke-width="2"/>`,
-  help: `<circle cx="20" cy="20" r="15" fill="none" stroke="${P.cream}" stroke-width="3"/><path d="M15 16A5 5 0 1 1 21.5 20.8C20.5 21.3 20 22 20 23.5V24.5" fill="none" stroke="${P.cream}" stroke-width="3" stroke-linecap="round"/><circle cx="20" cy="29.5" r="2" fill="${P.cream}"/>`,
-  shop: `<path d="M4 8H9L13 27H31L35 13H11" fill="none" stroke="${P.cream}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><circle cx="15" cy="32" r="2.6" fill="${P.cream}"/><circle cx="29" cy="32" r="2.6" fill="${P.cream}"/>`,
+  map: `<path d="M5 9L14 6L26 10L35 7V31L26 34L14 30L5 33Z" fill="${P.wheat}" stroke="${P.soil}" stroke-width="2.4" stroke-linejoin="round"/><path d="M14 6V30M26 10V34" stroke="${P.soil}" stroke-width="2"/><path d="M8 24L13 19L17 23L22 16L31 25" fill="none" stroke="${P.olive}" stroke-width="2.2"/>`,
+  help: `<circle cx="20" cy="20" r="15" fill="none" stroke="${P.soil}" stroke-width="3"/><path d="M15 16A5 5 0 1 1 21.5 20.8C20.5 21.3 20 22 20 23.5V24.5" fill="none" stroke="${P.soil}" stroke-width="3" stroke-linecap="round"/><circle cx="20" cy="29.5" r="2" fill="${P.soil}"/>`,
+  shop: `<path d="M4 8H9L13 27H31L35 13H11" fill="none" stroke="${P.soil}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><circle cx="15" cy="32" r="2.6" fill="${P.soil}"/><circle cx="29" cy="32" r="2.6" fill="${P.soil}"/>`,
   levels: `<g fill="${P.soil}"><rect x="5" y="5" width="12" height="12" rx="2"/><rect x="23" y="5" width="12" height="12" rx="2"/><rect x="5" y="23" width="12" height="12" rx="2"/><rect x="23" y="23" width="12" height="12" rx="2" opacity=".45"/></g>`,
   hint: `<path d="M20 4A11 11 0 0 1 27 23.5C25.5 25 25 26.5 25 28H15C15 26.5 14.5 25 13 23.5A11 11 0 0 1 20 4Z" fill="${P.gold}" ${S}/><rect x="15" y="29.5" width="10" height="3.5" rx="1" fill="${P.soil}"/><rect x="16.5" y="34" width="7" height="3" rx="1" fill="${P.soil}"/><path d="M17 18L20 22L23 18" fill="none" stroke="${P.soil}" stroke-width="1.5"/>`,
   lente: `<circle cx="17" cy="17" r="11" fill="#CFE6EC" stroke="${P.soil}" stroke-width="3.5"/><path d="M25 25L35 35" stroke="${P.soil}" stroke-width="5" stroke-linecap="round"/><path d="M11 14A7 7 0 0 1 16 9" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>`,
   fast: `<rect x="3" y="24" width="34" height="9" rx="4.5" fill="${P.soil}"/><g fill="${P.wheat}"><circle cx="8" cy="28.5" r="2"/><circle cx="16" cy="28.5" r="2"/><circle cx="24" cy="28.5" r="2"/><circle cx="32" cy="28.5" r="2"/></g>` +
     `<circle cx="25" cy="15" r="7" fill="${P.tomato}" ${S}/><path d="M4 11H14M7 16H15M4 21H13" stroke="${P.sky}" stroke-width="2.4" stroke-linecap="round"/>`,
   clear: `<rect x="7" y="7" width="26" height="26" rx="4" fill="none" stroke="${P.soil}" stroke-width="2.5" stroke-dasharray="4 3"/><path d="M14 14L26 26M26 14L14 26" stroke="${P.tomato}" stroke-width="3" stroke-linecap="round"/>`,
+  trophy: `<path d="M12 6H28V15C28 21 24.5 24 20 24C15.5 24 12 21 12 15Z" fill="${P.gold}" ${S}/><path d="M12 9H6V12C6 16 9 18 12.5 18M28 9H34V12C34 16 31 18 27.5 18" fill="none" stroke="${P.soil}" stroke-width="2.5"/><rect x="17.5" y="24" width="5" height="6" fill="${P.gold}" ${S}/><rect x="12" y="30" width="16" height="5" fill="${P.soil}"/>`,
+  cog: `<path d="M17 4H23L24 9L28 11L32.5 8L36 11.5L33 16L35 20L36 23L31 24L29 28L32 32.5L28.5 36L24 33L20 35L17 36L16 31L12 29L7.5 32L4 28.5L7 24L5 20L4 17L9 16L11 12L8 7.5L11.5 4L16 7Z" fill="${P.cream}" stroke="${P.soil}" stroke-width="2" stroke-linejoin="round"/><circle cx="20" cy="20" r="6" fill="${P.soil}"/>`,
+  sun: `<circle cx="20" cy="20" r="8" fill="${P.gold}" ${S}/><g stroke="${P.gold}" stroke-width="3" stroke-linecap="round"><path d="M20 3V8M20 32V37M3 20H8M32 20H37M8 8L11.5 11.5M28.5 28.5L32 32M8 32L11.5 28.5M28.5 11.5L32 8"/></g>`,
+  moon: `<path d="M26 5A15 15 0 1 0 35 27A12 12 0 0 1 26 5Z" fill="#F2E6B8" stroke="#3A4850" stroke-width="2" stroke-linejoin="round"/><circle cx="17" cy="22" r="2" fill="#D8C98F"/><circle cx="22" cy="30" r="1.5" fill="#D8C98F"/>`,
   place: `<rect x="3" y="3" width="34" height="11" rx="2" fill="${P.wheat}" stroke="${P.soil}" stroke-width="1.6"/><rect x="15" y="17" width="10" height="9" rx="1.5" fill="${P.cream}" stroke="${P.soil}" stroke-width="1.6"/>` +
     `<path d="M20 14V17M17 26L9 32M23 26L31 32" stroke="${P.soil}" stroke-width="2.2" stroke-linecap="round"/><circle cx="9" cy="34" r="4" fill="${P.tomato}"/><circle cx="31" cy="34" r="4" fill="#9DB23E"/><circle cx="20" cy="8.5" r="3.4" fill="${P.tomato}"/>`,
 };
 
 // Wraps 40 x 40 art into a standalone inline <svg>.
-export const svg40 = (inner, size = 40, cls = '') =>
-  `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 40 40" aria-hidden="true" focusable="false">${inner}</svg>`;
+export const svg40 = (inner, size = 40, cls = '') => pxArt(inner, size, size, cls);
 
 // <symbol> definitions for every item kind in a batch, so moving items can be cheap <use> elements.
 export const itemSymbolId = (it) => `it-${itemKey(it)}`;
@@ -298,7 +302,7 @@ export function ensureItemSymbols(defs, items) {
     const id = itemSymbolId(it);
     if (have.has(id)) continue;
     have.add(id);
-    add += `<symbol id="${id}" viewBox="0 0 40 40">${itemArt(it)}</symbol>`;
+    add += pxSymbolHTML(id, itemArt(it), 32);
   }
   if (add) defs.insertAdjacentHTML('beforeend', add);
 }

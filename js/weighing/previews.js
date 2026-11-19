@@ -1,3 +1,4 @@
+import { fitPixelCanvas } from '../pixel.js';
 // Small shop previews of the scanner, the vehicle and the unloading, at a given level.
 import { CONFIG } from '../config.js';
 import { drawScanner, drawScannerBeam, drawFitter } from './scanner.js';
@@ -9,14 +10,9 @@ import { scannerIndex, isSmartScanner } from './round.js';
 
 // Draw one preview. key: 'scanner' | 'truck' | 'belt'.
 export function drawPreview(canvas, key, level, now) {
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
   const r = canvas.getBoundingClientRect();
-  const w = r.width, h = r.height;
-  if (w < 2 || h < 2) return;
-  const pw = Math.round(w * dpr), ph = Math.round(h * dpr);
-  if (canvas.width !== pw || canvas.height !== ph) { canvas.width = pw; canvas.height = ph; }
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (r.width < 2 || r.height < 2) return;
+  const { ctx, W: w, H: h } = fitPixelCanvas(canvas);
   ctx.clearRect(0, 0, w, h);
   const ground = h * 0.9;
   ctx.fillStyle = '#DCC792';

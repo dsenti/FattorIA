@@ -29,7 +29,8 @@ git subtree push --prefix Game fattoria main
 ## Files
 ```
 index.html              all screens (map, weighing station, sorting station, lab, sheets, modals)
-css/style.css           layout and palette (course/STYLE.md colours)
+css/style.css           layout; the pixel theme (style E / map day+dusk) is the last section
+js/pixel.js             the pixel look: fitPixelCanvas() for canvases, pxArt() / pxSymbolHTML() to turn SVG art into pixel images
 js/config.js            ALL tunable numbers (see below)
 js/main.js              app shell: map, shop, leaderboard screen, settings, name picker, day summary
 js/storage.js           localStorage save/load (wrapped in try/catch)
@@ -61,7 +62,8 @@ js/lab/game.js          the minigame: field, player-built tree, node pop-up (dra
 js/lab/shop.js          the "Laboratorio" tab of the shop (più campioni, strumento più preciso, suggerimenti)
 sw.js                   service worker (offline cache, VERSION constant)
 manifest.webmanifest    "add to home screen" metadata
-assets/                 icons
+assets/                 icons; fonts/ (Pixelify Sans, OFL); map/ (valley pictures, day and dusk, per unlock state; places.json)
+tools/pixelart/         Python + Pillow generator for the map pictures (dev only, not shipped): .venv/bin/python Game/tools/pixelart/mapgen.py
 tests/run.mjs           node checks for the model and the name lists
 ```
 

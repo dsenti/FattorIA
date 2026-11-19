@@ -259,16 +259,30 @@ function renderMap() {
   const place = $('#place-sort');
   place.classList.toggle('locked', !open);
   place.classList.toggle('buyable', !open);
-  $('#place-sort-icon').innerHTML = svg40(open ? ICON.place : ICON.lock, 34);
   $('#place-sort-lock').innerHTML = open ? '' : `Sblocca · ${CONFIG.SORT.UNLOCK_COST} ${svg40(ICON.coin, 14, 'coin-ic')}`;
   place.setAttribute('aria-label', open ? 'Lo smistamento' : `Lo smistamento, si sblocca con ${CONFIG.SORT.UNLOCK_COST} monete`);
   const labOpen = state.lab.unlocked;
   const lab = $('#place-lab');
   lab.classList.toggle('locked', !labOpen);
   lab.classList.toggle('buyable', !labOpen);
-  $('#place-lab-icon').innerHTML = svg40(labOpen ? LAB_ICON.place : ICON.lock, 34);
   $('#place-lab-lock').innerHTML = labOpen ? '' : `Sblocca · ${CONFIG.LAB.UNLOCK_COST} ${svg40(ICON.coin, 14, 'coin-ic')}`;
   lab.setAttribute('aria-label', labOpen ? 'Il laboratorio' : `Il laboratorio, si sblocca con ${CONFIG.LAB.UNLOCK_COST} monete`);
+  // the valley picture: day or dusk, with the places that are open
+  const night = isNight();
+  $('#map-img').src = `assets/map/map-${night ? 'night' : 'day'}-s${open ? 1 : 0}l${labOpen ? 1 : 0}.png`;
+  $('#screen-map').classList.toggle('night', night);
+  $('#map-time').innerHTML = svg40(night ? ICON.sun : ICON.moon, 26);
+  $('#map-time').setAttribute('aria-label', night ? 'Passa al giorno' : 'Passa alla notte');
+}
+
+// Day from 7 to 19 by the phone's clock, unless the player chose with the sun / moon button.
+let mapTime = null;
+try { mapTime = localStorage.getItem('fattoria.mapTime'); } catch (e) { /* private mode */ }
+function isNight() {
+  if (mapTime === 'day') return false;
+  if (mapTime === 'night') return true;
+  const h = new Date().getHours();
+  return h < 7 || h >= 19;
 }
 
 async function onSortPlace() {
@@ -569,6 +583,18 @@ $('#screen-lab .l-levels-ic').innerHTML = svg40(ICON.levels, 20);
 document.querySelectorAll('.place.locked[data-lesson]').forEach((p) => p.addEventListener('click', () => {
   toast(`🔒 Questo posto si sblocca nella lezione ${p.dataset.lesson}.`);
 }));
+$('#map-time').addEventListener('click', () => {
+  mapTime = isNight() ? 'day' : 'night';
+  try { localStorage.setItem('fattoria.mapTime', mapTime); } catch (e) { /* private mode */ }
+  renderMap();
+});
+$('#ic-shop').innerHTML = svg40(ICON.shop, 22);
+$('#ic-board').innerHTML = svg40(ICON.trophy, 22);
+$('#btn-settings').innerHTML = svg40(ICON.cog, 24);
+$('#w-back').innerHTML = svg40(ICON.map, 26);
+$('#w-help').innerHTML = svg40(ICON.help, 26);
+$('#w-shop').innerHTML = svg40(ICON.shop, 26);
+for (const id of ['#screen-map', '#screen-weigh']) $(`${id} .coin-ic-slot`).innerHTML = svg40(ICON.coin, 18, 'coin-ic');
 $('#btn-shop').addEventListener('click', () => openShop(() => renderMap()));
 $('#btn-board').addEventListener('click', openBoard);
 $('#btn-settings').addEventListener('click', openSettings);

@@ -1,13 +1,14 @@
+import { fitPixelCanvas } from '../pixel.js';
 // Minigame 3: canvas drawing of the field (axes, regions, points, lines, handles) and the small
 // SVG pieces (class shapes, node thumbnails, icons). No emoji in the SVG art; the axes use emoji
 // icons like the pesatura.
 import { CLASS_COLOURS } from './levels.js';
 import { UNIT_SQUARE, clipBranch, lineInPoly, isNode } from './model.js';
 
-export const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+export const FONT = '"Pixelify Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 export const C = {
-  soil: '#5B3A29', olive: '#6B7F2A', wheat: '#E9D8A6', cream: '#FBF7EF', tomato: '#D9502B', sky: '#4A8FA3',
-  ink: '#3A2519', grid: 'rgba(91,58,41,0.08)', ok: '#3E7D32', gold: '#F4C95D',
+  soil: '#3A4850', olive: '#5F9C6A', wheat: '#EFE2C4', cream: '#FBF7EF', tomato: '#E07A63', sky: '#5E909B',
+  ink: '#22313A', grid: 'rgba(58,72,80,0.10)', ok: '#3E7D32', gold: '#F5CA63',
 };
 
 export const colourOf = (cls) => (cls == null ? '#B9AE9A' : CLASS_COLOURS[cls].fill);
@@ -27,14 +28,7 @@ export function muted(hex) {
 }
 
 export function fitCanvas(canvas) {
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  const r = canvas.getBoundingClientRect();
-  const w = Math.max(1, Math.round(r.width * dpr));
-  const h = Math.max(1, Math.round(r.height * dpr));
-  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { ctx, W: r.width, H: r.height };
+  return fitPixelCanvas(canvas);
 }
 
 // Field geometry in CSS pixels: the plot area, with room for the axes (as in the pesatura).

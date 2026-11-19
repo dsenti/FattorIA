@@ -1,3 +1,4 @@
+import { fitPixelCanvas } from '../pixel.js';
 // Minigame 1: La stazione di pesatura (the weighing station).
 // Owns the weighing screen: plot canvas, scene canvas (truck, farmer, belt, scanner),
 // the two sliders and the result panel.
@@ -19,14 +20,7 @@ const easeOut = (t) => 1 - (1 - t) ** 3;
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
 function fitCanvas(canvas) {
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  const r = canvas.getBoundingClientRect();
-  const w = Math.max(1, Math.round(r.width * dpr));
-  const h = Math.max(1, Math.round(r.height * dpr));
-  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { ctx, W: r.width, H: r.height };
+  return fitPixelCanvas(canvas);
 }
 
 export class WeighingGame {
