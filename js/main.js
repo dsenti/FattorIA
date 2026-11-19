@@ -12,6 +12,7 @@ import { SortingGame, helpHTML as sortHelpHTML } from './sorting/game.js';
 import { renderSortShop } from './sorting/shop.js';
 import { LEVELS as SORT_LEVELS } from './sorting/levels.js';
 import { ICON, svg40 } from './sorting/art.js';
+import { VERSION } from './version.js';
 import { LabGame, helpHTML as labHelpHTML } from './lab/game.js';
 import { renderLabShop } from './lab/shop.js';
 import { LAB_ICON } from './lab/draw.js';
@@ -269,7 +270,7 @@ function renderMap() {
   lab.setAttribute('aria-label', labOpen ? 'Il laboratorio' : `Il laboratorio, si sblocca con ${CONFIG.LAB.UNLOCK_COST} monete`);
   // the valley picture: day or dusk, with the places that are open
   const night = isNight();
-  $('#map-img').src = `assets/map/map-${night ? 'night' : 'day'}-s${open ? 1 : 0}l${labOpen ? 1 : 0}.png`;
+  $('#map-img').src = `assets/map/map-${night ? 'night' : 'day'}-s${open ? 1 : 0}l${labOpen ? 1 : 0}.png?v=${VERSION}`;
   $('#screen-map').classList.toggle('night', night);
   $('#map-time').innerHTML = svg40(night ? ICON.sun : ICON.moon, 26);
   $('#map-time').setAttribute('aria-label', night ? 'Passa al giorno' : 'Passa alla notte');
@@ -624,6 +625,14 @@ installDebugButton({ getState: () => state, save, renderCoins: (a) => { renderCo
 if (new URLSearchParams(location.search).has('debug')) window.fattoriaDebug = { game, sortGame, labGame, getState: () => state, save, renderMap };
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  // When a new version takes over (after a push), reload once so the whole new set of files runs.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
   });

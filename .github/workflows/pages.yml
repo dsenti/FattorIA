@@ -25,6 +25,16 @@ jobs:
         uses: actions/checkout@v4
       - name: Stamp the service worker with this commit
         run: sed -i "s/^const VERSION = 'dev';/const VERSION = '${GITHUB_SHA::7}';/" sw.js && grep -n "^const VERSION" sw.js
+      - name: Give every file a fresh address for this commit
+        # Browsers and the CDN can keep old copies of files for a while after a push. A page that
+        # mixes old and new modules can fail to start at all, so every module import, the
+        # stylesheet and the pictures get ?v=<commit>: one deploy always loads one consistent set.
+        run: |
+          V=${GITHUB_SHA::7}
+          find js -name '*.js' -exec sed -i -E "s#(from '\.{1,2}/[^']+\.js)'#\1?v=$V'#g" {} +
+          sed -i -E "s#(href=\"css/style\.css)\"#\1?v=$V\"#; s#(src=\"js/main\.js)\"#\1?v=$V\"#" index.html
+          sed -i "s/^export const VERSION = 'dev';/export const VERSION = '$V';/" js/version.js
+          grep -n "main.js\|style.css" index.html && grep -rn "?v=" js/main.js | head -3
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload site
