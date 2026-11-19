@@ -273,6 +273,9 @@ function renderMap() {
   $('#screen-map').classList.toggle('night', night);
   $('#map-time').innerHTML = svg40(night ? ICON.sun : ICON.moon, 26);
   $('#map-time').setAttribute('aria-label', night ? 'Passa al giorno' : 'Passa alla notte');
+  // when the picture is taller than the screen, start with the places in view (the peaks scroll up)
+  const sc = $('#map-scroll');
+  if (!sc.dataset.placed && sc.clientHeight) { sc.scrollTop = sc.scrollHeight; sc.dataset.placed = '1'; }
 }
 
 // Day from 7 to 19 by the phone's clock, unless the player chose with the sun / moon button.
