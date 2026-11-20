@@ -536,6 +536,7 @@ function openSettings() {
       '<button class="btn danger" id="set-reset">Ricomincia</button></div>';
     body.querySelectorAll('.choice[data-mode]').forEach((b) => b.addEventListener('click', () => {
       state.lineMode = b.dataset.mode;
+      state.lineModeSet = true;
       save();
       body.querySelectorAll('.choice[data-mode]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
       game.applyLineMode();
@@ -550,7 +551,7 @@ function openSettings() {
         { label: 'No, annulla', value: false },
       ]);
       if (!ok) return;
-      const keep = { playerId: state.playerId, name: state.name, lineMode: state.lineMode };
+      const keep = { playerId: state.playerId, name: state.name, lineMode: state.lineMode, lineModeSet: state.lineModeSet };
       clearState();
       state = { ...defaultState(), ...keep };
       save();

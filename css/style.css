@@ -687,7 +687,7 @@ img.ic-px { height: 1.2em; width: auto; vertical-align: -0.2em; image-rendering:
 .shop-icon img.shop-px { display: block; height: 36px; width: auto; max-width: 64px; object-fit: contain; image-rendering: pixelated; }
 
 /* backgrounds for the other minigames: inside the barn (sorting), the lab's tiled wall */
-#screen-sort .s-scroll { background: url('../assets/ui/barnwall.png') repeat; background-size: 54px 54px; image-rendering: pixelated; }
+#screen-sort .s-scroll { background: url('../assets/ui/machine.png') repeat; background-size: 72px 72px; image-rendering: pixelated; }
 #screen-lab .l-scroll { background: url('../assets/ui/labwall.png') repeat; background-size: 36px 36px; image-rendering: pixelated; }
 #screen-sort .s-caption { color: #F3EADB; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45); }
 
@@ -695,3 +695,10 @@ img.ic-px { height: 1.2em; width: auto; vertical-align: -0.2em; image-rendering:
 .coins, .result-coins, .l-coins, .s-pay, .s-lv-no, .stat b { font-variant-numeric: tabular-nums; }
 .place-name { font-weight: 800; }
 .s-gate .qmark, .l-node .qmark { font-family: 'Nunito', system-ui, sans-serif; font-weight: 900; }
+
+/* weighing: no instruction bubble at the top (the axes name the quantities); the plot gets the room */
+#screen-weigh .bubble { display: none; }
+#screen-weigh .plot-wrap { flex: 1 1 55%; margin-top: 10px; }
+/* the road always at the bottom of the screen: the machine fills the space above */
+#screen-sort .s-scroll { display: flex; flex-direction: column; }
+#screen-sort .s-svg { margin-top: auto; flex: none; }

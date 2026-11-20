@@ -529,7 +529,7 @@ export class WeighingGame {
     }
 
     // measured dots (smaller when there are many)
-    const dotR = r.sample.length > 150 ? 3.5 : r.sample.length > 60 ? 4.2 : 5;
+    const dotR = r.sample.length > 150 ? 4.5 : r.sample.length > 60 ? 5.5 : 6.5;
     for (const d of r.sample) {
       const t = clamp((now - d.born) / 260, 0, 1);
       const s = t < 1 ? 1 + 0.6 * Math.sin(t * Math.PI) : 1;
@@ -699,7 +699,7 @@ export class WeighingGame {
     }
     if (!this.truckGone) {
       const tappable = this.truckTappable(now) && r.sample.length === 0;
-      const nudge = tappable ? Math.max(0, Math.sin(now / 160)) * 2 : 0;
+      const nudge = tappable && Math.sin(now / 220) > 0.4 ? 1 : 0;   // one art pixel, no more
       const bed = drawVehicleS(ctx, { level: r.truckLevel, xRear: g.truckRear * W, ground, now, off: tOff, hop: hopOf('truck') + nudge });
       // While the farmer walks to the truck, the boxes being fetched are still on the pile.
       let shown = r.cratesLeft;

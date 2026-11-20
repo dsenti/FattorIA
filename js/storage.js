@@ -36,7 +36,8 @@ export function defaultState() {
     fits: [],              // last rounds: { f: farmer id, c: coins, r: error ratio }
     seenHelp: false,       // "how to play" shown once
     seenFlip: false,       // "axis reversed" warning shown once
-    lineMode: 'sliders',   // how the line is moved: 'sliders' or 'drag' (a setting; kept on restart)
+    lineMode: 'drag',      // how the line is moved: 'drag' (default) or 'sliders' (a setting; kept on restart)
+    lineModeSet: false,    // true once the player chose in Impostazioni (older saves switch to 'drag' until then)
     sort: defaultSort(),   // minigame 2 (Lo smistamento)
     lab: defaultLab(),     // minigame 3 (Il laboratorio)
   };
@@ -187,7 +188,8 @@ export function sanitize(raw) {
     fits: Array.isArray(raw.fits) ? raw.fits.slice(-MAX_HISTORY) : [],
     seenHelp: raw.seenHelp === true,
     seenFlip: raw.seenFlip === true,
-    lineMode: raw.lineMode === 'drag' ? 'drag' : 'sliders',
+    lineMode: raw.lineModeSet === true && raw.lineMode === 'sliders' ? 'sliders' : 'drag',
+    lineModeSet: raw.lineModeSet === true,
     sort,
     lab: sanitizeLab(raw.lab),
   };

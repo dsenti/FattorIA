@@ -93,10 +93,13 @@ export function truckPix(symURL, slotW) {
   if (!m) return null;
   const P = 1.5;
   const [, , w, h] = m.r;
-  const url = composeURL(`tr:${name}`, w, h, (ctx) => blit(ctx, name, 0, 0));
-  const [bx0, by0, bw] = m.box;
+  // facing right (they drive in from the left and leave to the right)
+  const url = composeURL(`tr:${name}:r`, w, h, (ctx) => blit(ctx, name, 0, 0, true));
+  const [bx, by0, bw] = m.box;
+  const bx0 = w - bx - bw;
   const left = -(w * P) / 2, top = -by0 * P;
-  const [px0, py0, pw, ph] = m.panel;
+  const [ppx, py0, pw, ph] = m.panel;
+  const px0 = w - ppx - pw;
   const sz = Math.min(pw, ph) * P + 2;
   const sx = left + (px0 + pw / 2) * P - sz / 2, sy = top + (py0 + ph / 2) * P - sz / 2;
   const svg = `<image href="${url}" x="${left}" y="${top}" width="${w * P}" height="${h * P}" preserveAspectRatio="none" style="image-rendering:pixelated"/>` +

@@ -295,7 +295,7 @@ export class SortingGame {
     const pileRows = Math.max(1, ...Object.values(counts).map((n) => Math.ceil(n / perPile)));
     g.pileH = pileRows * (PILE - 1) + 10;
     g.bedTop = g.pipeEnd + g.pileH;
-    g.H = g.bedTop + 48;
+    g.H = g.bedTop + 58;
     g.truckAt = truckAt; g.slotW = slotW; g.perPile = perPile; g.bedX = ta.bedX; g.bedW = ta.bedW;
     // pipe end points: leaves sharing a truck get side-by-side inlets
     const byTruck = {};
@@ -363,6 +363,12 @@ export class SortingGame {
         `<g class="f-no"><circle cx="${-GS - 5}" cy="${-GS + 2}" r="11" fill="${P.cream}" stroke="${P.tomato}" stroke-width="2"/><use href="#ic-no" x="${-GS - 13}" y="${-GS - 6}" width="16" height="16"/></g>` +
         '</g>';
     }
+    // the road under the machine, where the trucks wait to be filled
+    const roadY = g.bedTop + 14;
+    s += `<defs><pattern id="s-road" patternUnits="userSpaceOnUse" width="48" height="48"><image href="assets/ui/road.png" width="48" height="48" style="image-rendering:pixelated"/></pattern></defs>` +
+      `<rect x="0" y="${roadY}" width="${W}" height="${g.H - roadY}" fill="url(#s-road)"/>` +
+      `<rect x="0" y="${roadY}" width="${W}" height="3" fill="#2c3639"/><rect x="0" y="${roadY + 3}" width="${W}" height="1.5" fill="#7d8b92"/>` +
+      `<path d="M0 ${g.H - 6}H${W}" stroke="#e8dfc8" stroke-width="3" stroke-dasharray="15 12"/>`;
     // trucks
     for (const id of lv.trucks) {
       const x = truckAt[id];

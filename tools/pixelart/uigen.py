@@ -558,4 +558,35 @@ if __name__ == '__main__':
     at.save(os.path.join(OUT, 'sprites.png'), optimize=True)
     json.dump(meta, open(os.path.join(OUT, 'sprites.json'), 'w'), separators=(',', ':'))
     walls()
+    machine_tiles()
     print('ui sprites', at.size, len(meta))
+
+
+def machine_tiles():
+    """the sorting machine's steel panels and the road (tiles)"""
+    c = Cv(48, 48)
+    ST = R('#3f4b52', '#4a575e', '#55626a', '#5f6d74', '#6a7880')
+    for y in range(48):
+        for x in range(48):
+            t = 0.45 + (vnoise(x / 9.0, y / 9.0, 11) - 0.5) * 0.25 - (y % 24) / 24 * 0.15
+            col = pick(ST, t, x, y, True)
+            if y % 24 == 0:
+                col = ST[0]
+            elif y % 24 == 1:
+                col = ST[4]
+            if x % 48 == 0:
+                col = ST[0]
+            elif x % 48 == 1:
+                col = ST[3]
+            c.set(x, y, col)
+    for (x, y) in ((4, 4), (44, 4), (4, 20), (44, 20), (4, 28), (44, 28), (4, 44), (44, 44)):
+        c.set(x, y, ST[4]); c.set(x + 1, y + 1, ST[0])
+    for y in range(8, 16, 2):                      # a vent
+        hline(c, 18, 30, y, ST[0]); hline(c, 18, 30, y + 1, ST[3])
+    c.im.save(os.path.join(OUT, 'machine.png'))
+    c = Cv(32, 32)
+    AS = R('#3a3f42', '#454b4e', '#50575a', '#5c6366')
+    for y in range(32):
+        for x in range(32):
+            c.set(x, y, pick(AS, 0.45 + (hsh(x, y, 2) - 0.5) * 0.7, x, y, True))
+    c.im.save(os.path.join(OUT, 'road.png'))

@@ -45,6 +45,8 @@ const FILES = [
   'assets/ui/sprites.json',
   'assets/ui/barnwall.png',
   'assets/ui/labwall.png',
+  'assets/ui/machine.png',
+  'assets/ui/road.png',
   'js/uiart.js',
   'js/sorting/questions.js',
   'js/sorting/levels.js',
