@@ -459,7 +459,7 @@ function herder(ctx, o, k) {
 // ------------------------------------------------------------------ labels (sharp text)
 export function drawLabels(ctx) {
   if (!labels.length) return;
-  ctx.font = '800 12px "Nunito", system-ui, -apple-system, sans-serif';
+  ctx.font = '800 12px "Chakra Petch", system-ui, -apple-system, sans-serif';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
   for (const l of labels) {

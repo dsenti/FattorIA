@@ -211,11 +211,25 @@ class Map:
                     c.blend(x, y, T['MIST'], 0.28 if T['night'] else 0.4)
 
     # ---------------- ground ----------------
+    RIVER = [(204, 244), (210, 288), (198, 334), (182, 380), (178, 430), (168, 478), (157, 528), (164, 584), (156, 640), (146, 712)]
+
     def river_x(s, y):
-        return 206 - (y - 232) * 0.075 + 34 * math.sin((y - 232) / 72.0)
+        P = s.RIVER
+        if y <= P[0][1]:
+            return P[0][0]
+        for i in range(len(P) - 1):
+            if P[i][1] <= y <= P[i + 1][1]:
+                t = (y - P[i][1]) / (P[i + 1][1] - P[i][1])
+                p0 = P[max(0, i - 1)][0]; p1 = P[i][0]; p2 = P[i + 1][0]; p3 = P[min(len(P) - 1, i + 2)][0]
+                return 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t ** 3)
+        return P[-1][0]
 
     def river_w(s, y):
-        return 9 + (y - 232) * 0.05
+        return 3 + max(0, y - 244) * 0.056
+
+    def depth(s, y):
+        """perspective: 0.5 at the forest edge, 1 at the front"""
+        return 0.5 + 0.5 * max(0.0, min(1.0, (y - 250) / 450.0))
 
     def ground(s):
         c = s.c
@@ -236,24 +250,53 @@ class Map:
 
     def river(s):
         c = s.c
-        for y in range(int(232 * s.S), s.Hh):
+        night = T['night']
+        sand = R('#3a4846', '#46544f') if night else R('#b8a77e', '#cdbd92')
+        reed = R('#1f4a3c', '#2f6a52') if night else R('#4f8a3a', '#6aa84a')
+        for y in range(int(244 * s.S), s.Hh):
             yy = y / s.S
             cx, w = s.river_x(yy), s.river_w(yy)
-            for x in range(int((cx - w / 2 - 2) * s.S), int((cx + w / 2 + 2) * s.S) + 1):
+            half = w / 2
+            for x in range(int((cx - half - 3) * s.S), int((cx + half + 3) * s.S) + 1):
                 xx = x / s.S
-                d = abs(xx - cx) / (w / 2)
-                if d <= 1:
-                    if d > 1 - 1.4 / (w * s.S / 2):
+                d = abs(xx - cx)
+                if d <= half:
+                    edge = d > half - 1.0 / s.S
+                    if edge:
                         c.set(x, y, T['BANK'])
                         continue
-                    col = pick(T['WATER'], 0.75 - d * 0.5 + (vnoise(xx / 6, yy / 2.5, 7) - 0.5) * 0.5, x, y)
-                    if hsh(x // 2, y, 9) < 0.06:
+                    f = d / half
+                    col = pick(T['WATER'], 0.8 - f * 0.55 + (vnoise(xx / 5, (yy - x * 0.3) / 2.2, 7) - 0.5) * 0.5, x, y)
+                    if hsh(x // 2, y, 9) < 0.05 + 0.04 * (1 - f):
                         col = T['WHL']
-                    if abs(xx - 312) < 22 and hsh(x, y // 2, 12) < 0.18:
+                    if abs(xx - 312) < 22 and hsh(x, y // 2, 12) < 0.16:
                         col = T['WHL']
                     c.set(x, y, col)
+                elif d <= half + 1.6 and yy > 270:
+                    if hsh(x, y, 31) < 0.7:
+                        c.set(x, y, pick(sand, hsh(x, y, 33), x, y, False))
+        # stones and reeds along the banks
+        rnd = random.Random(17)
+        for k in range(110):
+            yy = rnd.uniform(285, 700)
+            side = rnd.choice((-1, 1))
+            cx, w = s.river_x(yy), s.river_w(yy)
+            xx = cx + side * (w / 2 + rnd.uniform(0.5, 2.5))
+            ds = s.depth(yy)
+            if rnd.random() < 0.35:
+                r = max(0.8, rnd.uniform(0.9, 1.8) * ds)
+                c.blob(xx * s.S, yy * s.S, r * s.S + 0.4, r * 0.7 * s.S + 0.4, T['METAL'][1:4] if not night else R('#3a3654', '#4a4565', '#5c587a'), None, dither=False)
+            else:
+                hgt = rnd.uniform(3, 6) * ds
+                for j in range(rnd.randint(2, 4)):
+                    bx = xx + j * 0.9 * side
+                    for t in range(int(hgt * s.S)):
+                        c.set(int(bx * s.S + (t // 3) * 0 + (1 if (t > hgt * s.S * 0.6 and j % 2) else 0)), int(yy * s.S) - t, reed[t % 2])
+                    if not night and rnd.random() < 0.4:
+                        c.set(int(bx * s.S), int((yy - hgt) * s.S) - 1, H('#8b6849'))
 
-    def iso_rows(s, x, y, w, d, colors, rowsx=True, step=3.0):
+    def iso_rows(s, x, y, w, d, colors, rowsx=True, step=3.0, scale=1.0):
+        w, d, step = w * scale, d * scale, step * scale
         p0 = (x, y)
         pr = (x + w * EX[0], y + w * EX[1])
         pb = (pr[0] + d * EY[0], pr[1] + d * EY[1])
@@ -485,37 +528,81 @@ class Map:
 
     def tree(s, x, y, size, kind='oak'):
         S = s.S
-        s.shadow([(x - size * 0.2, y), (x + size * 0.9, y + size * 0.1), (x + size * 1.0, y + size * 0.35), (x, y + size * 0.3)], 0.35)
-        if kind in ('oak', 'olive', 'apple'):
-            ramp = T['OLIVE'] if kind == 'olive' else T['OAK']
-            th = size * 0.45
-            s.c.rect(int((x - 0.6) * S), int((y - th) * S), max(1, int(1.4 * S + 0.5)), int(th * S) + 1, T['TRUNK'][1])
-            r = size * 0.55
-            cy = y - th - r * 0.8
-            s.c.blob(x * S, cy * S, r * S + 0.5, r * 0.85 * S + 0.5, ramp, T['OL'], dither=True)
-            if r * S > 4:
-                s.c.blob((x - r * 0.25) * S, (cy - r * 0.25) * S, r * 0.45 * S, r * 0.38 * S, ramp[2:], None, dither=True)
-            if kind == 'apple':
-                rnd = random.Random(int(x * 3 + y))
-                for k in range(5):
-                    s.c.set(int((x + rnd.uniform(-0.6, 0.6) * r) * S), int((cy + rnd.uniform(-0.5, 0.6) * r * 0.85) * S), H('#e05a4a') if not T['night'] else H('#c24a5a'))
-        else:
-            th = size * 0.2
-            s.c.rect(int((x - 0.5) * S), int((y - th) * S), max(1, int(1.2 * S + 0.5)), int(th * S) + 1, T['TRUNK'][0])
-            hgt, top, hw, tiers = size * 1.6, y - th - size * 1.6, size * 0.42, 3
+        c = s.c
+        rnd = random.Random(int(x * 31 + y * 17))
+        s.shadow([(x - size * 0.15, y), (x + size * 0.8, y + size * 0.08), (x + size * 0.9, y + size * 0.3), (x, y + size * 0.26)], 0.33)
+        if kind in ('pine', 'cypress'):
+            if kind == 'cypress':
+                th = size * 0.12
+                hgt, hw = size * 1.9, size * 0.2
+            else:
+                th = size * 0.18
+                hgt, hw = size * 1.55, size * 0.46
+            top = y - th - hgt
+            c.rect(int((x - 0.5) * S), int((y - th - 1) * S), max(1, int(1.2 * S + 0.5)), int((th + 1) * S) + 1, T['TRUNK'][0])
+            tiers = 1 if kind == 'cypress' else 4
 
             def ins(px_, py_):
                 X, Y = px_ / S, py_ / S
                 if Y < top or Y > y - th:
                     return False
                 f = (Y - top) / hgt
+                if kind == 'cypress':
+                    wdt = hw * math.sin(min(1.0, f * 1.15) * math.pi * 0.92) ** 0.8 + 0.3
+                    return abs(X - x) <= wdt
                 ft = (f * tiers) % 1.0
                 k = min(tiers - 1, int(f * tiers))
-                return abs(X - x) <= hw * (0.45 + 0.55 * (k + ft) / tiers) * (0.55 + 0.45 * ft)
+                jag = (hsh(int(px_), int(py_ / 2), 5) - 0.5) * 0.12
+                wdt = hw * (0.35 + 0.65 * (k + ft) / tiers) * (0.5 + 0.5 * ft + jag)
+                return abs(X - x) <= wdt
 
             def sh(px_, py_):
-                return pick(T['PINE'], 0.75 - ((px_ / S - x) / hw + 1) * 0.35 - ((py_ / S - top) / hgt) * 0.15, px_, py_)
-            s.c.shape(ins, ((x - hw) * S, top * S, (x + hw) * S, (y - th) * S), sh, T['OL'])
+                X, Y = px_ / S, py_ / S
+                f = (Y - top) / hgt
+                ft = (f * tiers) % 1.0 if kind == 'pine' else 0.5
+                t = 0.78 - ((X - x) / max(hw, 1) + 1) * 0.32 - ft * 0.18 + (hsh(int(px_), int(py_), 2) - 0.5) * 0.18
+                return pick(T['PINE'], t, px_, py_)
+            c.shape(ins, ((x - hw - 1) * S, top * S, (x + hw + 1) * S, (y - th) * S), sh, T['OL'])
+            return
+        # broadleaf and olive: a trunk with forks and an irregular crown of clumps
+        olive = kind == 'olive'
+        ramp = T['OLIVE'] if olive else T['OAK']
+        th = size * (0.35 if olive else 0.42)
+        tw = max(1, int(round((1.6 if olive else 1.3) * S)))
+        trunk = T['TRUNK']
+        c.rect(int((x - 0.6) * S), int((y - th) * S), tw, int(th * S) + 1, trunk[1])
+        if olive and S * size > 8:
+            c.set(int((x + 0.8) * S), int((y - th * 0.5) * S), trunk[0])
+        r = size * (0.42 if olive else 0.5)
+        cy = y - th - r * 0.7
+        n = 4 if olive else 6
+        blobs = [(0, 0, r * 0.75)]
+        for k in range(n):
+            a = k / n * math.tau + rnd.uniform(-0.4, 0.4)
+            d = r * rnd.uniform(0.45, 0.7)
+            blobs.append((math.cos(a) * d * 1.15, math.sin(a) * d * 0.75 - r * 0.05, r * rnd.uniform(0.38, 0.55)))
+        for (bx, by, br) in blobs[1:3]:
+            c.line(x * S, (y - th) * S, (x + bx * 0.6) * S, (cy + by * 0.6 + br * 0.4) * S, trunk[0])
+
+        def ins(px_, py_):
+            X, Y = px_ / S - x, py_ / S - cy
+            return any((X - bx) ** 2 + (Y - by) ** 2 <= br * br for (bx, by, br) in blobs)
+
+        def sh(px_, py_):
+            X, Y = px_ / S - x, py_ / S - cy
+            best, t = None, 0.5
+            for (bx, by, br) in blobs:
+                dd = math.hypot(X - bx, Y - by) / br
+                if dd <= 1 and (best is None or dd < best):
+                    best = dd
+                    nx, ny = (X - bx) / br, (Y - by) / br
+                    t = 0.55 + (-nx * 0.5 - ny * 0.7) * 0.45 + (1 - dd) * 0.15
+            t += (hsh(int(px_ / 2), int(py_ / 2), 8) - 0.5) * 0.3
+            return pick(ramp, t, px_, py_)
+        c.shape(ins, ((x - r * 1.6) * S, (cy - r * 1.3) * S, (x + r * 1.6) * S, (cy + r * 1.3) * S), sh, T['OL'])
+        if kind == 'apple':
+            for k in range(5):
+                c.set(int((x + rnd.uniform(-0.6, 0.6) * r) * S), int((cy + rnd.uniform(-0.4, 0.5) * r) * S), H('#e05a4a') if not T['night'] else H('#c24a5a'))
 
     def bush(s, x, y, r, col=None):
         S = s.S
@@ -539,6 +626,13 @@ class Map:
         s.face([P0, Rr, up(Rr), up(P0)], side, y - t, y, 0.4)
         s.face([P0, Lc, up(Lc), up(P0)], side, y - t, y, 0.7)
         s.face([up(P0), up(Rr), up(Bk), up(Lc)], top, y - t - w / 2 - d / 2, y - t, 0.9)
+
+    def bench(s, x, y):
+        wd = T['WALLS']['wood']
+        s.slab(x, y, 9, 3, 1.2, wd[1], wd[0])
+        S = s.S
+        for (lx, ly) in ((x + 1, y), (x + 8, y - 3.5)):
+            s.c.rect(int(lx * S), int((ly - 0.5) * S), 1, max(1, int(2 * S)), wd[0][0])
 
     def hay(s, x, y):
         s.slab(x, y, 5, 4, 4, R('#c99a3a', '#e0b44e', '#f2cc6a'), R('#a8781e', '#c4922c'))
@@ -658,24 +752,78 @@ class Map:
                             c.blend(x, y, col, a * (0.5 + f * 0.5))
 
     # ---------------- compose ----------------
+    def field_poly(s, x, y, w, d, scale=1.0):
+        w, d = w * scale, d * scale
+        return [(x, y), (x + w, y - w / 2), (x + w - d, y - w / 2 - d / 2), (x - d, y - d / 2)]
+
+    def free(s, x, y, pad=0.0):
+        """no trees in fields, on paths, in the river or on buildings"""
+        for poly in s.blocked:
+            if pip(x, y, poly):
+                return False
+        if abs(x - s.river_x(y)) < s.river_w(y) / 2 + 5 + pad:
+            return False
+        for (px_, py_, w) in s.road_pts:
+            if (x - px_) ** 2 + (y - py_) ** 2 < (w / 2 + 3 + pad) ** 2:
+                return False
+        return True
+
+    def road(s, pts, width):
+        s.path(pts, width)
+        for i in range(len(pts) - 1):
+            (x0, y0), (x1, y1) = pts[i], pts[i + 1]
+            n = int(math.hypot(x1 - x0, y1 - y0) / 2) + 1
+            for k in range(n + 1):
+                t = k / n
+                s.road_pts.append((x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, width))
+
     def render(s):
         S, D = s.S, s.D
         so, lo = s.sort_open, s.lab_open
+        night = T['night']
+        WHEAT = R('#3e3a30', '#4e4a38', '#5e5840') if night else R('#c09c44', '#d6b456', '#e6c86c')
+        s.blocked = []
+        s.road_pts = []
         s.sky()
         s.range_([(40, 92, 110), (150, 58, 125), (268, 82, 118), (372, 66, 108)], 228, T['MFAR'], 1, 0.3)
         s.range_([(-25, 150, 95), (105, 146, 92), (228, 156, 84), (345, 140, 94)], 236, T['MNEAR'], 2, 0.12)
         s.ground()
+        s.river()                       # drawn before the forest, so it comes out of the trees
         s.forest(238, 5)
-        s.forest(250, 6)
-        s.mist(236, 276)
-        s.iso_rows(24, 690, 80, 48, [T['SOIL'][1], T['CROP'][1], T['CROP'][2]], True, 3.2)
-        s.iso_rows(320, 556, 66, 38, [T['GRASS'][1], T['VINE'][1], T['VINE'][0]], True, 3.0)
-        s.iso_rows(296, 300, 64, 30, [T['SOIL'][1], T['CROP'][0], T['CROP'][1]], False, 3.0)
-        s.river()
-        s.path([(148, 330), (126, 392), (108, 488)], 8)
-        s.path([(70, 420), (100, 446), (126, 430)], 6)
-        s.path([(108, 488), (180, 500), (236, 478), (262, 436)], 8)
-        s.path([(236, 478), (250, 548), (252, 628)], 7)
+        s.forest(247, 6)
+        s.forest(254, 9)
+        s.mist(236, 280)
+        # fields: smaller towards the back (perspective); kinds: crop rows, wheat, ploughed soil, vegetables, vines
+        KINDS = {
+            'crop': ([T['SOIL'][1], T['CROP'][1], T['CROP'][2]], True, 3.0),
+            'wheat': ([WHEAT[0], WHEAT[1], WHEAT[2]], True, 2.4),
+            'soil': ([T['SOIL'][0], T['SOIL'][1], T['SOIL'][2]], False, 2.6),
+            'veg': ([T['SOIL'][1], T['CROP'][2], T['CROP'][0]], False, 3.4),
+            'vine': ([T['GRASS'][1], T['VINE'][1], T['VINE'][0]], True, 3.0),
+        }
+        FIELDS = [
+            (226, 274, 52, 20, 'wheat'), (282, 282, 60, 22, 'crop'), (338, 278, 50, 20, 'soil'), (372, 292, 40, 18, 'wheat'),
+            (16, 278, 56, 20, 'crop'), (66, 288, 44, 18, 'wheat'), (234, 322, 40, 20, 'soil'), (300, 332, 56, 24, 'vine'),
+            (352, 356, 38, 20, 'wheat'), (14, 366, 40, 22, 'veg'), (98, 374, 30, 16, 'wheat'), (226, 376, 30, 18, 'crop'),
+            (238, 418, 34, 20, 'veg'), (336, 472, 44, 24, 'crop'), (320, 500, 60, 32, 'vine'), (10, 528, 36, 22, 'soil'),
+            (196, 592, 36, 20, 'veg'), (300, 566, 44, 26, 'wheat'), (350, 600, 34, 22, 'crop'), (8, 616, 44, 28, 'crop'),
+            (96, 670, 32, 18, 'wheat'), (24, 700, 76, 44, 'crop'), (186, 702, 52, 30, 'wheat'), (312, 706, 64, 36, 'soil'),
+        ]
+        for (x, y, w, d, k) in FIELDS:
+            cols, rows, step = KINDS[k]
+            sc = s.depth(y)
+            s.iso_rows(x, y, w, d, cols, rows, step, sc)
+            p = s.field_poly(x, y, w, d, sc)
+            s.blocked.append([(px_ + (px_ - p[0][0]) * 0.05, py_) for (px_, py_) in p])
+        # roads: farm tracks and the village streets
+        s.road([(148, 336), (126, 398), (108, 488)], 8)
+        s.road([(70, 420), (100, 446), (126, 430)], 6)
+        s.road([(108, 488), (180, 500), (236, 478), (262, 436)], 8)
+        s.road([(236, 478), (250, 548), (252, 628)], 7)
+        s.road([(148, 336), (156, 316), (170, 300), (186, 292)], 5)
+        s.road([(104, 324), (130, 318), (156, 316), (190, 326)], 4.5)
+        s.road([(130, 318), (126, 296), (138, 284)], 4)
+        s.road([(108, 488), (98, 520), (100, 536)], 5)
         by = 497
         bx, bw = s.river_x(by), s.river_w(by)
         s.slab(bx - bw / 2 - 5, by + 4, bw + 10, 10, 2, T['ROOFS']['wood'][1], T['ROOFS']['wood'][0])
@@ -685,71 +833,101 @@ class Map:
             s.c.line(px_ * S, (by + 4 - k * 1.5 - 2) * S, px_ * S, (by + 4 - k * 1.5 - 6) * S, T['WALLS']['wood'][0][0])
         s.c.line((bx - bw / 2 - 5) * S, (by - 2) * S, (bx + bw / 2 + 5) * S, (by - 2 - (bw + 10) / 2) * S, T['ROOFS']['wood'][1][2])
         s.items = []
-        V = [(112, 312, 23, 17, 16, 10, 'cream', 'red', True), (140, 300, 19, 16, 15, 9, 'peach', 'red', False),
-             (176, 318, 25, 16, 17, 10, 'lilac', 'slate', True), (92, 334, 19, 15, 14, 9, 'peach', 'red', False),
-             (128, 282, 17, 13, 13, 8, 'cream', 'slate', False), (146, 344, 17, 13, 13, 8, 'cream', 'red', True), (196, 296, 15, 12, 12, 8, 'peach', 'red', False)]
+        # the village, a little smaller (it is further away), with streets between the houses
+        k = 0.84
+        V = [(112, 312, 23, 17, 16, 10, 'cream', 'red', True), (142, 302, 19, 16, 15, 9, 'peach', 'red', False),
+             (178, 318, 25, 16, 17, 10, 'lilac', 'slate', True), (94, 336, 19, 15, 14, 9, 'peach', 'red', False),
+             (124, 284, 17, 13, 13, 8, 'cream', 'slate', False), (150, 346, 17, 13, 13, 8, 'cream', 'red', True), (198, 300, 15, 12, 12, 8, 'peach', 'red', False)]
         for (x, y, w, d, h, hr, wl, rf, ch) in V:
-            s.add(y, (lambda x=x, y=y, w=w, d=d, h=h, hr=hr, wl=wl, rf=rf, ch=ch: s.house(x, y, w, d, h, hr, wl, rf, chimney=ch, flowers=True)))
-        s.add(292, lambda: s.house(160, 292, 12, 12, 38, 15, 'stone', 'red', nwin=1, door=False, kind='pyramid'))
+            s.blocked.append(s.field_poly(x + 2, y + 4, w * k + 4, d * k + 6))
+            s.add(y, (lambda x=x, y=y, w=w, d=d, h=h, hr=hr, wl=wl, rf=rf, ch=ch: s.house(x, y, w * k, d * k, h * k, hr * k, wl, rf, chimney=ch, flowers=True)))
+        s.add(292, lambda: s.house(162, 292, 10, 10, 32, 13, 'stone', 'red', nwin=1, door=False, kind='pyramid'))
+        s.blocked.append(s.field_poly(164, 296, 16, 16))
 
-        # La stalla (lesson 4): a small wooden stable with a paddock, closed for now
+        # La stalla (lesson 4)
         s.add(410, lambda: s.house(54, 410, 30, 20, 15, 11, 'wood', 'red', lit=False, nwin=2, door_face='gable', trim=True))
         s.add(436, lambda: s.fence(20, 424, 50, 439, 6))
         s.add(446, lambda: s.fence(50, 439, 84, 422, 6))
         s.add(432, lambda: s.cow(38, 432))
         s.add(428, lambda: s.cow(64, 428, True))
         s.add(436, lambda: s.hay(80, 436))
+        s.blocked.append(s.field_poly(20, 446, 70, 40))
 
-        # La pesatura: a cosy farmhouse with an awning, flower boxes and the scale out front
+        # La pesatura: farmhouse, a little vegetable patch, the scale and the truck beside it (not in the river)
         s.add(488, lambda: s.house(94, 488, 40, 26, 20, 14, 'cream', 'red', nwin=3, chimney=True, flowers=True, shutters=True,
                                    door_face='side', awning=True, trim=True, round_win=True))
-        s.add(510, lambda: s.slab(138, 512, 28, 18, 2, T['METAL'][1:4], T['METAL'][0:2]))
-        s.add(512, lambda: s.truck(144, 512))
+        s.add(540, lambda: s.slab(84, 548, 24, 16, 2, T['METAL'][1:4], T['METAL'][0:2]))
+        s.add(542, lambda: s.truck(88, 550))
         s.add(494, lambda: s.hay(66, 494))
         s.add(498, lambda: s.hay(72, 500))
         s.add(500, lambda: s.picket(52, 492, 76, 504, 6))
+        s.add(512, lambda: s.bench(116, 508))
+        s.blocked.append(s.field_poly(60, 500, 80, 50))
+        s.blocked.append(s.field_poly(70, 560, 50, 30))
 
-        # Lo smistamento: a little red barn with white trim and a silo
+        # Lo smistamento
         s.add(392, lambda: s.silo(332, 394, 8, 38, 'red'))
         s.add(424, lambda: s.house(282, 424, 40, 28, 21, 15, 'barn', 'slate', lit=so, nwin=3, trim=True, round_win=True,
                                    door_face='gable', smoke=False))
         if not so:
             s.add(446, lambda: s.fence(240, 436, 282, 457, 7))
-        for k in range(3):
-            s.add(430 + k, (lambda k=k: s.slab(300 + k * 6, 438 - k * 3, 4, 4, 3.5, R('#c84a3a', '#e06050', '#f07a66'), T['ROOFS']['wood'][0])))
+        for kk in range(3):
+            s.add(430 + kk, (lambda kk=kk: s.slab(300 + kk * 6, 438 - kk * 3, 4, 4, 3.5, R('#c84a3a', '#e06050', '#f07a66'), T['ROOFS']['wood'][0])))
+        s.blocked.append(s.field_poly(250, 440, 100, 50))
 
-        # Il laboratorio: a cottage with a greenhouse
+        # Il laboratorio
         s.add(630, lambda: s.house(258, 630, 24, 22, 18, 13, 'lilac', 'green', lit=lo, nwin=2, chimney=True, door_face='gable',
                                    trim=True, flowers=lo, smoke=lo))
         s.add(620, lambda: s.greenhouse(282, 618, 30, 20, 14, 8, lo))
         if not lo:
             s.add(668, lambda: s.fence(224, 642, 278, 669, 9))
             s.add(672, lambda: s.fence(278, 669, 346, 635, 11))
+        s.blocked.append(s.field_poly(224, 676, 130, 60))
 
-        T_ = [(26, 306, 18, 'pine'), (54, 296, 20, 'pine'), (222, 280, 17, 'pine'), (256, 300, 16, 'oak'), (380, 330, 18, 'oak'),
-              (366, 296, 18, 'pine'), (10, 362, 16, 'pine'), (186, 392, 16, 'oak'), (232, 372, 15, 'oak'), (376, 450, 20, 'pine'),
-              (16, 500, 17, 'oak'), (200, 566, 19, 'oak'), (360, 478, 15, 'apple'), (376, 640, 22, 'pine'), (128, 650, 18, 'oak'),
-              (206, 680, 20, 'pine'), (350, 700, 22, 'oak'), (320, 340, 15, 'oak'), (226, 620, 14, 'apple'), (310, 704, 17, 'pine'),
-              (14, 660, 17, 'pine'), (206, 316, 12, 'oak'), (384, 540, 16, 'pine'), (164, 712, 16, 'oak'), (262, 712, 15, 'oak'),
-              (100, 560, 13, 'apple'), (124, 572, 13, 'apple'), (76, 572, 13, 'apple'), (100, 588, 13, 'apple'), (52, 590, 12, 'olive'),
-              (40, 620, 12, 'olive'), (340, 410, 13, 'apple'), (110, 400, 12, 'oak')]
+        # an olive grove in rows, front left
+        for row in range(3):
+            for col in range(4):
+                x, y = 58 + col * 15 - row * 9, 600 + row * 11 - col * 5
+                if s.free(x, y):
+                    s.add(y, (lambda x=x, y=y: s.tree(x, y, 13 * s.depth(y) * 1.25, 'olive')))
+                    s.blocked.append([(x - 5, y - 5), (x + 5, y - 5), (x + 5, y + 3), (x - 5, y + 3)])
+        # trees: pines (more at the back and on the edges), chestnuts, oaks, cypresses near the village
         rnd = random.Random(42)
-        for (gx, gy, n, k) in ((372, 470, 3, 'pine'), (360, 610, 3, 'oak'), (300, 486, 2, 'oak'), (10, 448, 2, 'pine')):
-            for i in range(n + 3):
-                T_.append((gx + rnd.uniform(-20, 20), gy + rnd.uniform(-14, 14), rnd.uniform(15, 21), k))
-        for (x, y, sz, k) in T_:
-            s.add(y, (lambda x=x, y=y, sz=sz, k=k: s.tree(x, y, sz * 1.3, k)))
-        flowers = T['FLOWERS'] + [None]
-        for i in range(24):
-            x, y = rnd.uniform(10, 380), rnd.uniform(290, 700)
-            if abs(x - s.river_x(y)) < 18:
+        placed = []
+        tries = 0
+        while len(placed) < 95 and tries < 4000:
+            tries += 1
+            x, y = rnd.uniform(4, 386), rnd.uniform(266, 712)
+            ds = s.depth(y)
+            if not s.free(x, y, 2 * ds):
                 continue
-            s.add(y, (lambda x=x, y=y, r=rnd.uniform(3, 5), col=flowers[i % 4]: s.bush(x, y, r, col)))
+            if any((x - px_) ** 2 + ((y - py_) * 1.6) ** 2 < (11 * ds) ** 2 for (px_, py_) in placed):
+                continue
+            near_village = 80 < x < 215 and 270 < y < 360
+            u = rnd.random()
+            if near_village:
+                kind = 'cypress' if u < 0.6 else 'oak'
+            elif y < 330 or x < 24 or x > 364:
+                kind = 'pine' if u < 0.7 else ('oak' if u < 0.9 else 'cypress')
+            else:
+                kind = 'pine' if u < 0.38 else ('oak' if u < 0.72 else ('cypress' if u < 0.86 else 'apple'))
+            size = {'pine': 20, 'cypress': 18, 'oak': 18, 'apple': 14}[kind] * ds * rnd.uniform(0.85, 1.15)
+            placed.append((x, y))
+            s.add(y, (lambda x=x, y=y, size=size, kind=kind: s.tree(x, y, size, kind)))
+        flowers = T['FLOWERS'] + [None]
+        nb = 0
+        while nb < 26 and tries < 8000:
+            tries += 1
+            x, y = rnd.uniform(10, 380), rnd.uniform(300, 700)
+            if not s.free(x, y, 1):
+                continue
+            nb += 1
+            s.add(y, (lambda x=x, y=y, r=rnd.uniform(2.5, 4) * s.depth(y), col=flowers[nb % 4]: s.bush(x, y, r, col)))
         for (x, y) in ((130, 404), (118, 462), (160, 498), (218, 490), (246, 514), (254, 590), (256, 450)):
             s.add(y, (lambda x=x, y=y: s.lantern(x, y)))
         for z, _, fn in sorted(s.items):
             fn()
-        if T['night']:
+        if night:
             rnd = random.Random(8)
             for i in range(26):
                 x, y = rnd.uniform(10, 380) * S, rnd.uniform(330, 690) * S
@@ -761,7 +939,7 @@ class Map:
 
 # where the places are (CSS px of the 390 x 700 map) -> % for the HTML buttons
 PLACES = {
-    'weigh': {'x': 100, 'y': 474, 'w': 92, 'h': 96, 'label': 522},
+    'weigh': {'x': 100, 'y': 454, 'w': 92, 'h': 76, 'label': 494},
     'sort': {'x': 296, 'y': 392, 'w': 96, 'h': 78, 'label': 438},
     'lab': {'x': 282, 'y': 604, 'w': 104, 'h': 60, 'label': 644},
     'barn': {'x': 56, 'y': 400, 'w': 80, 'h': 50, 'label': 448},

@@ -15,7 +15,7 @@ const AXIS_SPRITE = Object.fromEntries([
 import { CLASS_COLOURS } from './levels.js';
 import { UNIT_SQUARE, clipBranch, lineInPoly, isNode } from './model.js';
 
-export const FONT = '"Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+export const FONT = '"Chakra Petch", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 export const C = {
   soil: '#3A4850', olive: '#5F9C6A', wheat: '#EFE2C4', cream: '#FBF7EF', tomato: '#E07A63', sky: '#5E909B',
   ink: '#22313A', grid: 'rgba(58,72,80,0.10)', ok: '#3E7D32', gold: '#F5CA63',
