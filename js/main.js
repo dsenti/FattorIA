@@ -20,9 +20,8 @@ function shopIcon(it) {
   const u = it.sprite && portrait(it.sprite, it.sprite.startsWith('veh') ? 1 : 2);
   return u ? `<img class="shop-px" src="${u}" alt="">` : it.icon;
 }
-import { LabGame, helpHTML as labHelpHTML } from './lab/game.js';
-import { renderLabShop } from './lab/shop.js';
-import { LAB_ICON } from './lab/draw.js';
+import { OrchardGame, helpHTML as labHelpHTML } from './orchard/game.js';
+import { HerdGame, helpHTML as herdHelpHTML } from './herd/game.js';
 import { installDebugButton } from './debug.js'; // TODO(Dominik): remove before the course
 
 let state = loadState();
@@ -197,32 +196,34 @@ const sortGame = new SortingGame($('#screen-sort'), {
 });
 const sortLevelId = (i) => SORT_LEVELS[i].id;
 
-// Minigame 3: Il laboratorio
-const labGame = new LabGame($('#screen-lab'), {
+// Minigames 3 and 4 share the way they pay
+function earn({ coins }) {
+  state.coins += coins;
+  state.totalEarned += coins;
+  save();
+  setTimeout(() => renderCoins(true), 400);
+  pushScore();
+}
+const sheetApp = {
   getState: () => state,
   save,
-  coinsChanged: () => renderCoins(false),
-  earn: ({ coins }) => {
-    state.coins += coins;
-    state.totalEarned += coins;
-    save();
-    setTimeout(() => renderCoins(true), 400);
-    pushScore();
-  },
+  earn,
   openSheet: (title, render, onClose) => openSheet(title, render, onClose),
   closeSheet: () => closeSheet(),
-  toast: (m, ms) => toast(m, ms),
-  openShop: () => openShop(() => labGame.refresh(), 'lab'),
-  overlayOpen: () => !$('#sheet').hidden || !$('#modal').hidden,
-  confirm: (html, yes, no) => modal(html, [{ label: yes, value: true, cls: 'primary' }, { label: no, value: false }]),
-});
+};
+
+// Minigame 3: Il frutteto (stored as "lab", the place it replaced)
+const labGame = new OrchardGame($('#screen-lab'), sheetApp);
+// Minigame 4: Il pascolo
+const herdGame = new HerdGame($('#screen-herd'), sheetApp);
 
 async function daySummary() {
   const recent = state.fits.slice(-state.dayFarmers);
   const perfect = recent.filter((r) => r.c === CONFIG.MAX_PAY).length;
   const avg = state.dayFarmers ? state.dayCoins / state.dayFarmers : 0;
   const nextPlace = !state.sort.unlocked ? ['lo smistamento', CONFIG.SORT.UNLOCK_COST]
-    : !state.lab.unlocked ? ['il laboratorio', CONFIG.LAB.UNLOCK_COST] : null;
+    : !state.lab.unlocked ? ['il frutteto', CONFIG.ORCHARD.UNLOCK_COST]
+      : !state.herd.unlocked ? ['il pascolo', CONFIG.HERD.UNLOCK_COST] : null;
   const tip = state.levels.scanner + state.levels.belt + state.levels.truck === 0
     ? 'Consiglio: nel negozio 🛒 puoi migliorare scanner, scarico e camion.'
     : nextPlace && state.coins >= nextPlace[1] * 0.6
@@ -253,6 +254,7 @@ function showScreen(id) {
   if (id === 'screen-weigh') game.show(); else game.hide();
   if (id === 'screen-sort') sortGame.show(); else sortGame.hide();
   if (id === 'screen-lab') labGame.show(); else labGame.hide();
+  if (id === 'screen-herd') herdGame.show(); else herdGame.hide();
   if (id === 'screen-map') renderMap();
 }
 
@@ -273,8 +275,14 @@ function renderMap() {
   const lab = $('#place-lab');
   lab.classList.toggle('locked', !labOpen);
   lab.classList.toggle('buyable', !labOpen);
-  $('#place-lab-lock').innerHTML = labOpen ? '' : `Sblocca · ${CONFIG.LAB.UNLOCK_COST} ${svg40(ICON.coin, 14, 'coin-ic')}`;
-  lab.setAttribute('aria-label', labOpen ? 'Il laboratorio' : `Il laboratorio, si sblocca con ${CONFIG.LAB.UNLOCK_COST} monete`);
+  $('#place-lab-lock').innerHTML = labOpen ? '' : `Sblocca · ${CONFIG.ORCHARD.UNLOCK_COST} ${svg40(ICON.coin, 14, 'coin-ic')}`;
+  lab.setAttribute('aria-label', labOpen ? 'Il frutteto' : `Il frutteto, si sblocca con ${CONFIG.ORCHARD.UNLOCK_COST} monete`);
+  const herdOpen = state.herd.unlocked;
+  const barn = $('#place-barn');
+  barn.classList.toggle('locked', !herdOpen);
+  barn.classList.toggle('buyable', !herdOpen);
+  $('#place-barn-lock').innerHTML = herdOpen ? '' : `Sblocca · ${CONFIG.HERD.UNLOCK_COST} ${svg40(ICON.coin, 14, 'coin-ic')}`;
+  barn.setAttribute('aria-label', herdOpen ? 'Il pascolo' : `Il pascolo, si sblocca con ${CONFIG.HERD.UNLOCK_COST} monete`);
   // the valley picture: day or dusk, with the places that are open
   const night = isNight();
   $('#map-img').src = `assets/map/map-${night ? 'night' : 'day'}-s${open ? 1 : 0}l${labOpen ? 1 : 0}.png?v=${VERSION}`;
@@ -321,30 +329,34 @@ function showSortHelp() {
   return modal(sortHelpHTML(), [{ label: 'Capito, si parte!', value: 'ok', cls: 'primary' }]);
 }
 
-async function onLabPlace() {
-  if (!state.lab.unlocked) {
-    const cost = CONFIG.LAB.UNLOCK_COST;
+// Buy a place on the map (once), then open its screen; the help shows the first time.
+async function openPlace(key, screen, cost, title, pitch, help) {
+  const st = state[key];
+  if (!st.unlocked) {
     if (state.coins < cost) {
-      toast(`Il laboratorio si sblocca con ${cost} monete. Ne hai ${state.coins}: guadagnale nelle altre stazioni!`, 3200);
+      toast(`${title} si sblocca con ${cost} monete. Ne hai ${state.coins}: guadagnale nelle altre stazioni!`, 3200);
       return;
     }
-    const ok = await modal(`<h2>Il laboratorio</h2><p>Campioni dalle fattorie della valle: impara a riconoscerli tracciando linee. Lo sblocchi con <b>${cost}</b> monete.</p>`, [
+    const ok = await modal(`<h2>${title}</h2><p>${pitch} Lo sblocchi con <b>${cost}</b> monete.</p>`, [
       { label: `Sblocca · ${cost} monete`, value: true, cls: 'primary' },
       { label: 'Non ora', value: false },
     ]);
     if (!ok || state.coins < cost) return;
     state.coins -= cost;
-    state.lab.unlocked = true;
+    st.unlocked = true;
     save();
     renderMap();
   }
-  showScreen('screen-lab');
-  if (!state.lab.seenHelp) { await showLabHelp(); state.lab.seenHelp = true; save(); }
+  showScreen(screen);
+  if (!st.seenHelp) { await help(); st.seenHelp = true; save(); }
 }
-
-function showLabHelp() {
-  return modal(labHelpHTML(), [{ label: 'Capito, si parte!', value: 'ok', cls: 'primary' }]);
-}
+const onLabPlace = () => openPlace('lab', 'screen-lab', CONFIG.ORCHARD.UNLOCK_COST, 'Il frutteto',
+  'Le capre del vicino vogliono la frutta: chiudile fuori con i recinti, in pochi secondi.', showLabHelp);
+const onHerdPlace = () => openPlace('herd', 'screen-herd', CONFIG.HERD.UNLOCK_COST, 'Il pascolo',
+  'In montagna ogni gregge ascolta un solo cane: mettilo nel mezzo del suo gregge.', showHerdHelp);
+const gotIt = [{ label: 'Capito, si parte!', value: 'ok', cls: 'primary' }];
+function showLabHelp() { return modal(labHelpHTML(), gotIt); }
+function showHerdHelp() { return modal(herdHelpHTML(), gotIt); }
 
 // ------------------------------------------------------------ help
 function showHelp() {
@@ -400,7 +412,6 @@ const SHOP = [
 function openShop(onClose, tab = 'weigh') {
   const tabs = [['weigh', 'Pesatura']];
   if (state.sort.unlocked) tabs.push(['sort', 'Smistamento']);
-  if (state.lab.unlocked) tabs.push(['lab', 'Laboratorio']);
   let current = tabs.some((t) => t[0] === tab) ? tab : 'weigh';
   const title = () => (current === 'weigh' ? '🛒 Negozio' : 'Negozio');
   openSheet(title(), (body) => {
@@ -424,10 +435,6 @@ function openShop(onClose, tab = 'weigh') {
           $('#sheet-title').textContent = title();
           draw();
         }));
-      }
-      if (current === 'lab') {
-        renderLabShop(body, { state, buy, redraw: draw });
-        return;
       }
       if (current === 'sort') {
         renderSortShop(body, { state, buy, redraw: draw });
@@ -532,7 +539,7 @@ function openSettings() {
       '</div></div>' +
       '<div class="settings-row">I progressi restano solo su questo telefono (o computer). ' +
       'Nella classifica vanno solo il nome del gioco e il punteggio: niente nome vero, niente email.</div>' +
-      '<div class="settings-row">Ricomincia da zero: monete, migliorie e agricoltori serviti tornano a 0, lo smistamento e il laboratorio si chiudono di nuovo.' +
+      '<div class="settings-row">Ricomincia da zero: monete, migliorie e agricoltori serviti tornano a 0, lo smistamento, il frutteto e il pascolo si chiudono di nuovo.' +
       '<button class="btn danger" id="set-reset">Ricomincia</button></div>';
     body.querySelectorAll('.choice[data-mode]').forEach((b) => b.addEventListener('click', () => {
       state.lineMode = b.dataset.mode;
@@ -559,6 +566,7 @@ function openSettings() {
       game.reset();
       sortGame.reset();
       labGame.reset();
+      herdGame.reset();
       closeSheet();
       renderMap();
       toast('Si ricomincia! 🌱');
@@ -581,20 +589,19 @@ $('#s-shop').innerHTML = svg40(ICON.shop, 26);
 $('#screen-sort .coin-ic-slot').innerHTML = svg40(ICON.coin, 18, 'coin-ic');
 $('#screen-sort .s-levels-ic').innerHTML = svg40(ICON.levels, 20);
 $('#place-lab').addEventListener('click', onLabPlace);
-$('#l-back').addEventListener('click', () => showScreen('screen-map'));
-$('#l-shop').addEventListener('click', () => openShop(() => labGame.refresh(), 'lab'));
-$('#l-help').addEventListener('click', showLabHelp);
-$('#l-back').innerHTML = svg40(ICON.map, 26);
-$('#l-help').innerHTML = svg40(ICON.help, 26);
-$('#l-shop').innerHTML = svg40(ICON.shop, 26);
-$('#l-restart').innerHTML = svg40(LAB_ICON.restart, 24);
-$('#l-del').innerHTML = svg40(LAB_ICON.trash, 24);
-$('#l-pop-x').innerHTML = svg40(ICON.no, 22);
-$('#screen-lab .coin-ic-slot').innerHTML = svg40(ICON.coin, 18, 'coin-ic');
-$('#screen-lab .l-levels-ic').innerHTML = svg40(ICON.levels, 20);
-document.querySelectorAll('.place.locked[data-lesson]').forEach((p) => p.addEventListener('click', () => {
-  toast(`🔒 Questo posto si sblocca nella lezione ${p.dataset.lesson}.`);
-}));
+$('#place-barn').addEventListener('click', onHerdPlace);
+for (const [k, help] of [['l', showLabHelp], ['h', showHerdHelp]]) {
+  $(`#${k}-back`).addEventListener('click', () => showScreen('screen-map'));
+  $(`#${k}-help`).addEventListener('click', help);
+  $(`#${k}-back`).innerHTML = svg40(ICON.map, 26);
+  $(`#${k}-help`).innerHTML = svg40(ICON.help, 26);
+}
+for (const id of ['#screen-lab', '#screen-herd']) {
+  $(`${id} .coin-ic-slot`).innerHTML = svg40(ICON.coin, 18, 'coin-ic');
+  $(`${id} .g-levels-ic`).innerHTML = svg40(ICON.levels, 20);
+  $(`${id} .g-restart`).innerHTML = svg40(ICON.restart, 24);
+}
+$('#h-whistle').innerHTML = svg40(ICON.whistle, 30);
 $('#map-time').addEventListener('click', () => {
   mapTime = isNight() ? 'day' : 'night';
   try { localStorage.setItem('fattoria.mapTime', mapTime); } catch (e) { /* private mode */ }
@@ -602,7 +609,7 @@ $('#map-time').addEventListener('click', () => {
 });
 $('#btn-shop').innerHTML = svg40(ICON.shop, 26);
 $('#btn-board').innerHTML = svg40(ICON.trophy, 26);
-for (const id of ['#btn-settings', '#w-settings', '#s-settings', '#l-settings']) {
+for (const id of ['#btn-settings', '#w-settings', '#s-settings', '#l-settings', '#h-settings']) {
   $(id).innerHTML = svg40(ICON.cog, 26);
   if (id !== '#btn-settings') $(id).addEventListener('click', openSettings);
 }
@@ -618,7 +625,7 @@ $('#w-shop').addEventListener('click', () => openShop());
 $('#w-help').addEventListener('click', showHelp);
 
 // Canvases drawn before the font arrived: draw them again once it has.
-if (document.fonts) document.fonts.ready.then(() => { sortGame.refresh(); labGame.refresh(); });
+if (document.fonts) document.fonts.ready.then(() => { sortGame.refresh(); labGame.refresh(); herdGame.refresh(); });
 
 // Block pinch-zoom gestures on iOS Safari (it ignores user-scalable=no).
 document.addEventListener('gesturestart', (e) => e.preventDefault());
@@ -633,10 +640,10 @@ async function boot() {
   pushScore();
 }
 boot();
-installDebugButton({ getState: () => state, save, renderCoins: (a) => { renderCoins(a); sortGame.refresh(); labGame.refresh(); } }); // TODO(Dominik): remove before the course
+installDebugButton({ getState: () => state, save, renderCoins: (a) => { renderCoins(a); sortGame.refresh(); labGame.refresh(); herdGame.refresh(); } }); // TODO(Dominik): remove before the course
 
 // Debug handle for play-testing from the browser console: open the game with ?debug
-if (new URLSearchParams(location.search).has('debug')) window.fattoriaDebug = { game, sortGame, labGame, getState: () => state, save, renderMap };
+if (new URLSearchParams(location.search).has('debug')) window.fattoriaDebug = { game, sortGame, labGame, herdGame, getState: () => state, save, renderMap };
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   // When a new version takes over (after a push), reload once so the whole new set of files runs.

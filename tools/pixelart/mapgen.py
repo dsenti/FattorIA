@@ -883,7 +883,7 @@ class Map:
         s.add(292, lambda: s.house(162, 292, 10, 10, 32, 13, 'stone', 'red', nwin=1, door=False, kind='pyramid'))
         s.blocked.append(s.field_poly(164, 296, 16, 16))
 
-        # La stalla (lesson 4)
+        # Il pascolo: the shepherd's barn (the herds are up in the mountains)
         s.add(410, lambda: s.house(54, 410, 30, 20, 15, 11, 'wood', 'red', lit=False, nwin=2, door_face='gable', trim=True))
         s.add(436, lambda: s.fence(20, 424, 50, 439, 6))
         s.add(446, lambda: s.fence(50, 439, 84, 422, 6))
@@ -914,10 +914,14 @@ class Map:
             s.add(430 + kk, (lambda kk=kk: s.slab(300 + kk * 6, 438 - kk * 3, 4, 4, 3.5, R('#c84a3a', '#e06050', '#f07a66'), T['ROOFS']['wood'][0])))
         s.blocked.append(s.field_poly(250, 440, 100, 50))
 
-        # Il laboratorio
-        s.add(630, lambda: s.house(258, 630, 24, 22, 18, 13, 'lilac', 'green', lit=lo, nwin=2, chimney=True, door_face='gable',
+        # Il frutteto: the fruit farmer's cottage and rows of apple trees behind a fence (the goats)
+        s.add(636, lambda: s.house(252, 636, 22, 20, 16, 12, 'lilac', 'green', lit=lo, nwin=2, chimney=True, door_face='gable',
                                    trim=True, flowers=lo, smoke=lo))
-        s.add(620, lambda: s.greenhouse(282, 618, 30, 20, 14, 8, lo))
+        for row in range(3):
+            for col in range(4):
+                x, y = 284 + col * 18 - row * 9, 614 + row * 14 - col * 5
+                s.add(y, (lambda x=x, y=y: s.tree(x, y, 11 * s.depth(y) * 1.2, 'apple')))
+        s.add(663, lambda: s.fence(272, 662, 334, 640, 9))
         if not lo:
             s.add(668, lambda: s.fence(224, 642, 278, 669, 9))
             s.add(672, lambda: s.fence(278, 669, 346, 635, 11))

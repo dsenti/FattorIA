@@ -1,6 +1,6 @@
 # FattorIA: the FATE-AI game
 
-A small browser game for the FATE-AI course. The spec is in `GAME_SPEC.md`. It has the map, **minigame 1, "La stazione di pesatura"** (L2: data, feature, target, linear regression, line of best fit, error, outliers, data quality) **minigame 2, "Lo smistamento"** (L3: classification, label, decision tree, training vs test, accuracy) and **minigame 3, "Il laboratorio"** (L3: the player builds a decision tree of boundary lines at any angle through a point cloud; training vs test, accuracy, overfitting).
+A small browser game for the FATE-AI course. The spec is in `GAME_SPEC.md`. It has the map, **minigame 1, "La stazione di pesatura"** (L2: data, feature, target, linear regression, line of best fit, error, outliers, data quality) **minigame 2, "Lo smistamento"** (L3: classification, label, decision tree, training vs test, accuracy) **minigame 3, "Il frutteto"** (L3: swipe fences, quickly, so every piece of the orchard holds only trees or only goats; a fence is a decision boundary) and **minigame 4, "Il pascolo"** (L4 preview, unlocked by coins: drag each sheepdog to the middle of its herd in the mountains; the whistle shows how far each dog is from the middle, not in which direction; the centroid of k-means).
 
 Plain HTML, CSS and JavaScript ES modules. No build step, no npm packages, no framework. It works offline after the first load (service worker) and keeps progress only in the browser's `localStorage`.
 
@@ -13,7 +13,7 @@ Then open http://localhost:8000. To try it on a phone on the same Wi-Fi, run `py
 
 Opening `index.html` straight from the file system (`file://`) does **not** work: browsers block ES modules there.
 
-Model checks (no browser needed): `node tests/run.mjs` from `Game/`. It also prints a small tuning report: the average coins that a player who fits the measured dots perfectly would earn at different upgrade levels. For minigame 2 it checks that **every level has exactly one question assignment that sorts its training batch 100%** (exhaustive over all 18 questions on every gate), that the correct tree scores 100% on generated test batches, that every truck symbol shows only what goes in, that pipe colours differ within a level, that the trees fit 360 px, and that saves migrate. For minigame 3 it checks the level list (one-line levels mixed in, a clean triangle and square, 5 colours), the tree model (apply, "+" nodes, replace, delete, the node cap, the layout of random trees at 360 px), that every true region gets enough points, that the true tree always pays 10 while a careful copy passes and "one colour everywhere" fails, the overfitting note, the saves, how little text the screen has, that no L4 word appears, and that `sw.js` caches every JS file. It prints each level's true-tree test accuracy.
+Model checks (no browser needed): `node tests/run.mjs` from `Game/`. It also prints a small tuning report: the average coins that a player who fits the measured dots perfectly would earn at different upgrade levels. For minigame 2 it checks that **every level has exactly one question assignment that sorts its training batch 100%** (exhaustive over all 18 questions on every gate), that the correct tree scores 100% on generated test batches, that every truck symbol shows only what goes in, that pipe colours differ within a level, that the trees fit 360 px, and that saves migrate. For minigames 3 and 4 it checks the levels (easy to hard), that every orchard is half trees and half goats, that the true fences pass and no fence fails, the pieces / majority / pay / stars, that dogs on the herd centres pass and dogs 1.3 × the tolerance off fail, the saves (the old laboratorio progress is dropped, the bought place stays), that there is little text and no emoji, that no L4 word appears in the orchard, and that `sw.js` caches every JS file.
 
 ## Deploy to GitHub Pages
 Live at **https://dsenti.github.io/FattorIA/**, from the public repo `dsenti/FattorIA`.
@@ -28,7 +28,7 @@ git subtree push --prefix Game fattoria main
 
 ## Files
 ```
-index.html              all screens (map, weighing station, sorting station, lab, sheets, modals)
+index.html              all screens (map, weighing, sorting, orchard, pasture, sheets, modals)
 css/style.css           layout; the pixel theme (style E / map day+dusk) is the last section
 js/pixel.js             the pixel look: fitPixelCanvas() for canvases, pxArt() / pxSymbolHTML() to turn SVG art into pixel images
 js/config.js            ALL tunable numbers (see below)
@@ -55,16 +55,17 @@ js/sorting/trucks.js    per level: what each truck symbol shows (from the items 
 js/sorting/art.js       all minigame 2 drawings as inline SVG (items, question icons, truck symbols, trucks, icons)
 js/sorting/game.js      the minigame: hopper, tree, pipes, trucks, question palette, Prova animation, Avanti (test, pay, trucks drive off), level list
 js/sorting/shop.js      the "Smistamento" tab of the shop (sensors, lente, nastro veloce, suggerimenti)
-js/lab/levels.js        minigame 3: THE LEVELS (axes, classes, true tree of lines, noise) and the class colours. Edit here.
-js/lab/model.js         pure model: geometry (convex clipping), the player's tree (apply, delete, route, regions), samples, scoring, pay, progress, layout
-js/lab/draw.js          canvas field (axes, regions, points, lines, handles, marks) and small SVG pieces and icons
-js/lab/game.js          the minigame: field, player-built tree, node pop-up (drag the line, a colour or + per side, Applica), Prova, level list
-js/lab/shop.js          the "Laboratorio" tab of the shop (più campioni, strumento più preciso, suggerimenti)
+js/orchard/levels.js    minigame 3: THE LEVELS (number of trees + goats, fences, noise, pass mark, true fences, zone). Edit here.
+js/orchard/model.js     pure model: the orchard (makeItems), pieces and majority (evaluate), time, stars, pay, clipping a swipe to the orchard
+js/orchard/game.js      the minigame: swipe fences, countdown, goats eating trees, result, level list
+js/herd/levels.js       minigame 4: THE LEVELS (herds: colour, size, middle, spread, angle, strays; tolerance). Edit here.
+js/herd/model.js        pure model: the sheep, the middle of each herd (mean), the whistle (distance of each dog), pay, stars
+js/herd/game.js         the minigame: drag dogs from the tray, whistle rings, sheep running to their dog, level list
 sw.js                   service worker (offline cache, VERSION constant)
 manifest.webmanifest    "add to home screen" metadata
 assets/                 icons; fonts/ (Chakra Petch, OFL: titles, buttons, numbers); map/ (valley pictures, day and dusk, per unlock state; places.json)
-tools/pixelart/         Python + Pillow generators (dev only, not shipped): mapgen.py (map pictures), weighgen.py (weighing sprites + shed), uigen.py (sorting, lab and UI sprites + wall tiles), preview.py (contact sheets)
-assets/ui/              sprites.png + sprites.json (produce, animals, overlays, question icons, truck symbols, trucks, lab axis icons, UI icons), barnwall.png, labwall.png
+tools/pixelart/         Python + Pillow generators (dev only, not shipped): mapgen.py (map pictures), weighgen.py (weighing sprites + shed), uigen.py (sorting, orchard, pasture and UI sprites + backgrounds), preview.py (contact sheets)
+assets/ui/              sprites.png + sprites.json (produce, animals, overlays, question icons, truck symbols, trucks, goats, fruit trees, sheep, sheepdogs, UI icons), barnwall.png, machine.png, road.png, orchard.png (grass tile), alpine.png (the mountain pasture)
 js/uiart.js             builds sorting items (with rot / soil / worm / snail), truck symbols and trucks from the UI sprites; art.js registers which SVG art has a pixel sprite (svg40, symbolHTML, truckArt use it)
 assets/weigh/           sprites.png + sprites.json (atlas with meta: wheels, beds, seats...) and shed.png, made by weighgen.py
 js/weighing/sprites.js  loads the weighing sprite sheet; blit() draws a sprite 1:1 in a pixel canvas's backing pixels
@@ -87,15 +88,15 @@ Everything is in `js/config.js`, with comments:
 
 Farmers (names, questions, per-farmer noise) are in `js/weighing/farmers.js`.
 
-Minigame 3 (`CONFIG.LAB`): `UNLOCK_COST` (200), `SAMPLES` (training samples per "Più campioni" level, 70 → 150), `NOISE_FACTOR` ("Strumento più preciso", × 1 → × 0.4), `upgradeCost(n)`, `hintCost(k)`, `HINT_BAND`, `TEST_SIZE` (40), `MAX_NODES` (7, the cap on the player's tree), `SCORE_THRESHOLDS` (accuracy ratio → 0–10 coins), `PASS_COINS` (7), `REPLAY_FACTOR` (a tree started on a passed level pays half), `REGION_WEIGHT_POWER` (how samples spread over the true regions), `OVERFIT_TRAIN_GAIN` / `OVERFIT_TEST_LOSS` (the "imparare a memoria" note), `DROP_MS` / `DROP_STAGGER_MS` (Prova animation). Per level in `js/lab/levels.js`: `noise`, `gap`, `samplesFactor`.
+Minigame 3 (`CONFIG.ORCHARD`): `UNLOCK_COST` (200), `TIME_BASE` (5 s for one fence) + `TIME_PER_FENCE` (1.5 s), `START_DELAY_MS` (the clock starts after this or at the first fence), `MIN_SWIPE` (px), `MIN_PAY` / `MAX_PAY` (4–10 coins from the pass mark to the true fences' score), `REPLAY_FACTOR`, `EAT_MS`. Per level: `pass`, `noise`, `gap`, `n`, `fences`. Minigame 4 (`CONFIG.HERD`): `UNLOCK_COST` (300), `PAY` ([10, 7, 4] for 1, 2, 3+ whistles), `REPLAY_FACTOR`, `GATHER_MS`. Per level: `tol` (share of the shorter side of the pasture).
 
 Minigame 2 (`CONFIG.SORT`): `UNLOCK_COST` (100 coins to open the place on the map), `pay(n)` (first perfect run of level n: 5 + 2n coins × test accuracy), `REPLAY_PAY`, `SENSOR_COST` per sensor, `CALIBRO_REFUND` (the removed size sensor), `LENTE_COST`, `FAST_COST`, `hintCost(k)` (the k-th hint), and the animation timing (`SPEED`, `GATE_PAUSE_MS`, `SPAWN_MS`, `FAST_FACTOR`, `REPLAY_FACTOR`, `DRIVE_OFF_MS`).
 
 ## Minigame 2: editing levels
 Levels are in `js/sorting/levels.js`. A tree is written as `ask(question, { no: ..., yes: ... })`, and a leaf is a truck id; the questions in `ask()` are the solution (hidden in the game). Items are token strings such as `'patata marrone grande sporco'` or `'mela verde lumaca'` (an apple with a snail on it) or `'lumaca marrone'` (a lone snail), with their truck (the etichetta). After any change run `node tests/run.mjs`: if another assignment also sorts the batch perfectly, the test prints it (gates in pre-order), and you add an item that tells the two apart. Level ids are saved in the players' progress, so don't rename a level that has been played. If you change the levels a lot, bump `LEVELS_VERSION` in `levels.js`: saves from an older version then start the levels again (keeping coins and sensors).
 
-## Minigame 3: editing levels
-Levels are in `js/lab/levels.js`. A node is `cut(x1, y1, x2, y2, { left, right })`: the line through the two points (field coordinates 0..1, y up); walking from the first point to the second, `left` is what lies on your left. Each side is another `cut(...)` or a class number (a leaf). This true tree generates the data and is the benchmark; the player builds their own tree from one empty node. After any change run `node tests/run.mjs`: it fails if a region gets too few points, if a careful copy of the true tree can't pass reliably, or if the true tree needs more than `MAX_NODES` − 1 lines. Level ids are saved; if you change the levels a lot, bump `LAB_LEVELS_VERSION`.
+## Minigames 3 and 4: editing levels
+Orchard levels are in `js/orchard/levels.js`: `lines` are the true fences (`[x1, y1, x2, y2]` in 0..1, y down), `zone(x, y)` says what grows where (`'tree'` or `'goat'`), `fences` how many the player gets, `noise` how many items stand on the wrong side, `pass` the share that must be right. Pasture levels are in `js/herd/levels.js`: `h(colour, sheep, x, y, spreadX, spreadY, angle, strays)` and `tol`. Run `node tests/run.mjs` after a change. Level ids are saved; if you change the levels a lot, bump `ORCHARD_LEVELS_VERSION` / `HERD_LEVELS_VERSION`.
 
 ## Moving the line
 Two modes, a setting in ⚙️ Impostazioni ("Come muovi la retta", `state.lineMode`: `'sliders'` default or `'drag'`; kept by Ricomincia). In drag mode the two handles sit at x = 0 and x = 1 and move only vertically inside the plot (`lineToEnds` / `endsToLine` / `clampEnds` in `round.js`); the sliders remain the internal source of truth, so Blocca, scanner 100 and scoring work the same in both modes.
@@ -104,9 +105,9 @@ Two modes, a setting in ⚙️ Impostazioni ("Come muovi la retta", `state.lineM
 Plot units are normalised (0–1 on both axes; the axes show no numbers). Each farmer has a hidden true line and a harvest of `HARVEST_SIZE` units spread around it. The truck carries a random subset. The scanner adds noise, and sometimes a glitch (an outlier), to each measured unit. On "Blocca la retta", the game computes the mean absolute error of the player's line and of the least-squares line, both on the **whole harvest** (without scanner noise). The ratio of the two goes through `SCORE_THRESHOLDS`.
 
 ## Debugging
-**Temporary 🐞 +100 button** (TODO(Dominik): remove before the course): on the weighing station, Lo smistamento and Il laboratorio (there labelled "DEBUG +100", since minigames 2 and 3 have no emoji in their chrome), adds 100 coins to the wallet without counting them as earned, so the leaderboard is unaffected. Turn it off with `DEBUG_COINS_BUTTON = false` in `js/config.js`, or delete `js/debug.js` and its two lines in `js/main.js`.
+**Temporary 🐞 +100 button** (TODO(Dominik): remove before the course): on the weighing station and in minigames 2–4 (there labelled "DEBUG +100", since they have no emoji in their chrome), adds 100 coins to the wallet without counting them as earned, so the leaderboard is unaffected. Turn it off with `DEBUG_COINS_BUTTON = false` in `js/config.js`, or delete `js/debug.js` and its two lines in `js/main.js`.
 
-Open the game with `?debug` (e.g. `http://localhost:8000/?debug`) to get `window.fattoriaDebug` in the console: `fattoriaDebug.game.round` (hidden line, harvest, sample), `fattoriaDebug.game.newRound()`, `fattoriaDebug.getState().levels.truck = 10`. For minigame 2: `fattoriaDebug.sortGame.load(14)` (jump to level 15), `fattoriaDebug.getState().sort.sensors = ['naso','vermi','bilancia','forma','vita']`, then `fattoriaDebug.sortGame.refresh()`. For minigame 3: `fattoriaDebug.getState().lab.unlocked = true`, `fattoriaDebug.labGame.load(3)` (level 4, the triangle), and to copy the true tree into the player's: `g = fattoriaDebug.labGame; g.board.tree = JSON.parse(JSON.stringify(g.level.tree)); g.render()`.
+Open the game with `?debug` (e.g. `http://localhost:8000/?debug`) to get `window.fattoriaDebug` in the console: `fattoriaDebug.game.round` (hidden line, harvest, sample), `fattoriaDebug.game.newRound()`, `fattoriaDebug.getState().levels.truck = 10`. For minigame 2: `fattoriaDebug.sortGame.load(14)` (jump to level 15), `fattoriaDebug.getState().sort.sensors = ['naso','vermi','bilancia','forma','vita']`, then `fattoriaDebug.sortGame.refresh()`. For minigame 3: `fattoriaDebug.labGame.load(8)` (level 9; open levels need the one before passed: `fattoriaDebug.labGame.lab.passed`), `fattoriaDebug.labGame.lv.lines` (the true fences). For minigame 4: `fattoriaDebug.herdGame.load(7)`, `fattoriaDebug.herdGame.centres` (the middles).
 
 ## Reset during testing
-In-game: ⚙️ → Ricomincia (also closes Lo smistamento and Il laboratorio again and clears their levels, upgrades and hints). Or in the browser console: `localStorage.clear()`. To drop the offline cache: DevTools → Application → Service workers → Unregister.
+In-game: ⚙️ → Ricomincia (also closes Lo smistamento, Il frutteto and Il pascolo again and clears their levels, upgrades and hints). Or in the browser console: `localStorage.clear()`. To drop the offline cache: DevTools → Application → Service workers → Unregister.

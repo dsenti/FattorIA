@@ -178,59 +178,33 @@ export const CONFIG = {
 
   // ---------------------------------------------------------------- minigame 3: Il laboratorio
   // TODO(Dominik): all prices, pay and data sizes below are first guesses; tune after play-testing.
-  LAB: {
-    // Coins to unlock the place on the map (after the other two stations).
+  // Minigame 3: Il frutteto (decision boundaries). Swipe fences across the orchard, against the
+  // clock, so the goats stay away from the fruit trees.
+  ORCHARD: {
     UNLOCK_COST: 200,
-    // Training samples per level of "Più campioni" (0..10): 70 -> 150.
-    SAMPLES: [70, 78, 86, 94, 102, 110, 118, 126, 134, 142, 150],
-    // "Strumento più preciso" (0..10): the level's measurement noise is multiplied by this.
-    // Never zero: the classes always overlap a little near the boundaries.
-    NOISE_FACTOR: [1, 0.92, 0.85, 0.78, 0.72, 0.66, 0.6, 0.55, 0.5, 0.45, 0.4],
-    // Buying level n of either upgrade costs this.
-    upgradeCost: (n) => 2 * n,
-    // The player's tree has at most this many nodes (lines), so it stays readable on 360 px.
-    MAX_NODES: 7,
-    // Hints (suggerimento): the k-th hint bought (k = 0, 1, 2, ...) costs this. A hint shows, for
-    // one level, roughly where the true lines lie, as bands this wide (field units), in every node.
-    hintCost: (k) => 3 + 3 * k,
-    HINT_BAND: 0.07,
-    // New, unseen test samples dropped into the field on "Prova".
-    TEST_SIZE: 40,
-    // Coins from ratio = player's test accuracy / true tree's test accuracy (same samples).
-    // First matching row wins; below the last row pays 0. Like the pesatura: only matching the
-    // true tree pays 10, a little worse drops quickly to 9 or 8. With 40 test samples:
-    // 1 more mistake than the true tree -> 9, 2 -> 8, 3 -> 7.
-    SCORE_THRESHOLDS: [
-      { minRatio: 0.999, coins: 10 },
-      { minRatio: 0.97, coins: 9 },
-      { minRatio: 0.94, coins: 8 },
-      { minRatio: 0.91, coins: 7 },
-      { minRatio: 0.87, coins: 6 },
-      { minRatio: 0.82, coins: 5 },
-      { minRatio: 0.76, coins: 4 },
-      { minRatio: 0.70, coins: 3 },
-      { minRatio: 0.62, coins: 2 },
-      { minRatio: 0.50, coins: 1 },
-    ],
-    // A Prova that pays at least this passes the level and opens the next one.
-    PASS_COINS: 7,
-    // Pay: one tree (from empty until "Ricomincia il livello") earns at most 10 coins on a level:
-    // each Prova pays only what it adds to the tree's record. A tree started on a level that was
-    // already passed pays this share (replaying for coins).
+    // Seconds per level: BASE for a one-fence level, + PER_FENCE for each further fence allowed.
+    TIME_BASE: 5,
+    TIME_PER_FENCE: 1.5,
+    // The clock starts this long after the level appears (to see the orchard first).
+    START_DELAY_MS: 900,
+    // A swipe shorter than this (CSS px) is not a fence.
+    MIN_SWIPE: 40,
+    // Pay for a passed level: from MIN_PAY at the pass mark up to MAX_PAY at a perfect score.
+    MIN_PAY: 4,
+    MAX_PAY: 10,
     REPLAY_FACTOR: 0.5,
-    // Sampling: each region of the true tree gets samples in proportion to area ^ this power
-    // (0 = the same for every region, 1 = by area), so small regions (a triangle) still show.
-    REGION_WEIGHT_POWER: 0.5,
-    // "Imparare a memoria" (overfitting) note after a Prova: the player's tree beats the true tree
-    // on the training samples by at least OVERFIT_TRAIN_GAIN, and loses to it on the test samples
-    // by at least OVERFIT_TEST_LOSS (accuracy shares). Tuned in tests/run.mjs: a tree that carves
-    // lines around stray training points on the overfitting level triggers it about half the
-    // time, a careful player (lines within ~0.015 of the true ones) practically never.
-    OVERFIT_TRAIN_GAIN: 0.02,
-    OVERFIT_TEST_LOSS: 0.025,
-    // Prova animation: each test sample falls for DROP_MS; one starts every DROP_STAGGER_MS.
-    DROP_MS: 520,
-    DROP_STAGGER_MS: 26,
+    // Eating animation (wrong animals walk to a tree and eat it), ms.
+    EAT_MS: 1600,
+  },
+  // Minigame 4: Il pascolo (the centre of a group). Drag each sheepdog to the middle of its herd;
+  // the whistle tells how far it is. TODO(Dominik): lesson 4 content (k-means), unlocked by coins.
+  HERD: {
+    UNLOCK_COST: 300,
+    // Pay for a passed level by whistles used: 1 -> PAY[0], 2 -> PAY[1], more -> PAY[2].
+    PAY: [10, 7, 4],
+    REPLAY_FACTOR: 0.5,
+    // Sheep run to their dog after a passing whistle, ms.
+    GATHER_MS: 1200,
   },
 
   // ---------------------------------------------------------------- leaderboard

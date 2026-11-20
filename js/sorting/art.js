@@ -305,6 +305,8 @@ export const ICON = {
   cog: `<path d="M17 4H23L24 9L28 11L32.5 8L36 11.5L33 16L35 20L36 23L31 24L29 28L32 32.5L28.5 36L24 33L20 35L17 36L16 31L12 29L7.5 32L4 28.5L7 24L5 20L4 17L9 16L11 12L8 7.5L11.5 4L16 7Z" fill="${P.cream}" stroke="${P.soil}" stroke-width="2" stroke-linejoin="round"/><circle cx="20" cy="20" r="6" fill="${P.soil}"/>`,
   sun: `<circle cx="20" cy="20" r="8" fill="${P.gold}" ${S}/><g stroke="${P.gold}" stroke-width="3" stroke-linecap="round"><path d="M20 3V8M20 32V37M3 20H8M32 20H37M8 8L11.5 11.5M28.5 28.5L32 32M8 32L11.5 28.5M28.5 11.5L32 8"/></g>`,
   moon: `<path d="M26 5A15 15 0 1 0 35 27A12 12 0 0 1 26 5Z" fill="#F2E6B8" stroke="#3A4850" stroke-width="2" stroke-linejoin="round"/><circle cx="17" cy="22" r="2" fill="#D8C98F"/><circle cx="22" cy="30" r="1.5" fill="#D8C98F"/>`,
+  restart: `<path d="M31 21A11 11 0 1 1 27.5 12.5" fill="none" stroke="${P.soil}" stroke-width="3.4" stroke-linecap="round"/><path d="M29 5L28.5 13.5L20 13" fill="none" stroke="${P.soil}" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>`,
+  whistle: `<path d="M6 16H24L34 21V27H14A8 8 0 0 1 6 19Z" fill="${P.ink}"/><circle cx="16" cy="21" r="3" fill="#f5ca63"/>`,
   place: `<rect x="3" y="3" width="34" height="11" rx="2" fill="${P.wheat}" stroke="${P.soil}" stroke-width="1.6"/><rect x="15" y="17" width="10" height="9" rx="1.5" fill="${P.cream}" stroke="${P.soil}" stroke-width="1.6"/>` +
     `<path d="M20 14V17M17 26L9 32M23 26L31 32" stroke="${P.soil}" stroke-width="2.2" stroke-linecap="round"/><circle cx="9" cy="34" r="4" fill="${P.tomato}"/><circle cx="31" cy="34" r="4" fill="#9DB23E"/><circle cx="20" cy="8.5" r="3.4" fill="${P.tomato}"/>`,
 };
@@ -337,6 +339,6 @@ export function ensureItemSymbols(defs, items) {
 }
 
 // the UI icons drawn as pixel sprites
-for (const k of ['yes', 'no', 'noRed', 'coin', 'lock', 'map', 'help', 'shop', 'levels', 'hint', 'lente', 'fast', 'clear', 'place', 'trophy', 'cog', 'sun', 'moon']) {
+for (const k of ['yes', 'no', 'noRed', 'coin', 'lock', 'map', 'help', 'shop', 'levels', 'hint', 'lente', 'fast', 'clear', 'place', 'trophy', 'cog', 'sun', 'moon', 'restart', 'whistle']) {
   if (ICON[k]) registerSprite(ICON[k], `u_${k}`);
 }

@@ -12,14 +12,11 @@ import { QUESTIONS, QUESTION_IDS, SENSORS, parseItem, itemKey, questionUnlocked 
 import { compile, solutionOf, trainingBatch, testBatch, runBatch, countSolutions, bruteForce, layoutTree, treeDepth, rng, route, wrongGates } from '../js/sorting/tree.js';
 import { levelStatus, requiredSensors, startLevel } from '../js/sorting/progress.js';
 import { truckSpec, PIPE_COLOUR } from '../js/sorting/trucks.js';
-import { defaultSort, sanitizeSort, defaultLab, sanitizeLab } from '../js/storage.js';
-import { LAB_LEVELS, CLASS_COLOURS, cut } from '../js/lab/levels.js';
-import {
-  emptyNode, listNodes, countNodes, isComplete, nodeAt, route as labRoute, reaches, regions, trueRegions, makeSamples,
-  accuracy, scoreTest, coinsForAccRatio, payFor, looksOverfit, polyArea, clipPoly, lineInPoly, UNIT_SQUARE, labNoise,
-  labSamples, labLevelStatus, labStartLevel, layoutLab, applyNode, deleteNode, removedBy, addedBy, subtreeSize,
-  majority, cleanTree, copyTree, inPoly, sideCount, defaultLine,
-} from '../js/lab/model.js';
+import { defaultSort, sanitizeSort, defaultLab, sanitizeLab, defaultHerd, sanitizeHerd } from '../js/storage.js';
+import { ORCHARD_LEVELS } from '../js/orchard/levels.js';
+import * as O from '../js/orchard/model.js';
+import { HERD_LEVELS } from '../js/herd/levels.js';
+import * as H from '../js/herd/model.js';
 
 let passed = 0;
 const test = (name, fn) => { fn(); passed++; console.log('ok  ', name); };
@@ -608,338 +605,146 @@ test('smistamento: no emoji in minigame 2; no L3 words in minigame 1; no "bias"'
   assert.ok(help.length > 100 && !L3.test(help), 'weighing help');
 });
 
-// ------------------------------------------------------------------ minigame 3: Il laboratorio
-// seeded random numbers, so the statistical checks below give the same answer every run
-function seeded(seed) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6D2B79F5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-// a careful copy of a tree: every line end moved by up to +-j
-const jitter = (tree, R, j) => { const t = copyTree(tree); for (const e of listNodes(t)) for (const q of ['x1', 'y1', 'x2', 'y2']) e.node.line[q] += (R() - 0.5) * 2 * j; return t; };
-// a random line, at least as long as the game allows (two handles apart)
-function randLine(R) {
-  for (;;) { const l = { x1: R(), y1: R(), x2: R(), y2: R() }; if (Math.hypot(l.x2 - l.x1, l.y2 - l.y1) > 0.06) return l; }
-}
-// a random player tree with up to `max` nodes
-function randomTree(R, K, max) {
-  const t = emptyNode();
-  for (let k = 0; k < 40 && countNodes(t) <= max; k++) {
-    const open = listNodes(t).filter((e) => !e.node.line);
-    if (!open.length) break;
-    const e = open[Math.floor(R() * open.length)];
-    const room = max - countNodes(t);
-    const choice = [0, 1].map(() => (R() < 0.45 && room > 0 ? '+' : Math.floor(R() * K)));
-    if (choice[0] === '+' && choice[1] === '+' && room < 2) choice[1] = 0;
-    applyNode(t, e.path, randLine(R), choice);
+// ------------------------------------------------------------------ minigame 3: Il frutteto
+test('frutteto: about 10 levels, easy -> hard; 1 to 3 fences; unique ids', () => {
+  assert.ok(ORCHARD_LEVELS.length >= 8 && ORCHARD_LEVELS.length <= 12);
+  assert.equal(new Set(ORCHARD_LEVELS.map((l) => l.id)).size, ORCHARD_LEVELS.length);
+  for (const lv of ORCHARD_LEVELS) {
+    assert.ok(lv.fences >= 1 && lv.fences <= 3, lv.id);
+    assert.ok(lv.lines.length <= lv.fences, `${lv.id}: the true fences fit in the fences you get`);
+    assert.ok(lv.pass > 0.6 && lv.pass <= 1, lv.id);
   }
-  // close the rest with colours
-  for (const e of listNodes(t)) if (!e.node.line) applyNode(t, e.path, randLine(R), [0, K - 1]);
-  return t;
-}
+  assert.equal(ORCHARD_LEVELS[0].fences, 1, 'one fence first');
+  assert.ok(ORCHARD_LEVELS.some((l) => l.fences === 3), 'a three-fence level');
+  assert.ok(ORCHARD_LEVELS.slice(0, 2).every((l) => l.noise === 0), 'no stray goats at the start');
+});
 
-test('laboratorio: config (upgrades 0..10, pay thresholds, prices, node cap)', () => {
-  const L = CONFIG.LAB;
-  assert.equal(L.SAMPLES.length, CONFIG.MAX_LEVEL + 1);
-  assert.equal(L.NOISE_FACTOR.length, CONFIG.MAX_LEVEL + 1);
-  assert.ok(L.SAMPLES[0] >= 60 && L.SAMPLES[0] <= 80 && L.SAMPLES[10] >= 140 && L.SAMPLES[10] <= 160, 'about 70 -> 150 samples');
-  for (let i = 1; i <= 10; i++) {
-    assert.ok(L.SAMPLES[i] > L.SAMPLES[i - 1], 'more samples every level');
-    assert.ok(L.NOISE_FACTOR[i] < L.NOISE_FACTOR[i - 1], 'less noise every level');
+test('frutteto: every orchard is half trees, the true fences pass it, no fence fails it', () => {
+  for (const lv of ORCHARD_LEVELS) {
+    for (let seed = 1; seed <= 25; seed++) {
+      const items = O.makeItems(lv, seed);
+      assert.equal(items.length, lv.n, `${lv.id}: ${items.length} items`);
+      const trees = items.filter((it) => it.c === 'tree').length;
+      assert.ok(Math.abs(trees - lv.n / 2) <= 1, `${lv.id}: ${trees} trees of ${lv.n}`);
+      for (const it of items) assert.ok(it.x >= 0 && it.x <= 1 && it.y >= 0 && it.y <= 1);
+      const best = O.bestScore(lv, items);
+      assert.ok(best >= lv.pass, `${lv.id} seed ${seed}: the true fences score ${best}`);
+      if (lv.noise === 0) assert.equal(best, 1, `${lv.id}: no noise, the true fences are perfect`);
+      assert.ok(O.evaluate(items, []).score < lv.pass, `${lv.id}: no fence passes`);
+      assert.equal(O.starsFor(lv, best, best), 3);
+    }
   }
-  assert.ok(L.NOISE_FACTOR[10] > 0, 'noise never zero');
-  const t = L.SCORE_THRESHOLDS;
-  for (let i = 1; i < t.length; i++) assert.ok(t[i].minRatio < t[i - 1].minRatio && t[i].coins < t[i - 1].coins);
-  assert.equal(coinsForAccRatio(1), 10);
-  assert.equal(coinsForAccRatio(1.2), 10, 'beating the true tree by luck pays 10');
-  assert.equal(coinsForAccRatio(0.3), 0);
-  assert.equal(coinsForAccRatio(39 / 40), 9, '1 more mistake than the true tree on 40');
-  assert.equal(coinsForAccRatio(37 / 40), 7, '3 more mistakes');
-  assert.equal(L.UNLOCK_COST, 200);
-  assert.ok(L.hintCost(1) > L.hintCost(0), 'hint price rises');
-  assert.ok(L.MAX_NODES >= 6 && L.MAX_NODES <= 8, 'node cap');
-  assert.ok(CLASS_COLOURS.length >= 5 && new Set(CLASS_COLOURS.map((c) => c.shape)).size === CLASS_COLOURS.length, 'a shape per colour');
 });
 
-test('laboratorio: about 10 levels, easy -> hard; one-line levels mixed in; triangle, square, 5 colours', () => {
-  assert.ok(LAB_LEVELS.length >= 9 && LAB_LEVELS.length <= 12);
-  assert.equal(new Set(LAB_LEVELS.map((l) => l.id)).size, LAB_LEVELS.length, 'unique ids');
-  const lines = LAB_LEVELS.map((lv) => countNodes(lv.tree));
-  LAB_LEVELS.forEach((lv) => {
-    assert.ok(lv.title && lv.title.length <= 30 && lv.x.name && lv.x.icon && lv.y.name && lv.y.icon, `${lv.id}: short title, axes`);
-    assert.ok(lv.classes.length >= 2 && lv.classes.length <= CLASS_COLOURS.length, `${lv.id}: 2-5 classes`);
-    assert.ok(countNodes(lv.tree) <= CONFIG.LAB.MAX_NODES - 1, `${lv.id}: the player has room for the true tree and one more line`);
-    assert.ok(isComplete(lv.tree), `${lv.id}: complete true tree`);
-    assert.ok(lv.noise > 0 && lv.noise < 0.15, `${lv.id}: noise`);
-    for (const e of listNodes(lv.tree)) {
-      const t = e.node.line;
-      for (const v of [t.x1, t.y1, t.x2, t.y2]) assert.ok(v >= 0 && v <= 1, `${lv.id}: line points inside the field`);
-      assert.ok(lineInPoly(t, e.poly), `${lv.id}: every true line cuts its region (no spare nodes)`);
-      assert.ok(e.node.kids.every((k) => typeof k === 'object' || (Number.isInteger(k) && k >= 0 && k < lv.classes.length)), `${lv.id}: leaves`);
-    }
-    const rs = trueRegions(lv.tree);
-    for (let k = 0; k < lv.classes.length; k++) assert.ok(rs.some((r) => r.cls === k && r.area > 0.03), `${lv.id}: class ${k} has a region`);
-    assert.ok(Math.abs(rs.reduce((a, r) => a + r.area, 0) - 1) < 1e-9, `${lv.id}: regions cover the field once`);
-    // the true tree survives a save, so it is a tree the player could build
-    assert.deepEqual(cleanTree(copyTree(lv.tree), lv.classes.length), lv.tree, `${lv.id}: the true tree is a valid player tree`);
-  });
-  assert.equal(lines[0], 1, 'level 1: one line');
-  assert.ok(lines.filter((n) => n === 1).length >= 3, 'several levels need one line only');
-  assert.ok(lines.slice(3).some((n) => n === 1), 'a one-line level among the harder ones');
-  assert.ok(lines[lines.length - 1] >= 5 && LAB_LEVELS[LAB_LEVELS.length - 1].classes.length >= 5, 'a hard final level');
-  assert.ok(LAB_LEVELS.filter((lv) => lv.classes.length >= 5).length >= 2, 'two 5-colour levels');
-  // a clean triangle and a clean square (a region with 3 / 4 sides away from the border, a gap, little noise)
-  const shape = (k) => LAB_LEVELS.find((lv) => lv.gap >= 0.05 && lv.noise <= 0.02 &&
-    trueRegions(lv.tree).some((r) => r.poly.length === k && r.poly.every((p) => p[0] > 1e-6 && p[0] < 1 - 1e-6 && p[1] > 1e-6 && p[1] < 1 - 1e-6)));
-  assert.ok(shape(3), 'a clean triangle level');
-  assert.ok(shape(4), 'a clean square level');
-  // non-convex classes: one colour in two leaves
-  assert.ok(LAB_LEVELS.filter((lv) => lv.classes.some((_, k) => regions(lv.tree).filter((r) => r.cls === k).length >= 2)).length >= 3, 'non-convex classes');
-});
-
-test('laboratorio: tree model (apply, "+" nodes, replace, delete, cap, orientation, routing)', () => {
-  const t = emptyNode();
-  assert.equal(countNodes(t), 1);
-  assert.ok(!isComplete(t));
-  assert.equal(labRoute(t, 0.5, 0.5).cls, null, 'an empty root predicts nothing');
-  // a vertical line: side "+" on the right, colour 2 on the left
-  applyNode(t, [], { x1: 0.5, y1: 1, x2: 0.5, y2: 0 }, ['+', 2]);
-  // turned so that kid 0 is the left part of the field
-  assert.equal(t.kids[0], 2, 'the left side comes first after apply');
-  assert.ok(typeof t.kids[1] === 'object' && t.kids[1].line === null, 'a "+" side gets an empty node');
-  assert.equal(countNodes(t), 2);
-  assert.ok(!isComplete(t));
-  assert.equal(labRoute(t, 0.2, 0.5).cls, 2);
-  assert.equal(labRoute(t, 0.8, 0.5).cls, null, 'stops at the empty node');
-  assert.ok(reaches(t, [1], 0.8, 0.5) && !reaches(t, [1], 0.2, 0.5));
-  // a horizontal line in node 2, "+" above: turned so that the lower side comes first
-  applyNode(t, [1], { x1: 0.5, y1: 0.5, x2: 1, y2: 0.5 }, ['+', 0]);
-  assert.equal(nodeAt(t, [1]).kids[0], 0, 'lower side first');
-  applyNode(t, [1, 1], { x1: 0.75, y1: 0, x2: 0.75, y2: 1 }, [1, 3]);
-  assert.equal(countNodes(t), 3);
-  assert.ok(isComplete(t));
-  assert.equal(labRoute(t, 0.6, 0.2).cls, 0);
-  assert.equal(labRoute(t, 0.6, 0.8).cls, 1);
-  assert.equal(labRoute(t, 0.9, 0.8).cls, 3);
-  // changing a "+" side of node 2 to a colour removes its subtree
-  const n2 = nodeAt(t, [1]);
-  assert.equal(removedBy(n2, [0, 1]), subtreeSize(n2.kids[1]));
-  assert.equal(removedBy(n2, [0, '+']), 0);
-  assert.equal(addedBy(t, ['+', '+']), 1, 'one new node on the colour side');
-  applyNode(t, [1], n2.line, [0, 1]);
-  assert.equal(countNodes(t), 2);
-  assert.equal(labRoute(t, 0.9, 0.8).cls, 1);
-  // delete: node 2 becomes a leaf; the root becomes empty
-  deleteNode(t, [1], 3);
-  assert.equal(countNodes(t), 1);
-  assert.equal(labRoute(t, 0.9, 0.8).cls, 3);
-  assert.deepEqual(deleteNode(t, [], 0), emptyNode());
-  // the regions of any tree cover the field once and agree with route(); layout within 348 px
-  const R = seeded(7);
-  for (let k = 0; k < 200; k++) {
-    const tr = randomTree(R, 5, CONFIG.LAB.MAX_NODES);
-    assert.ok(countNodes(tr) <= CONFIG.LAB.MAX_NODES, 'cap');
-    const rs = regions(tr);
-    assert.ok(Math.abs(rs.reduce((a, q) => a + polyArea(q.poly), 0) - 1) < 1e-9, 'cover');
-    for (let j = 0; j < 10; j++) {
-      const x = R(), y = R();
-      const inside = rs.filter((q) => inPoly(q.poly, x, y, 1e-9));
-      if (inside.length === 1) assert.equal(inside[0].cls, labRoute(tr, x, y).cls);
-    }
-    const W = 348;
-    const lay = layoutLab(tr, W, { top: 29, rowH: 66, pad: 6 });
-    const size = (it) => (it.kind === 'leaf' ? 13 : it.kind === 'empty' ? 18 : 21);
-    for (const a of lay.items) assert.ok(a.x - size(a) >= 0 && a.x + size(a) <= W, 'inside the width');
-    for (let p = 0; p < lay.items.length; p++) for (let q = p + 1; q < lay.items.length; q++) {
-      const a = lay.items[p], b = lay.items[q];
-      if (a.y === b.y) assert.ok(Math.abs(a.x - b.x) >= size(a) + size(b) + 3, 'tree pieces overlap');
-    }
-    assert.deepEqual(cleanTree(copyTree(tr), 5), tr, 'saves round trip');
-  }
-  // majority and the live count
-  const pts = [{ x: 0.2, y: 0.5, cls: 1 }, { x: 0.3, y: 0.5, cls: 1 }, { x: 0.8, y: 0.5, cls: 0 }];
-  const vline = { x1: 0.5, y1: 0, x2: 0.5, y2: 1 };   // left side = x < 0.5
-  assert.equal(majority(pts, vline, 0), 1);
-  assert.equal(majority(pts, vline, 1), 0);
-  assert.deepEqual(sideCount(vline, [1, 0], pts), { right: 3, total: 3 });
-  assert.deepEqual(sideCount(vline, ['+', 1], pts), { right: 0, total: 1 }, '"+" sides do not count');
-  assert.ok(defaultLine(UNIT_SQUARE).y1 === defaultLine(UNIT_SQUARE).y2, 'a new line starts horizontal');
-});
-
-test('laboratorio: every true region holds enough training points to be seen', () => {
-  const R = seeded(11);
-  LAB_LEVELS.forEach((lv) => {
-    const rs = trueRegions(lv.tree).filter((r) => r.area > 0);
-    for (const r of rs) assert.ok(r.weight * labSamples(lv, 0) >= 7, `${lv.id}: region of class ${r.cls} expects ${(r.weight * labSamples(lv, 0)).toFixed(1)} points`);
-    const pts = makeSamples(lv, 400, labNoise(lv, 0), R);
-    const counts = rs.map((r) => pts.filter((p) => inPoly(r.poly, p.tx, p.ty, 1e-9)).length);
-    counts.forEach((n, k) => assert.ok(n / 400 * labSamples(lv, 0) >= 5, `${lv.id}: region ${k} got ${n}/400`));
-    for (const p of pts) assert.equal(labRoute(lv.tree, p.tx, p.ty).cls, p.cls, `${lv.id}: label = true tree at the noiseless position`);
-    for (const p of pts) assert.ok(p.x > 0 && p.x < 1 && p.y > 0 && p.y < 1, 'measured inside the field');
-  });
-});
-
-test('laboratorio: the true tree passes reliably on fresh samples; a careful copy passes; one colour fails', () => {
-  const R = seeded(23);
-  const cfg = CONFIG.LAB;
-  const report = [];
-  LAB_LEVELS.forEach((lv) => {
-    const N = 300;
-    let acc = 0, near = 0, flat = 0;
-    for (let k = 0; k < N; k++) {
-      const test2 = makeSamples(lv, cfg.TEST_SIZE, labNoise(lv, 0), R);
-      const t = scoreTest(lv.tree, lv.tree, test2);
-      assert.equal(t.coins, 10, `${lv.id}: the true tree always pays 10`);
-      acc += t.best.acc;
-      if (scoreTest(jitter(lv.tree, R, 0.015), lv.tree, test2).coins >= cfg.PASS_COINS) near++;
-      const counts = lv.classes.map((_, q) => test2.filter((p) => p.cls === q).length);
-      const top = counts.indexOf(Math.max(...counts));
-      if (scoreTest(cut(0, 0, 1, 0.001, { left: top, right: top }), lv.tree, test2).coins >= cfg.PASS_COINS) flat++;
-    }
-    acc /= N;
-    report.push(`${lv.id} ${(100 * acc).toFixed(0)}%`);
-    assert.ok(acc >= 0.85, `${lv.id}: true tree accuracy ${acc.toFixed(3)}`);
-    assert.ok(near / N >= 0.9, `${lv.id}: careful copy passes ${near}/${N}`);
-    assert.ok(flat / N <= 0.02, `${lv.id}: one colour passes ${flat}/${N}`);
-  });
-  console.log('      true tree test accuracy:', report.join(', '));
-});
-
-test('laboratorio: pay, overfitting on a noisy one-line level, progression', () => {
-  assert.equal(payFor(8, { best: 0, replay: false }), 8);
-  assert.equal(payFor(8, { best: 6, replay: false }), 2, 'only the part above the record');
-  assert.equal(payFor(5, { best: 6, replay: false }), 0);
-  assert.equal(payFor(10, { best: 0, replay: true }), Math.round(10 * CONFIG.LAB.REPLAY_FACTOR));
-  assert.ok(looksOverfit(0.95, 0.9, 0.85, 0.92), 'better on training, worse on test');
-  assert.ok(!looksOverfit(0.95, 0.9, 0.92, 0.92), 'as good on test: fine');
-  assert.ok(!looksOverfit(0.7, 0.9, 0.6, 0.9), 'a bad tree is not "learnt by heart"');
-  // a noisy one-line level: a player who grows the tree to the cap around stray training points
-  // (best of many random lines, greedily) beats the true tree on training and loses on test
-  const lv = LAB_LEVELS.find((l) => l.id === 'mosca');
-  assert.equal(countNodes(lv.tree), 1);
-  const R = seeded(5);
-  let gainTrain = 0, lossTest = 0, notes = 0;
-  const N = 20;
-  for (let k = 0; k < N; k++) {
-    const train = makeSamples(lv, labSamples(lv, 0), labNoise(lv, 0), R);
-    // the true line, then "+" on both sides, and so on, until the cap
-    const t = copyTree(lv.tree);
-    applyNode(t, [], t.line, ['+', '+']);
-    for (let guard = 0; guard < 20; guard++) {
-      const open = listNodes(t).filter((e) => !e.node.line);
-      if (!open.length) break;
-      const e = open[0];
-      const pts = train.filter((p) => reaches(t, e.path, p.x, p.y));
-      const room = CONFIG.LAB.MAX_NODES - countNodes(t);
-      let best = null, bestRight = -1;
-      for (let j = 0; j < 400; j++) {
-        const line = { x1: R(), y1: R(), x2: R(), y2: R() };
-        const ch = [0, 1].map((b) => majority(pts, line, b, majority(pts, null, 0)));
-        const r = sideCount(line, ch, pts).right;
-        if (r > bestRight) { bestRight = r; best = { line, ch }; }
-      }
-      const ch = best.ch.map((c, b) => (room >= 2 && b === 0 && bestRight < pts.length ? '+' : c));
-      applyNode(t, e.path, best.line, ch);
-    }
-    const test2 = makeSamples(lv, CONFIG.LAB.TEST_SIZE, labNoise(lv, 0), R);
-    const [trP, trB, teP, teB] = [accuracy(t, train).acc, accuracy(lv.tree, train).acc, accuracy(t, test2).acc, accuracy(lv.tree, test2).acc];
-    gainTrain += (trP - trB) / N; lossTest += (teB - teP) / N;
-    if (looksOverfit(trP, trB, teP, teB)) notes++;
-  }
-  assert.ok(gainTrain > 0.03 && lossTest > 0.01, `learning by heart: training +${gainTrain.toFixed(3)}, test -${lossTest.toFixed(3)}`);
-  assert.ok(notes >= N * 0.3, `the note appears for a tree learnt by heart (${notes}/${N})`);
-  let careful = 0;
-  LAB_LEVELS.forEach((l2) => {
-    for (let k = 0; k < 40; k++) {
-      const tr = makeSamples(l2, labSamples(l2, 0), labNoise(l2, 0), R), te = makeSamples(l2, 40, labNoise(l2, 0), R);
-      const sp = jitter(l2.tree, R, 0.015);
-      if (looksOverfit(accuracy(sp, tr).acc, accuracy(l2.tree, tr).acc, accuracy(sp, te).acc, accuracy(l2.tree, te).acc)) careful++;
-    }
-  });
-  assert.ok(careful <= 4, `careful players get the note ${careful}/400 times`);
-  // progression: level by level
+test('frutteto: pieces, majority, time, stars and pay', () => {
+  const items = [{ x: 0.2, y: 0.5, c: 'tree' }, { x: 0.3, y: 0.5, c: 'tree' }, { x: 0.8, y: 0.5, c: 'goat' }, { x: 0.25, y: 0.2, c: 'goat' }];
+  const e = O.evaluate(items, [[0.5, 0, 0.5, 1]]);
+  assert.equal(e.pieces.size, 2);
+  assert.deepEqual(e.wrong, [3], 'the goat among the trees is wrong');
+  assert.equal(e.score, 0.75);
+  assert.deepEqual(O.evaluate([{ x: 0.1, y: 0.1, c: 'tree' }, { x: 0.2, y: 0.1, c: 'goat' }], []).wrong, [0], 'a tie goes to the goats');
+  assert.equal(O.timeFor({ fences: 1 }), CONFIG.ORCHARD.TIME_BASE);
+  assert.ok(O.timeFor({ fences: 3 }) > O.timeFor({ fences: 1 }));
+  const lv = { pass: 0.8 };
+  assert.equal(O.starsFor(lv, 0.79, 1), 0);
+  assert.equal(O.payFor(lv, 0.79, 1, false), 0);
+  assert.equal(O.payFor(lv, 0.8, 1, false), CONFIG.ORCHARD.MIN_PAY);
+  assert.equal(O.payFor(lv, 1, 1, false), CONFIG.ORCHARD.MAX_PAY);
+  assert.equal(O.payFor(lv, 1, 1, true), Math.round(CONFIG.ORCHARD.MAX_PAY * CONFIG.ORCHARD.REPLAY_FACTOR));
+  assert.ok(O.starsFor(lv, 0.85, 1) === 1 && O.starsFor(lv, 0.95, 1) === 2 && O.starsFor(lv, 1, 1) === 3);
+  // a short swipe in the middle becomes a fence across the whole orchard
+  const c = O.clipToSquare([0.4, 0.5, 0.6, 0.5]);
+  assert.ok(c && Math.abs(c[0]) < 1e-9 && Math.abs(c[2] - 1) < 1e-9 && c[1] === 0.5);
+  assert.equal(O.clipToSquare([-1, 2, 2, 2]), null, 'outside the orchard');
   const lab = defaultLab();
-  assert.ok(labLevelStatus(lab, LAB_LEVELS, 0).open && !labLevelStatus(lab, LAB_LEVELS, 1).open);
-  lab.passed = [LAB_LEVELS[0].id];
-  assert.equal(labStartLevel(lab, LAB_LEVELS), 1);
-  lab.current = LAB_LEVELS[5].id;
-  assert.equal(labStartLevel(lab, LAB_LEVELS), 1, 'never a closed level');
+  assert.ok(O.levelOpen(lab, 0, ORCHARD_LEVELS) && !O.levelOpen(lab, 1, ORCHARD_LEVELS));
+  lab.passed = [ORCHARD_LEVELS[0].id];
+  assert.ok(O.levelOpen(lab, 1, ORCHARD_LEVELS) && !O.levelOpen(lab, 2, ORCHARD_LEVELS));
 });
 
-test('laboratorio: saves (no "lab"; garbage; version 1 fixed shapes dropped; trees cleaned)', () => {
-  const base = { playerId: '11111111-2222-4333-8444-555555555555', coins: 3, levels: { scanner: 2, belt: 2, truck: 4 } };
-  assert.deepEqual(sanitize(base).lab, defaultLab(), 'old save without the lab gets an empty progress');
-  assert.deepEqual(sanitizeLab('garbage'), defaultLab());
-  // a save from round 1 (fixed shapes): progress starts over, place, upgrades and hints stay
-  const v1 = { levelsVersion: 1, unlocked: true, passed: ['olive', 'uve'], current: 'uve', samples: 3, precision: 4, hints: 2, hintsBought: 1, seenHelp: true,
-    boards: { olive: { nodes: [{ x1: 0.1, y1: 0.2, x2: 0.9, y2: 0.8, c: [1, 0], flip: true }], best: 7 } }, hinted: { olive: [0] } };
-  const m1 = sanitize({ ...base, coins: 50, lab: v1 });
-  assert.equal(m1.coins, 50, 'coins kept');
-  assert.ok(m1.lab.unlocked && m1.lab.samples === 3 && m1.lab.precision === 4 && m1.lab.hints === 2 && m1.lab.hintsBought === 1 && m1.lab.seenHelp);
-  assert.deepEqual([m1.lab.passed, m1.lab.boards, m1.lab.hinted, m1.lab.current], [[], {}, [], null]);
-  const t = copyTree(LAB_LEVELS[1].tree);
-  const good = {
-    ...defaultLab(), unlocked: true, passed: ['olive', 'nope'], current: 'latte', precision: 14, hinted: ['latte', 'x'],
-    boards: {
-      latte: { tree: t, best: 7, replay: false },
-      olive: { tree: { line: { x1: 0.1, y1: 0.2, x2: 0.9, y2: 0.8 }, kids: [1, 1] }, best: 99 },
-      uve: { tree: { line: { x1: -1, y1: 0.2, x2: 0.9, y2: 0.8 }, kids: [0, 1] } },
-      castagno: { tree: { line: { x1: 0.1, y1: 0.2, x2: 0.9, y2: 0.8 }, kids: [0, 7] } },
-      mieli: { tree: emptyNode() },
-    },
-  };
-  const m = sanitize({ ...base, lab: good }).lab;
-  assert.deepEqual(m.passed, ['olive']);
-  assert.equal(m.current, 'latte');
-  assert.equal(m.precision, CONFIG.MAX_LEVEL, 'upgrade levels clamped');
-  assert.deepEqual(m.hinted, ['latte']);
-  assert.deepEqual(m.boards.latte, { tree: t, best: 7, replay: false });
-  assert.equal(m.boards.olive.best, CONFIG.MAX_PAY, 'record clamped');
-  assert.equal(m.boards.uve, undefined, 'a line outside the field is dropped');
-  assert.equal(m.boards.castagno, undefined, 'an unknown colour is dropped');
-  assert.deepEqual(m.boards.mieli.tree, emptyNode());
-  // too many nodes: dropped
-  let big = emptyNode();
-  for (let k = 0; k < CONFIG.LAB.MAX_NODES + 2; k++) big = { line: { x1: 0.1, y1: 0.2, x2: 0.9, y2: 0.8 }, kids: [0, big.line ? big : 1] };
-  assert.equal(cleanTree(big, 2), null, 'more than MAX_NODES nodes');
-  assert.deepEqual(sanitize(JSON.parse(JSON.stringify({ ...base, lab: m }))).lab, m, 'round trip');
+// ------------------------------------------------------------------ minigame 4: Il pascolo
+test('pascolo: 10 levels, easy -> hard (more herds, overlaps, strays, smaller tolerance)', () => {
+  assert.ok(HERD_LEVELS.length >= 8 && HERD_LEVELS.length <= 12);
+  assert.equal(new Set(HERD_LEVELS.map((l) => l.id)).size, HERD_LEVELS.length);
+  assert.equal(HERD_LEVELS[0].herds.length, 1, 'one herd first');
+  const last = HERD_LEVELS[HERD_LEVELS.length - 1];
+  assert.ok(last.herds.length >= 3 && last.tol <= HERD_LEVELS[0].tol);
+  for (const lv of HERD_LEVELS) {
+    assert.ok(lv.herds.length >= 1 && lv.herds.length <= 4, lv.id);
+    assert.equal(new Set(lv.herds.map((h) => h.c)).size, lv.herds.length, `${lv.id}: one colour per herd`);
+  }
 });
 
-test('laboratorio: little text; no L4 words, no "bias", emoji only as axis icons; sw.js caches every file', () => {
+test('pascolo: dogs in the middle pass, dogs a bit off fail; the circle is the distance', () => {
+  for (const lv of HERD_LEVELS) {
+    for (let seed = 1; seed <= 10; seed++) {
+      const sheep = H.makeSheep(lv, seed);
+      assert.equal(sheep.length, lv.herds.reduce((t, h) => t + h.n + (h.strays || 0), 0));
+      const C = H.centres(lv, sheep);
+      for (const [w, h] of [[360, 420], [330, 300]]) {
+        assert.ok(H.whistle(lv, sheep, C, w, h).pass, `${lv.id}: dogs on the centres pass`);
+        const unit = Math.min(w, h);
+        const off = C.map((c) => ({ x: c.x + (lv.tol * 1.3 * unit) / w, y: c.y }));
+        const r = H.whistle(lv, sheep, off, w, h);
+        assert.ok(!r.pass && r.res.every((q) => !q.ok && q.near), `${lv.id}: 1.3 x tol off fails, but is near`);
+        assert.ok(Math.abs(r.res[0].dist - lv.tol * 1.3) < 1e-9, 'the distance is in shares of the shorter side');
+      }
+      assert.ok(!H.whistle(lv, sheep, C.map(() => null)).pass, 'dogs still in the tray');
+    }
+  }
+});
+
+test('pascolo: pay and stars fall with the whistles', () => {
+  assert.equal(H.payFor(1, false), CONFIG.HERD.PAY[0]);
+  assert.ok(H.payFor(2, false) < H.payFor(1, false) && H.payFor(9, false) === CONFIG.HERD.PAY[CONFIG.HERD.PAY.length - 1]);
+  assert.equal(H.payFor(1, true), Math.round(CONFIG.HERD.PAY[0] * CONFIG.HERD.REPLAY_FACTOR));
+  assert.deepEqual([1, 2, 3, 7].map(H.starsFor), [3, 2, 1, 1]);
+});
+
+test('frutteto and pascolo: saves (old laboratorio dropped, place kept; garbage; round trip)', () => {
+  const base = { playerId: 'x'.repeat(36), coins: 10 };
+  assert.deepEqual(sanitize(base).lab, defaultLab());
+  assert.deepEqual(sanitize(base).herd, defaultHerd());
+  const oldLab = { levelsVersion: 2, unlocked: true, passed: ['mosca'], boards: { mosca: {} }, current: 'mosca', seenHelp: true, samples: 3 };
+  const m = sanitize({ ...base, lab: oldLab }).lab;
+  assert.ok(m.unlocked, 'the bought place stays');
+  assert.deepEqual([m.passed, m.stars, m.current, m.seenHelp], [[], {}, null, false]);
+  assert.ok(!('samples' in m) && !('boards' in m));
+  const good = { ...defaultLab(), unlocked: true, passed: [ORCHARD_LEVELS[0].id, 'nope', ORCHARD_LEVELS[0].id], stars: { [ORCHARD_LEVELS[0].id]: 5, nope: 2, x: 'a' }, current: ORCHARD_LEVELS[1].id, seenHelp: true };
+  const g = sanitizeLab(good);
+  assert.deepEqual(g.passed, [ORCHARD_LEVELS[0].id]);
+  assert.deepEqual(g.stars, { [ORCHARD_LEVELS[0].id]: 3 });
+  assert.equal(g.current, ORCHARD_LEVELS[1].id);
+  assert.deepEqual(sanitizeLab(JSON.parse(JSON.stringify(g))), g, 'round trip');
+  const hg = sanitizeHerd({ ...defaultHerd(), unlocked: true, passed: [HERD_LEVELS[0].id], stars: { [HERD_LEVELS[0].id]: 2 } });
+  assert.ok(hg.unlocked && hg.passed.length === 1 && hg.stars[HERD_LEVELS[0].id] === 2);
+  assert.deepEqual(sanitizeHerd('garbage'), defaultHerd());
+});
+
+test('frutteto and pascolo: little text, no emoji; no L4 words in the orchard; key terms; sw.js caches every file', () => {
   const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
   const emoji = /\p{Extended_Pictographic}/u;
-  const L4 = /distanz|somiglian|simil|vicin|\bknn\b|k-means|cluster|raggrupp|supervisionat/i;
-  const files = ['js/lab/levels.js', 'js/lab/model.js', 'js/lab/draw.js', 'js/lab/game.js', 'js/lab/shop.js'];
-  for (const f of files) {
+  const L4 = /distanz|somiglian|simil|vicin|\bknn\b|k-means|cluster|raggrupp|supervisionat|centr/i;
+  for (const f of ['js/orchard/levels.js', 'js/orchard/model.js', 'js/orchard/game.js', 'js/herd/levels.js', 'js/herd/model.js', 'js/herd/game.js']) {
     const src = read(f);
-    assert.ok(!L4.test(src), `${f}: L4 word "${(src.match(L4) || [])[0]}"`);
+    assert.ok(!emoji.test(src), `${f}: emoji ${(src.match(emoji) || [])[0]}`);
     assert.ok(!/\bbias\b/i.test(src), `${f}: says "bias"`);
-    if (f !== 'js/lab/levels.js') assert.ok(!emoji.test(src), `${f}: emoji ${(src.match(emoji) || [])[0]}`);
+    if (f.startsWith('js/orchard')) assert.ok(!L4.test(src), `${f}: L4 word "${(src.match(L4) || [])[0]}"`);
   }
-  const noIcons = read('js/lab/levels.js').replace(/icon: '[^']*'/g, '');
-  assert.ok(!emoji.test(noIcons), 'levels.js: emoji outside the axis icons');
-  assert.ok(LAB_LEVELS.every((lv) => !lv.story), 'no level stories: title and legend only');
-  // the pop-up and the screen: no sentences, only a few words
   const html = read('index.html');
-  const labHtml = html.slice(html.indexOf('id="screen-lab"'), html.indexOf('SHEETS AND MODALS'));
-  assert.ok(labHtml.length > 100 && !emoji.test(labHtml) && !L4.test(labHtml), 'lab screen HTML');
-  const visible = labHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-  assert.ok(visible.split(' ').length <= 12, `lab screen text: "${visible}"`);
-  const main = read('js/main.js');
-  const labMain = main.slice(main.indexOf('async function onLabPlace'), main.indexOf('// ------------------------------------------------------------ help'));
-  assert.ok(labMain.length > 100 && !L4.test(labMain), 'lab texts in main.js');
-  // the key terms appear (once each on screen, in Italian with the English)
-  const game = read('js/lab/game.js');
-  for (const term of ['addestramento <em>(training)</em>', 'accuratezza <em>(accuracy)</em>', 'confine di decisione', '(decision boundary)']) assert.ok(game.includes(term), `key term ${term}`);
+  for (const [id, end] of [['screen-lab', 'PASTURE'], ['screen-herd', 'SHEETS AND MODALS']]) {
+    const part = html.slice(html.indexOf(`<section id="${id}"`), html.indexOf(end)).replace(/<!--[\s\S]*?-->|<!--[\s\S]*$/g, "");
+    assert.ok(part.length > 100 && !emoji.test(part), `${id} HTML`);
+    const visible = part.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    assert.ok(visible.split(' ').length <= 6, `${id} text: "${visible}"`);
+  }
+  assert.ok(read('js/orchard/game.js').includes('confine di decisione</b> <em>(decision boundary)</em>'), 'orchard key term');
+  assert.ok(read('js/herd/game.js').includes('<b>centro</b> <em>(centroid)</em>'), 'herd key term');
   const sw = read('sw.js');
   const walk = (dir) => readdirSync(new URL(`../${dir}`, import.meta.url), { withFileTypes: true })
     .flatMap((d) => (d.isDirectory() ? walk(`${dir}/${d.name}`) : [`${dir}/${d.name}`]));
   for (const f of walk('js').filter((x) => x.endsWith('.js'))) assert.ok(sw.includes(`'${f}'`), `sw.js FILES misses ${f}`);
+  for (const f of ['assets/ui/alpine.png', 'assets/ui/orchard.png']) assert.ok(sw.includes(`'${f}'`), `sw.js FILES misses ${f}`);
 });
 
 console.log(`\n${passed} checks passed`);

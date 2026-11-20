@@ -2,7 +2,7 @@
 trucks), il laboratorio (axis icons, tool icons) and the shared UI icons; plus the wall tiles.
 
 Run:  .venv/bin/python Game/tools/pixelart/uigen.py
-Writes Game/assets/ui/sprites.png + sprites.json, barnwall.png, labwall.png."""
+Writes Game/assets/ui/sprites.png + sprites.json, barnwall.png, machine.png, road.png, alpine.png, orchard.png."""
 import math, os, json, random
 from px import Cv, H, R, mix, pick, bay, hsh, vnoise, pip
 from weighgen import (OL, INK, WHITE, RED, GRN, TEAL, BLUE, YEL, ORG, WOOD, DWOOD, METAL, DARK, CREAM, PURP,
@@ -516,19 +516,10 @@ def walls():
     for (x, y) in ((4, 7), (22, 25), (31, 12)):
         c.set(x, y, PL[0])
     c.im.save(os.path.join(OUT, 'barnwall.png'))
-    c = Cv(24, 24)                                   # lab tiles (cool slate)
-    TL = R('#3a5458', '#415d61', '#48666a', '#517074')
-    for y in range(24):
-        for x in range(24):
-            if x % 12 == 0 or y % 12 == 0:
-                c.set(x, y, TL[0])
-            else:
-                c.set(x, y, pick(TL, 0.55 + (vnoise(x / 5.0, y / 5.0, 7) - 0.5) * 0.4 - (0.2 if (x % 12 == 11 or y % 12 == 11) else 0) + (0.2 if (x % 12 == 1 or y % 12 == 1) else 0), x, y, True))
-    c.im.save(os.path.join(OUT, 'labwall.png'))
 
 
 def build_all():
-    produce_all(); overlays(); animals(); questions(); symbol_parts(); trucks(); lab_icons(); ui_icons()
+    produce_all(); overlays(); animals(); questions(); symbol_parts(); trucks(); lab_icons(); ui_icons(); farm_sprites()
 
 
 def pack():
@@ -551,15 +542,6 @@ def pack():
     return at, out
 
 
-if __name__ == '__main__':
-    os.makedirs(OUT, exist_ok=True)
-    build_all()
-    at, meta = pack()
-    at.save(os.path.join(OUT, 'sprites.png'), optimize=True)
-    json.dump(meta, open(os.path.join(OUT, 'sprites.json'), 'w'), separators=(',', ':'))
-    walls()
-    machine_tiles()
-    print('ui sprites', at.size, len(meta))
 
 
 def machine_tiles():
@@ -590,3 +572,152 @@ def machine_tiles():
         for x in range(32):
             c.set(x, y, pick(AS, 0.45 + (hsh(x, y, 2) - 0.5) * 0.7, x, y, True))
     c.im.save(os.path.join(OUT, 'road.png'))
+
+
+# ======================================================================== IL FRUTTETO AND IL PASCOLO
+TAG = {'r': R('#a8473a', '#d8604c', '#ee8a72'), 'b': R('#36578a', '#4f78b0', '#7da2d0'),
+       'y': R('#b8862d', '#e0ac3c', '#f5ca63'), 'p': R('#56427a', '#7a62a4', '#a490cc')}
+
+
+def farm_sprites():
+    GOAT = R('#7a6a58', '#a8957c', '#cfbfa4', '#efe4cc')
+    for f in range(3):                          # 0, 1: walking, 2: eating (head down)
+        c = new('goat_%d' % f, 16, 13)
+        c.blob(7, 7, 5, 3.2, GOAT, None, dither=False)
+        hx, hy = (12.5, 4.5) if f < 2 else (13, 8.5)
+        c.blob(hx, hy, 2.2, 2, GOAT[1:], None, dither=False)
+        c.set(int(hx) - 1, int(hy) - 3, DARK[1]); c.set(int(hx) + 1, int(hy) - 3, DARK[1])     # horns
+        c.set(int(hx) + 1, int(hy), INK)
+        c.set(int(hx), int(hy) + 2, GOAT[3])                                                  # beard
+        legs = (3, 6, 9, 11) if f != 1 else (4, 5, 10, 10)
+        for lx in legs:
+            vline(c, lx, 10, 12, GOAT[0])
+        c.set(1, 6, GOAT[2])
+        outline(c)
+    for kind in ('ftree', 'ftree_bare'):
+        c = new(kind, 20, 24)
+        box(c, 9, 14, 2, 9, WOOD, OL, 'h', 0.8, 0.4)
+        if kind == 'ftree':
+            for (x, y, r) in ((10, 9, 6.5), (5.5, 11, 4.2), (14.5, 11, 4.2), (10, 4.5, 4)):
+                c.blob(x, y, r, r * 0.9, GRN[1:], None, dither=False)
+            outline(c)
+            for (x, y) in ((6, 9), (12, 6), (14, 12), (9, 12), (4, 13), (11, 3)):
+                c.set(x, y, RED[2]); c.set(x + 1, y, RED[3]); c.set(x, y + 1, RED[1]); c.set(x + 1, y + 1, RED[2])
+        else:
+            for (x0, y0, x1, y1) in ((10, 14, 5, 8), (10, 13, 15, 7), (10, 12, 10, 4)):
+                c.line(x0, y0, x1, y1, WOOD[1])
+            for (x, y) in ((5, 8), (15, 7), (10, 4), (7, 10)):
+                c.set(x, y, GRN[2])
+            outline(c)
+            for (x, y) in ((4, 22), (14, 21)):
+                c.set(x, y, RED[1])                                                         # a core on the ground
+    for t, ramp in TAG.items():
+        for f in (0, 1):
+            c = new('sheep_%s_%d' % (t, f), 14, 11)
+            WOOL = R('#c8c2b4', '#e6e0d2', '#f7f3ea', '#ffffff')
+            for (x, y, r) in ((5, 5, 3.4), (8, 4.5, 3.4), (6.5, 6.5, 3.6), (9.5, 6.5, 3)):
+                c.blob(x, y, r, r * 0.85, WOOL, None, dither=False)
+            c.blob(12, 5 + f * 0.5, 1.8, 1.8, DARK[1:], None, dither=False)                    # face
+            c.set(12, 3, ramp[2]); c.set(11, 3, ramp[1])                                    # ear tag
+            for lx in ((4, 9) if f == 0 else (5, 8)):
+                vline(c, lx, 9, 10, DARK[1])
+            hline(c, 9, 10, 8, ramp[1]); c.set(10, 9, YEL[3])                                # collar + bell
+            for (mx, my) in ((5, 3), (6, 3), (7, 3), (5, 4), (6, 4), (7, 4), (8, 4), (6, 5), (7, 5)):
+                c.set(mx, my, ramp[2] if (mx + my) % 3 else ramp[1])                         # the herd's paint mark
+            outline(c)
+        for pose in ('stand', 'sit'):
+            c = new('sdog_%s_%s' % (t, pose), 16, 13)
+            DOG = R('#2a2420', '#3e342c', '#5a4a3c')
+            WHT = R('#d8d0c4', '#f2ece2')
+            if pose == 'stand':
+                c.blob(7, 7, 5, 2.4, DOG, None, dither=False)
+                for lx in (3, 5, 9, 11):
+                    vline(c, lx, 9, 12, DOG[1])
+                c.set(1, 5, DOG[1]); c.set(0, 4, DOG[2])
+                hx, hy = 13, 4.5
+            else:
+                c.blob(7, 8, 4, 3.4, DOG, None, dither=False)
+                hline(c, 4, 10, 12, DOG[1])
+                hx, hy = 10.5, 3.5
+            c.blob(hx, hy, 2.4, 2.2, DOG[1:], None, dither=False)
+            c.set(int(hx) + 1, int(hy), INK); c.set(int(hx) - 1, int(hy) - 2, DOG[0])
+            c.set(int(hx) + 2, int(hy) + 1, WHT[1])
+            c.set(int(hx) - 2, int(hy) + 2, WHT[1]); c.set(int(hx) - 1, int(hy) + 2, WHT[1])
+            for dx in range(-3, 1):
+                c.set(int(hx) + dx, int(hy) + 3, ramp[1] if dx % 2 else ramp[2])               # bandana
+            outline(c)
+    c = new('u_whistle', 16, 16)
+    box(c, 2, 6, 10, 6, METAL, OL, 'v', 0.95, 0.45)
+    box(c, 11, 6, 4, 3, METAL, OL, 'v', 0.95, 0.5)
+    c.blob(6, 9, 2, 2, DARK[1:], None, dither=False)
+    hline(c, 0, 2, 9, RED[2]); c.set(0, 8, RED[2]); c.set(0, 10, RED[2])
+    for (x, y) in ((13, 2), (15, 4), (11, 1)):
+        c.set(x, y, YEL[3])
+    c = new('u_timer', 16, 16)
+    box(c, 3, 0, 10, 2, WOOD, OL, 'v', 0.9, 0.5); box(c, 3, 14, 10, 2, WOOD, OL, 'v', 0.9, 0.5)
+    fill_poly(c, [(4, 2), (12, 2), (8.5, 8), (12, 14), (4, 14), (7.5, 8)], GLASS, 0.9, 0.5, 'v')
+    fill_poly(c, [(6, 12), (10, 12), (11, 14), (5, 14)], YEL, 0.9, 0.6, 'v', None)
+    c.set(8, 9, YEL[3]); c.set(8, 10, YEL[3])
+    c = new('u_fence', 16, 16)
+    for x in (2, 7, 12):
+        box(c, x, 3, 2, 12, WOOD, OL, 'h', 0.9, 0.5)
+    hline(c, 1, 14, 6, WOOD[3]); hline(c, 1, 14, 11, WOOD[3])
+    c = new('u_sheep', 16, 16)
+    src = UI['sheep_r_0'][0]
+    for y in range(src.h):
+        for x in range(src.w):
+            c.set(x + 1, y + 3, src.get(x, y))
+
+
+def farm_backgrounds():
+    from px import vnoise as vn
+    W, Hh = 260, 360
+    c = Cv(W, Hh)
+    SKY = R('#9cc8dc', '#b4d6e4', '#cde4ea', '#e2eeec')
+    for y in range(Hh):
+        for x in range(W):
+            if y < 70:
+                c.set(x, y, pick(SKY, y / 70, x, y, True))
+    for (px_, top, hw, col, snow) in ((40, 8, 70, R('#7d93a5', '#93a8bb', '#a5b9ca'), 0.28), (150, 0, 90, R('#8aa0b2', '#9fb3c4', '#b6c8d6'), 0.3),
+                                       (240, 14, 70, R('#7d93a5', '#93a8bb', '#a5b9ca'), 0.26), (100, 30, 80, R('#6a8c8a', '#7b9c97', '#8eaca4'), 0.0),
+                                       (210, 36, 80, R('#6a8c8a', '#7b9c97', '#8eaca4'), 0.0)):
+        for y in range(top, 96):
+            f = (y - top) / (96 - top)
+            half = f * hw + (vn(y * 0.4, px_, 3) - 0.5) * 4
+            for x in range(int(px_ - half), int(px_ + half) + 1):
+                if 0 <= x < W:
+                    lit = x < px_
+                    col_ = R('#e8eff5', '#ffffff') if f < snow else col
+                    c.set(x, y, pick(col_, (0.85 if lit else 0.3) - f * 0.2, x, y, True))
+    GR = R('#5f9450', '#699e57', '#74a85f', '#7fb267', '#8bbc71', '#9bc67f')
+    for y in range(80, Hh):
+        for x in range(W):
+            if y < 92 and c.get(x, y)[3]:
+                continue
+            t = 0.25 + (y - 80) / (Hh - 80) * 0.45 + (vn(x / 20.0, y / 14.0, 4) - 0.5) * 0.5
+            col = pick(GR, t, x, y, True)
+            if hsh(x, y, 6) < 0.012:
+                col = [H('#f5ca63'), H('#ffffff'), H('#e07a63'), H('#a490cc')][int(hsh(x, y, 7) * 4)]
+            c.set(x, y, col)
+    for (x, y) in ((20, 300), (230, 140), (40, 160), (200, 320)):
+        c.blob(x, y, 4, 2.6, METAL[1:4], OL, dither=False)                                   # rocks
+    c.im.save(os.path.join(OUT, 'alpine.png'))
+    t = Cv(48, 48)
+    for y in range(48):
+        for x in range(48):
+            col = pick(GR, 0.5 + (vn(x / 7.0, y / 7.0, 9) - 0.5) * 0.5, x, y, True)
+            if hsh(x, y, 2) < 0.02:
+                col = GR[5]
+            t.set(x, y, col)
+    t.im.save(os.path.join(OUT, 'orchard.png'))
+
+if __name__ == '__main__':
+    os.makedirs(OUT, exist_ok=True)
+    build_all()
+    at, meta = pack()
+    at.save(os.path.join(OUT, 'sprites.png'), optimize=True)
+    json.dump(meta, open(os.path.join(OUT, 'sprites.json'), 'w'), separators=(',', ':'))
+    walls()
+    machine_tiles()
+    farm_backgrounds()
+    print('ui sprites', at.size, len(meta))

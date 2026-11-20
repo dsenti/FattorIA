@@ -36,10 +36,10 @@
             <span class="place-tag"><span class="place-name">Lo smistamento</span><span class="place-lock" id="place-sort-lock"></span></span>
           </button>
           <button class="place locked buyable" id="place-lab" style="left:72.31%;top:86.29%;width:26.67%;height:8.57%">
-            <span class="place-tag"><span class="place-name">Il laboratorio</span><span class="place-lock" id="place-lab-lock"></span></span>
+            <span class="place-tag"><span class="place-name">Il frutteto</span><span class="place-lock" id="place-lab-lock"></span></span>
           </button>
-          <button class="place locked tag-up" id="place-barn" style="left:14.36%;top:57.14%;width:20.51%;height:7.14%" data-lesson="4" aria-disabled="true" aria-label="La stalla, si sblocca nella lezione 4">
-            <span class="place-tag"><span class="place-name">La stalla</span><span class="place-lock">Lezione 4</span></span>
+          <button class="place locked buyable tag-up" id="place-barn" style="left:14.36%;top:57.14%;width:20.51%;height:7.14%">
+            <span class="place-tag"><span class="place-name">Il pascolo</span><span class="place-lock" id="place-barn-lock"></span></span>
           </button>
         </div>
       </div>
@@ -137,47 +137,50 @@
     </div>
   </section>
 
-  <!-- ============================================================ LAB (minigame 3) -->
+  <!-- ============================================================ ORCHARD (minigame 3) -->
   <section id="screen-lab" class="screen" hidden>
     <header class="topbar">
       <button class="btn icon" id="l-back" aria-label="Torna alla mappa"></button>
-      <div class="title small">Laboratorio</div>
+      <div class="title small">Frutteto</div>
       <div class="coins" aria-label="Monete"><span class="coin-ic-slot"></span> <span class="coin-value">0</span></div>
       <button class="btn icon" id="l-help" aria-label="Come si gioca"></button>
-      <button class="btn icon" id="l-shop" aria-label="Negozio"></button>
       <button class="btn icon" id="l-settings" aria-label="Impostazioni"></button>
     </header>
     <div class="s-levelbar">
-      <button class="btn s-levels" id="l-levels" aria-label="Livelli"><span class="l-levels-ic"></span><span id="l-level-no">1/10</span></button>
-      <div class="s-level-text"><div class="s-level-title" id="l-title"></div><div class="l-legend" id="l-legend"></div></div>
-      <button class="btn icon l-restart" id="l-restart" aria-label="Ricomincia il livello: albero vuoto, campioni nuovi"></button>
+      <button class="btn s-levels" id="o-levels" aria-label="Livelli"><span class="g-levels-ic"></span><span id="o-level-no">1/10</span></button>
+      <div class="o-fences" id="o-fences" aria-label="Recinti"></div>
+      <button class="btn icon g-restart" id="o-retry" aria-label="Rigioca il livello"></button>
     </div>
-    <div class="l-scroll" id="l-scroll">
-      <div class="l-field-wrap" id="l-field-wrap"><canvas id="l-field" aria-label="Il campo: ogni punto è un campione, il colore è la sua etichetta"></canvas></div>
-      <svg id="l-tree" class="l-tree" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Il tuo albero di decisione: tocca un nodo"></svg>
-    </div>
+    <div class="o-timebar" aria-hidden="true"><span id="o-timer"></span></div>
+    <div class="o-field-wrap"><canvas id="o-field" aria-label="Il frutteto: alberi e capre. Striscia il dito per mettere un recinto."></canvas></div>
     <div class="s-bottom">
-      <div class="l-score" id="l-score"></div>
+      <div class="o-result" id="o-result"></div>
       <div class="s-actions">
-        <button class="btn olive big" id="l-try" disabled>Prova</button>
-        <button class="btn primary big" id="l-next" disabled>Avanti</button>
+        <button class="btn primary big" id="o-next" disabled>Avanti</button>
       </div>
     </div>
-    <div class="l-pop" id="l-pop" hidden>
-      <div class="l-card" id="l-card" role="dialog" aria-modal="true" aria-labelledby="l-pop-title">
-        <div class="l-card-head">
-          <b id="l-pop-title">Nodo 1</b>
-          <span class="l-pop-n" id="l-pop-n"></span>
-          <span class="l-pop-ok" id="l-pop-ok"></span>
-          <button class="btn icon" id="l-pop-x" aria-label="Chiudi"></button>
-        </div>
-        <canvas id="l-pop-canvas" class="l-pop-canvas" aria-label="Trascina i due pallini della linea"></canvas>
-        <div class="l-sides" id="l-sides"></div>
-        <div class="l-pop-actions">
-          <button class="btn l-hint" id="l-hint" aria-label="Suggerimento"></button>
-          <button class="btn l-del" id="l-del" aria-label="Elimina il nodo"></button>
-          <button class="btn olive l-apply" id="l-apply"></button>
-        </div>
+  </section>
+
+  <!-- ============================================================ PASTURE (minigame 4) -->
+  <section id="screen-herd" class="screen" hidden>
+    <header class="topbar">
+      <button class="btn icon" id="h-back" aria-label="Torna alla mappa"></button>
+      <div class="title small">Pascolo</div>
+      <div class="coins" aria-label="Monete"><span class="coin-ic-slot"></span> <span class="coin-value">0</span></div>
+      <button class="btn icon" id="h-help" aria-label="Come si gioca"></button>
+      <button class="btn icon" id="h-settings" aria-label="Impostazioni"></button>
+    </header>
+    <div class="s-levelbar">
+      <button class="btn s-levels" id="h-levels" aria-label="Livelli"><span class="g-levels-ic"></span><span id="h-level-no">1/10</span></button>
+      <div class="h-count" id="h-count" aria-label="Fischi"></div>
+      <button class="btn icon g-restart" id="h-restart" aria-label="Ricomincia il livello"></button>
+    </div>
+    <div class="h-field-wrap"><canvas id="h-field" aria-label="Il pascolo in montagna: trascina ogni cane nel mezzo del suo gregge"></canvas></div>
+    <div class="s-bottom">
+      <div class="o-result" id="h-result"></div>
+      <div class="s-actions">
+        <button class="btn olive big h-whistle" id="h-whistle" disabled aria-label="Fischia"></button>
+        <button class="btn primary big" id="h-next" disabled>Avanti</button>
       </div>
     </div>
   </section>

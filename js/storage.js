@@ -4,8 +4,8 @@ import { isValidName } from './names.js';
 import { LEVELS, LEVELS_VERSION } from './sorting/levels.js';
 import { SENSORS, QUESTION_IDS } from './sorting/questions.js';
 import { compile } from './sorting/tree.js';
-import { LAB_LEVELS, LAB_LEVELS_VERSION } from './lab/levels.js';
-import { cleanTree } from './lab/model.js';
+import { ORCHARD_LEVELS, ORCHARD_LEVELS_VERSION } from './orchard/levels.js';
+import { HERD_LEVELS, HERD_LEVELS_VERSION } from './herd/levels.js';
 
 const MAX_HISTORY = 50;
 
@@ -39,7 +39,8 @@ export function defaultState() {
     lineMode: 'drag',      // how the line is moved: 'drag' (default) or 'sliders' (a setting; kept on restart)
     lineModeSet: false,    // true once the player chose in Impostazioni (older saves switch to 'drag' until then)
     sort: defaultSort(),   // minigame 2 (Lo smistamento)
-    lab: defaultLab(),     // minigame 3 (Il laboratorio)
+    lab: defaultLab(),     // minigame 3 (Il frutteto; stored as "lab", the place it replaced)
+    herd: defaultHerd(),   // minigame 4 (Il pascolo)
   };
 }
 
@@ -62,58 +63,45 @@ export function defaultSort() {
   };
 }
 
-// Minigame 3 progress. Old saves without it get this.
-export function defaultLab() {
+// Minigames 3 and 4 keep the same kind of progress: the place, the levels passed and their stars.
+function defaultLevels(version) {
   return {
-    levelsVersion: LAB_LEVELS_VERSION,  // saved progress belongs to this version of the levels
+    levelsVersion: version,  // saved progress belongs to this version of the levels
     unlocked: false,       // the place was bought on the map
-    passed: [],            // level ids passed at least once (a Prova paid >= CONFIG.LAB.PASS_COINS)
+    passed: [],            // level ids passed at least once
+    stars: {},             // level id -> best stars 1..3
     current: null,         // level id being played
-    boards: {},            // level id -> { tree (see lab/model.js), best: coins (record of this tree), replay }
-    hinted: [],            // level ids whose hint was used (the true lines show as bands)
-    hints: 0,              // hints in stock
-    hintsBought: 0,        // hints bought so far (the price rises)
-    samples: 0,            // "Più campioni" level 0..10
-    precision: 0,          // "Strumento più preciso" level 0..10
     seenHelp: false,
-    seenOverfit: false,    // the "imparare a memoria" toast was shown once
   };
 }
+export const defaultLab = () => defaultLevels(ORCHARD_LEVELS_VERSION);
+export const defaultHerd = () => defaultLevels(HERD_LEVELS_VERSION);
 
-const LAB_CLASSES = new Map(LAB_LEVELS.map((lv) => [lv.id, lv.classes.length]));
-
-// Returns the cleaned minigame 3 progress. If the save is from an older version of the levels
-// (version 1: fixed tree shapes), the level progress (passed, trees, hints) starts over, but the
-// place, the upgrades and the hints in stock stay.
-export function sanitizeLab(raw) {
-  const d = defaultLab();
+// Cleans saved level progress. From another version of the levels (or the old laboratorio) only
+// the bought place and the seen help stay.
+function sanitizeLevels(raw, version, levels) {
+  const d = defaultLevels(version);
   if (!raw || typeof raw !== 'object') return d;
-  const n = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
-  const lvl = (v) => Math.max(0, Math.min(CONFIG.MAX_LEVEL, n(v)));
-  const same = raw.levelsVersion === LAB_LEVELS_VERSION;
-  const boards = {};
-  if (same && raw.boards && typeof raw.boards === 'object') {
-    for (const [id, K] of LAB_CLASSES) {
-      const b = raw.boards[id];
-      const tree = b && cleanTree(b.tree, K);
-      if (tree) boards[id] = { tree, best: Math.min(CONFIG.MAX_PAY, n(b.best)), replay: b.replay === true };
+  const ids = new Set(levels.map((l) => l.id));
+  const same = raw.levelsVersion === version && !('boards' in raw);
+  const stars = {};
+  if (same && raw.stars && typeof raw.stars === 'object') {
+    for (const id of ids) {
+      const v = raw.stars[id];
+      if (Number.isInteger(v) && v >= 1) stars[id] = Math.min(3, v);
     }
   }
   return {
-    levelsVersion: LAB_LEVELS_VERSION,
+    levelsVersion: version,
     unlocked: raw.unlocked === true,
-    passed: same && Array.isArray(raw.passed) ? [...new Set(raw.passed.filter((id) => LAB_CLASSES.has(id)))] : [],
-    current: same && LAB_CLASSES.has(raw.current) ? raw.current : null,
-    boards,
-    hinted: same && Array.isArray(raw.hinted) ? [...new Set(raw.hinted.filter((id) => LAB_CLASSES.has(id)))] : [],
-    hints: n(raw.hints),
-    hintsBought: n(raw.hintsBought),
-    samples: lvl(raw.samples),
-    precision: lvl(raw.precision),
-    seenHelp: raw.seenHelp === true,
-    seenOverfit: raw.seenOverfit === true,
+    passed: same && Array.isArray(raw.passed) ? [...new Set(raw.passed.filter((id) => ids.has(id)))] : [],
+    stars,
+    current: same && ids.has(raw.current) ? raw.current : null,
+    seenHelp: same && raw.seenHelp === true,
   };
 }
+export const sanitizeLab = (raw) => sanitizeLevels(raw, ORCHARD_LEVELS_VERSION, ORCHARD_LEVELS);
+export const sanitizeHerd = (raw) => sanitizeLevels(raw, HERD_LEVELS_VERSION, HERD_LEVELS);
 
 const LEVEL_GATES = new Map(LEVELS.map((lv) => [lv.id, compile(lv.tree).gates.length]));
 const SENSOR_IDS = new Set(SENSORS.map((x) => x.id));
@@ -192,6 +180,7 @@ export function sanitize(raw) {
     lineModeSet: raw.lineModeSet === true,
     sort,
     lab: sanitizeLab(raw.lab),
+    herd: sanitizeHerd(raw.herd),
   };
 }
 
