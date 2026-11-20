@@ -702,3 +702,10 @@ img.ic-px { height: 1.2em; width: auto; vertical-align: -0.2em; image-rendering:
 /* the road always at the bottom of the screen: the machine fills the space above */
 #screen-sort .s-scroll { display: flex; flex-direction: column; }
 #screen-sort .s-svg { margin-top: auto; flex: none; }
+
+/* top bars: the map's shop, leaderboard and settings live here as icons (no bottom bar) */
+.topbar .title-box { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.1; }
+.topbar .title-box .title { flex: none; }
+.topbar .map-player { padding: 0; min-height: 0; font-size: 12.5px; text-align: left; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar .btn.icon { width: 40px; min-width: 40px; }
+@media (max-width: 380px) { .topbar .btn.icon { width: 36px; min-width: 36px; } }

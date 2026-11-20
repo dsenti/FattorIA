@@ -18,8 +18,11 @@
   <!-- ============================================================ MAP -->
   <section id="screen-map" class="screen">
     <header class="topbar">
-      <div class="title">FattorIA</div>
+      <div class="title-box"><div class="title">FattorIA</div><div class="map-player" id="map-player"></div></div>
       <div class="coins" aria-label="Monete"><span class="coin-ic-slot"></span> <span class="coin-value">0</span></div>
+      <button class="btn icon" id="btn-shop" aria-label="Negozio"></button>
+      <button class="btn icon" id="btn-board" aria-label="Classifica"></button>
+      <button class="btn icon" id="btn-settings" aria-label="Impostazioni"></button>
     </header>
     <div class="map" id="map">
       <div class="map-scroll" id="map-scroll">
@@ -43,12 +46,6 @@
       </div>
       <button class="btn icon map-time" id="map-time" aria-label="Giorno o notte"></button>
     </div>
-    <div class="map-player" id="map-player"></div>
-    <nav class="bottombar">
-      <button class="btn" id="btn-shop"><span class="ic" id="ic-shop"></span>Negozio</button>
-      <button class="btn" id="btn-board"><span class="ic" id="ic-board"></span>Classifica</button>
-      <button class="btn icon" id="btn-settings" aria-label="Impostazioni"></button>
-    </nav>
   </section>
 
   <!-- ============================================================ WEIGHING STATION -->
@@ -59,6 +56,7 @@
       <div class="coins" aria-label="Monete"><span class="coin-ic-slot"></span> <span class="coin-value">0</span></div>
       <button class="btn icon" id="w-help" aria-label="Come si gioca"></button>
       <button class="btn icon" id="w-shop" aria-label="Negozio"></button>
+      <button class="btn icon" id="w-settings" aria-label="Impostazioni"></button>
     </header>
     <div class="bubble">
       <div class="bubble-face" id="w-face">👨‍🌾</div>
@@ -119,6 +117,7 @@
       <div class="coins" aria-label="Monete"><span class="coin-ic-slot"></span> <span class="coin-value">0</span></div>
       <button class="btn icon" id="s-help" aria-label="Come si gioca"></button>
       <button class="btn icon" id="s-shop" aria-label="Negozio"></button>
+      <button class="btn icon" id="s-settings" aria-label="Impostazioni"></button>
     </header>
     <div class="s-levelbar">
       <button class="btn s-levels" id="s-levels" aria-label="Livelli"><span class="s-levels-ic"></span><span id="s-level-no">1/15</span></button>
@@ -146,6 +145,7 @@
       <div class="coins" aria-label="Monete"><span class="coin-ic-slot"></span> <span class="coin-value">0</span></div>
       <button class="btn icon" id="l-help" aria-label="Come si gioca"></button>
       <button class="btn icon" id="l-shop" aria-label="Negozio"></button>
+      <button class="btn icon" id="l-settings" aria-label="Impostazioni"></button>
     </header>
     <div class="s-levelbar">
       <button class="btn s-levels" id="l-levels" aria-label="Livelli"><span class="l-levels-ic"></span><span id="l-level-no">1/10</span></button>

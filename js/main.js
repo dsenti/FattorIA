@@ -600,9 +600,12 @@ $('#map-time').addEventListener('click', () => {
   try { localStorage.setItem('fattoria.mapTime', mapTime); } catch (e) { /* private mode */ }
   renderMap();
 });
-$('#ic-shop').innerHTML = svg40(ICON.shop, 22);
-$('#ic-board').innerHTML = svg40(ICON.trophy, 22);
-$('#btn-settings').innerHTML = svg40(ICON.cog, 24);
+$('#btn-shop').innerHTML = svg40(ICON.shop, 26);
+$('#btn-board').innerHTML = svg40(ICON.trophy, 26);
+for (const id of ['#btn-settings', '#w-settings', '#s-settings', '#l-settings']) {
+  $(id).innerHTML = svg40(ICON.cog, 26);
+  if (id !== '#btn-settings') $(id).addEventListener('click', openSettings);
+}
 $('#w-back').innerHTML = svg40(ICON.map, 26);
 $('#w-help').innerHTML = svg40(ICON.help, 26);
 $('#w-shop').innerHTML = svg40(ICON.shop, 26);
