@@ -227,6 +227,11 @@ class Map:
     def river_w(s, y):
         return 3 + max(0, y - 244) * 0.056
 
+    def field_scale(s, y):
+        """fields shrink faster than trees towards the horizon (strong perspective)"""
+        f = max(0.0, min(1.0, (y - 262) / 440.0))
+        return 0.32 + 0.68 * f ** 0.85
+
     def depth(s, y):
         """perspective: 0.5 at the forest edge, 1 at the front"""
         return 0.5 + 0.5 * max(0.0, min(1.0, (y - 250) / 450.0))
@@ -296,7 +301,7 @@ class Map:
                         c.set(int(bx * s.S), int((yy - hgt) * s.S) - 1, H('#8b6849'))
 
     def iso_rows(s, x, y, w, d, colors, rowsx=True, step=3.0, scale=1.0):
-        w, d, step = w * scale, d * scale, step * scale
+        w, d, step = w * scale, d * scale, max(1.6, step * scale)
         p0 = (x, y)
         pr = (x + w * EX[0], y + w * EX[1])
         pb = (pr[0] + d * EY[0], pr[1] + d * EY[1])
@@ -811,7 +816,7 @@ class Map:
         ]
         for (x, y, w, d, k) in FIELDS:
             cols, rows, step = KINDS[k]
-            sc = s.depth(y)
+            sc = s.field_scale(y)
             s.iso_rows(x, y, w, d, cols, rows, step, sc)
             p = s.field_poly(x, y, w, d, sc)
             s.blocked.append([(px_ + (px_ - p[0][0]) * 0.05, py_) for (px_, py_) in p])
