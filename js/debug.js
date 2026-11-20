@@ -8,7 +8,7 @@ import { CONFIG } from './config.js';
 export function installDebugButton({ getState, save, renderCoins }) {
   if (!CONFIG.DEBUG_COINS_BUTTON) return;
   // Minigame 1 keeps its bug emoji; minigames 2 and 3 use no emoji in their chrome.
-  for (const [sel, label] of [['#screen-weigh .topbar', '🐞 +100'], ['#screen-sort .topbar', 'DEBUG +100'], ['#screen-lab .topbar', 'DEBUG +100'], ['#screen-herd .topbar', 'DEBUG +100']]) {
+  for (const [sel, label] of [['#screen-weigh .topbar', '🐞 +100'], ['#screen-sort .topbar', 'DEBUG +100'], ['#screen-lab .topbar', 'DEBUG +100'], ['#screen-herd .topbar', 'DEBUG +100'], ['#screen-quiz .topbar', 'DEBUG +100'], ['#screen-forest .topbar', 'DEBUG +100']]) {
     const bar = document.querySelector(sel);
     const coins = bar && bar.querySelector('.coins');
     if (!coins) continue;

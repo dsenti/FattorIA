@@ -228,6 +228,18 @@ TODO(Dominik): prices, once it has been play-tested.
 
 **Teaches:** the middle of a group is its **centro (centroid)**, the mean of the positions; strays pull it away from where most sheep stand. This is the k-means centroid step (L4). TODO(Dominik): it is unlocked by coins (300), not by lesson 4; keep or lock it until L4?
 
+## La piazza: IA o no? (L1)
+
+**Idea (2026-11-20, game-dev, on Dominik's request for "two new levels of your choosing").** Market day in the village square: everybody shows off a new machine. One card at a time (pixel icon + one line): swipe right or tap **IA**, swipe left or tap **Non IA**. A clock on every card (9 / 8 / 7 s per round), a combo counter for right answers in a row, then the verdict and a one-line reason (longer after a mistake; a tap skips). 3 rounds: clear cards, cards that need a thought, tricky cards (GPS steering, milking machine sensor, step-counting collar). 10 cards a round, always 5 AI and 5 not AI. Pass with 6/10; stars at 6, 8, 10; coins = right answers (half on replay).
+
+**Teaches (L1):** AI = learned from examples (data) to recognise, predict or decide; not AI = fixed rules written by a person, or only measuring. Seeds data (the weather station and the collar "collect data that an AI could use"). Open from the start, on the village. TODO(Dominik): check the cards' verdicts and reasons (`js/quiz/cards.js`).
+
+## Il bosco: funghi al crepuscolo (L4 preview, KNN)
+
+**Idea (2026-11-20, game-dev).** A forest runner at dusk: in this light every mushroom looks grey. The forager walks the trail (parallax pines, fireflies); when she finds a mushroom it is measured and pinned, grey and pulsing, on **la guida** below: x = how wide the cap is, y = how thick the stem is, among the known porcini (brown) and poisonous mushrooms (red, white dots). Quick (7 s down to 4 s): **Raccogli** or **Lascia**. Then the board draws the **3 nearest** mushrooms and the circle that holds them, and the truth appears; the mushroom joins the board. A poisonous one in the basket: a stomach ache (red flash, a heart lost). 6 trails: two clear patches, closer patches, long patches, two patches each (not one region per kind), fog (overlap, one surprise allowed), night (three patches each, 4 s). Found mushrooms agree with their 3 nearest neighbours, except the allowed surprises. Pass with a heart left and at least half of the porcini; stars: 3 with no mistake, 2 with one; coins = porcini in the basket (up to 10, half on replay).
+
+**Teaches (L4):** *k vicini più prossimi (k-nearest neighbours)*, "you are like your neighbours", distance / similarity on a picture of two features; a far-away or mixed neighbourhood can be wrong. Unlocked by coins (400) on the forest at the back of the valley. TODO(Dominik): keep it locked until L4? The features are made up for the game.
+
 **Tech.** `js/orchard/*` and `js/herd/*`: `levels.js`, `model.js` (pure, tested), `game.js` (canvas, pointer events). Sprites from `tools/pixelart/uigen.py` (`farm_sprites`, `farm_backgrounds`). Tunables in `CONFIG.ORCHARD` and `CONFIG.HERD`.
 
 ---
@@ -238,3 +250,5 @@ TODO(Dominik): prices, once it has been play-tested.
 | 2. Lo smistamento | L3 | classificazione, etichetta, albero di decisione, addestramento vs test, accuratezza | built (first version) |
 | 3. Il frutteto | L3 | confine di decisione, classificazione | built (first version) |
 | 4. Il pascolo | L4 | centroide (k-means), gruppi | built (first version) |
+| La piazza: IA o no? | L1 | IA vs non IA, dati | built (first version) |
+| Il bosco | L4 | k vicini più prossimi (KNN), distanza / somiglianza | built (first version) |

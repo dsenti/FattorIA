@@ -6,6 +6,8 @@ import { SENSORS, QUESTION_IDS } from './sorting/questions.js';
 import { compile } from './sorting/tree.js';
 import { ORCHARD_LEVELS, ORCHARD_LEVELS_VERSION } from './orchard/levels.js';
 import { HERD_LEVELS, HERD_LEVELS_VERSION } from './herd/levels.js';
+import { ROUNDS as QUIZ_ROUNDS, QUIZ_VERSION } from './quiz/cards.js';
+import { FOREST_LEVELS, FOREST_VERSION } from './forest/levels.js';
 
 const MAX_HISTORY = 50;
 
@@ -41,6 +43,8 @@ export function defaultState() {
     sort: defaultSort(),   // minigame 2 (Lo smistamento)
     lab: defaultLab(),     // minigame 3 (Il frutteto; stored as "lab", the place it replaced)
     herd: defaultHerd(),   // minigame 4 (Il pascolo)
+    quiz: defaultQuiz(),   // La piazza (IA o no?), open from the start
+    forest: defaultForest(), // Il bosco (funghi, k vicini)
   };
 }
 
@@ -76,6 +80,8 @@ function defaultLevels(version) {
 }
 export const defaultLab = () => defaultLevels(ORCHARD_LEVELS_VERSION);
 export const defaultHerd = () => defaultLevels(HERD_LEVELS_VERSION);
+export const defaultQuiz = () => defaultLevels(QUIZ_VERSION);
+export const defaultForest = () => defaultLevels(FOREST_VERSION);
 
 // Cleans saved level progress. From another version of the levels (or the old laboratorio) only
 // the bought place and the seen help stay.
@@ -102,6 +108,8 @@ function sanitizeLevels(raw, version, levels) {
 }
 export const sanitizeLab = (raw) => sanitizeLevels(raw, ORCHARD_LEVELS_VERSION, ORCHARD_LEVELS);
 export const sanitizeHerd = (raw) => sanitizeLevels(raw, HERD_LEVELS_VERSION, HERD_LEVELS);
+export const sanitizeQuiz = (raw) => sanitizeLevels(raw, QUIZ_VERSION, QUIZ_ROUNDS);
+export const sanitizeForest = (raw) => sanitizeLevels(raw, FOREST_VERSION, FOREST_LEVELS);
 
 const LEVEL_GATES = new Map(LEVELS.map((lv) => [lv.id, compile(lv.tree).gates.length]));
 const SENSOR_IDS = new Set(SENSORS.map((x) => x.id));
@@ -181,6 +189,8 @@ export function sanitize(raw) {
     sort,
     lab: sanitizeLab(raw.lab),
     herd: sanitizeHerd(raw.herd),
+    quiz: sanitizeQuiz(raw.quiz),
+    forest: sanitizeForest(raw.forest),
   };
 }
 

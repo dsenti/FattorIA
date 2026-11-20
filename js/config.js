@@ -207,6 +207,13 @@ export const CONFIG = {
     GATHER_MS: 1200,
   },
 
+  // La piazza: IA o no? (lesson 1), open from the start. 10 cards a round; PASS right answers pass;
+  // coins = right answers (half on a replay); the reason shows FEEDBACK_MS (longer after a mistake).
+  QUIZ: { CARDS: 10, PASS: 6, FEEDBACK_MS: 2200, REPLAY_FACTOR: 0.5 },
+  // Il bosco: funghi al crepuscolo (k nearest neighbours). TODO(Dominik): lesson 4 content, unlocked by coins.
+  // K neighbours, LIVES hearts, walk / reveal times (ms), coins = porcini in the basket up to MAX_PAY.
+  FOREST: { UNLOCK_COST: 400, K: 3, LIVES: 3, WALK_MS: 1300, REVEAL_MS: 1500, MAX_PAY: 10, REPLAY_FACTOR: 0.5 },
+
   // ---------------------------------------------------------------- leaderboard
   // Leave empty to use the local stub. See SUPABASE_SETUP.md.
   SUPABASE_URL: '',

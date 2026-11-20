@@ -41,6 +41,12 @@
           <button class="place locked buyable tag-up" id="place-barn" style="left:14.36%;top:57.14%;width:20.51%;height:7.14%">
             <span class="place-tag"><span class="place-name">Il pascolo</span><span class="place-lock" id="place-barn-lock"></span></span>
           </button>
+          <button class="place" id="place-quiz" style="left:39.74%;top:40.71%;width:28.21%;height:10%">
+            <span class="place-tag"><span class="place-name">La piazza</span></span>
+          </button>
+          <button class="place locked buyable" id="place-forest" style="left:80.77%;top:33.71%;width:33.33%;height:5.43%">
+            <span class="place-tag"><span class="place-name">Il bosco</span><span class="place-lock" id="place-forest-lock"></span></span>
+          </button>
         </div>
       </div>
       </div>
@@ -181,6 +187,63 @@
       <div class="s-actions">
         <button class="btn olive big h-whistle" id="h-whistle" disabled aria-label="Fischia"></button>
         <button class="btn primary big" id="h-next" disabled>Avanti</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ LA PIAZZA (quiz) -->
+  <section id="screen-quiz" class="screen" hidden>
+    <header class="topbar">
+      <button class="btn icon" id="q-back" aria-label="Torna alla mappa"></button>
+      <div class="title small">Piazza</div>
+      <div class="coins" aria-label="Monete"><span class="coin-ic-slot"></span> <span class="coin-value">0</span></div>
+      <button class="btn icon" id="q-help" aria-label="Come si gioca"></button>
+      <button class="btn icon" id="q-settings" aria-label="Impostazioni"></button>
+    </header>
+    <div class="s-levelbar">
+      <button class="btn s-levels" id="q-levels" aria-label="Giri"><span class="g-levels-ic"></span><span id="q-level-no">1/3</span></button>
+      <div class="q-dots" id="q-dots" aria-label="Carte"></div>
+      <div class="q-combo" id="q-combo" aria-label="Di fila"></div>
+    </div>
+    <div class="q-stage" id="q-stage"></div>
+    <div class="s-bottom">
+      <div class="s-actions q-actions" id="q-actions">
+        <button class="btn big q-no" id="q-no">Non IA</button>
+        <button class="btn primary big q-yes" id="q-yes">IA</button>
+      </div>
+      <div class="s-actions" id="q-result" hidden>
+        <button class="btn big" id="q-retry">Ancora</button>
+        <button class="btn primary big" id="q-next" disabled>Avanti</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ IL BOSCO (mushrooms) -->
+  <section id="screen-forest" class="screen" hidden>
+    <header class="topbar">
+      <button class="btn icon" id="f-back" aria-label="Torna alla mappa"></button>
+      <div class="title small">Bosco</div>
+      <div class="coins" aria-label="Monete"><span class="coin-ic-slot"></span> <span class="coin-value">0</span></div>
+      <button class="btn icon" id="f-help" aria-label="Come si gioca"></button>
+      <button class="btn icon" id="f-settings" aria-label="Impostazioni"></button>
+    </header>
+    <div class="s-levelbar">
+      <button class="btn s-levels" id="f-levels" aria-label="Sentieri"><span class="g-levels-ic"></span><span id="f-level-no">1/6</span></button>
+      <div class="f-hearts" id="f-hearts" aria-label="Cuori"></div>
+      <div class="h-count f-basket" id="f-basket" aria-label="Cestino"></div>
+    </div>
+    <div class="f-scene-wrap"><canvas id="f-scene" aria-label="Il bosco al crepuscolo: la cercatrice trova un fungo"></canvas></div>
+    <div class="f-board-wrap"><canvas id="f-board" aria-label="La guida: porcini e funghi velenosi, il fungo nuovo è grigio"></canvas></div>
+    <div class="s-bottom">
+      <div class="o-timebar f-timebar" aria-hidden="true"><span id="f-timer"></span></div>
+      <div class="o-result" id="f-result"></div>
+      <div class="s-actions" id="f-play">
+        <button class="btn big" id="f-leave">Lascia</button>
+        <button class="btn primary big f-pick" id="f-pick"><span class="f-pick-ic"></span>Raccogli</button>
+      </div>
+      <div class="s-actions" id="f-done" hidden>
+        <button class="btn big" id="f-retry">Ancora</button>
+        <button class="btn primary big" id="f-next" disabled>Avanti</button>
       </div>
     </div>
   </section>

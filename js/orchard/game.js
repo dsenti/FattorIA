@@ -119,6 +119,13 @@ export class OrchardGame {
   frame(now) {
     if (!this.active) return;
     this.raf = requestAnimationFrame(this.loop);
+    const dt = now - (this.lastNow || now);
+    this.lastNow = now;
+    if (this.app.overlayOpen && this.app.overlayOpen()) {   // help or level list open: the clock waits
+      this.t0 += dt; if (this.tStart) this.tStart += dt; if (this.eatT0) this.eatT0 += dt;
+      this.draw(now);
+      return;
+    }
     if (this.phase === 'ready' && now - this.t0 > CONFIG.ORCHARD.START_DELAY_MS) { this.phase = 'play'; this.tStart = now; }
     if (this.phase === 'play') {
       this.left = Math.max(0, this.total - (now - this.tStart) / 1000);

@@ -435,6 +435,54 @@ svg.dim { opacity: 0.4; }
 .h-whistle svg, .h-whistle img.px { display: block; }
 #o-next.ready, #h-next.ready { animation: glow 1.8s ease-in-out infinite; }
 
+/* ---------------------------------------------------------------- la piazza (quiz) and il bosco */
+#place-quiz:not(.locked), #place-forest:not(.locked) { animation: glow 2.2s ease-in-out infinite; animation-delay: 1s; }
+.q-dots { display: flex; gap: 3px; flex: 1; min-width: 0; justify-content: center; }
+.q-dot { width: 12px; height: 12px; background: var(--paper); box-shadow: var(--frame); }
+.q-dot.now { background: var(--gold); }
+.q-dot.ok { background: var(--olive); }
+.q-dot.ko { background: var(--tomato); }
+.q-combo { flex: none; min-width: 46px; text-align: center; font-size: 19px; font-weight: 700; color: var(--gold); text-shadow: 0 2px 0 rgba(20, 35, 40, 0.5); }
+.q-combo.pop { animation: bump 0.3s ease-out; }
+.q-stage { flex: 1; min-height: 0; position: relative; overflow: hidden; touch-action: none;
+  background: #b9a588 url('../assets/ui/cobbles.png') repeat; background-size: 48px 48px; image-rendering: pixelated; margin: 2px 12px 4px; box-shadow: var(--frame), var(--drop); }
+.q-side { position: absolute; top: 12px; padding: 6px 12px; font-weight: 700; font-size: 17px; background: var(--cream); color: var(--ink); box-shadow: var(--frame); opacity: 0.55; transition: opacity 0.15s, transform 0.15s; z-index: 0; }
+.q-side-no { left: 8px; }
+.q-side-yes { right: 8px; background: var(--gold); }
+.q-side-no::before { content: '\2190  '; }
+.q-side-yes::after { content: '  \2192'; }
+.q-stage.lean-yes .q-side-yes, .q-stage.lean-no .q-side-no { opacity: 1; transform: scale(1.15); }
+.q-card { position: absolute; left: 50%; top: 50%; width: min(78%, 300px); margin-left: calc(min(78%, 300px) / -2); transform-origin: 50% 120%;
+  translate: 0 -50%; background: var(--cream); color: var(--ink); box-shadow: var(--frame), var(--drop); padding: 16px 14px 14px; display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 1; transition: transform 0.2s ease-out; cursor: grab; }
+.q-card.dragging { transition: none; cursor: grabbing; }
+.q-ic { line-height: 0; }
+.q-title { font-weight: 700; font-size: 18px; line-height: 1.25; text-align: center; }
+.q-why { font-size: 14.5px; line-height: 1.35; text-align: center; }
+.q-verdict { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 18px; margin-bottom: 4px; }
+.q-card.right { box-shadow: var(--frame), 0 0 0 calc(3 * var(--u)) var(--olive), var(--drop); }
+.q-card.wrong { box-shadow: var(--frame), 0 0 0 calc(3 * var(--u)) var(--tomato), var(--drop); animation: qshake 0.35s steps(4); }
+@keyframes qshake { 25% { margin-left: calc(min(78%, 300px) / -2 - 6px); } 75% { margin-left: calc(min(78%, 300px) / -2 + 6px); } }
+.q-clock { align-self: stretch; height: 8px; background: var(--paper); box-shadow: var(--frame); overflow: hidden; }
+.q-clock span { display: block; height: 100%; width: 100%; background: var(--olive); }
+.q-clock span.low { background: var(--tomato); }
+.q-card.right .q-clock, .q-card.wrong .q-clock { display: none; }
+.q-end { gap: 12px; cursor: default; }
+.q-big { font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.q-endcoins { font-size: 22px; }
+.q-best { font-size: 15px; opacity: 0.75; }
+.o-star.big { width: 34px; height: 34px; }
+.q-actions .btn.big { font-size: 19px; }
+.q-no { background: #fff; }
+.f-hearts { display: flex; gap: 2px; line-height: 0; }
+.f-basket { margin-left: auto; }
+.f-basket span { font-size: 13px; opacity: 0.7; margin-left: 4px; }
+.f-scene-wrap { flex: 0 0 auto; height: clamp(150px, 24dvh, 200px); position: relative; margin: 2px 12px 4px; box-shadow: var(--frame), var(--drop); background: #2f4a3a; }
+.f-board-wrap { flex: 1; min-height: 0; position: relative; margin: 2px 12px 4px; box-shadow: var(--frame), var(--drop); background: #efe2c4; }
+.f-scene-wrap canvas, .f-board-wrap canvas { touch-action: none; }
+.f-timebar { margin: 0 0 6px; }
+.f-pick { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.f-pick-ic { line-height: 0; }
+
 /* ---------------------------------------------------------------- small / short screens */
 @media (max-height: 700px) {
   .bubble { margin-top: 4px; padding: 5px 8px; }
@@ -452,8 +500,8 @@ svg.dim { opacity: 0.4; }
   .btn.big { min-height: 46px; }
 }
 @media (max-width: 380px) {
-  #screen-sort .topbar .title, #screen-lab .topbar .title, #screen-herd .topbar .title { display: none; }
-  #screen-sort .topbar .coins, #screen-lab .topbar .coins, #screen-herd .topbar .coins { margin-left: auto; }
+  #screen-sort .topbar .title, #screen-lab .topbar .title, #screen-herd .topbar .title, #screen-quiz .topbar .title, #screen-forest .topbar .title { display: none; }
+  #screen-sort .topbar .coins, #screen-lab .topbar .coins, #screen-herd .topbar .coins, #screen-quiz .topbar .coins, #screen-forest .topbar .coins { margin-left: auto; }
   .info-row { font-size: 12px; padding: 3px 8px; }
   .info-row span { white-space: nowrap; }
 }
@@ -494,7 +542,7 @@ img.px, .px-wait { display: inline-block; vertical-align: middle; flex: none; }
 em { opacity: 0.75; }
 
 /* floors */
-#screen-weigh, #screen-sort, #screen-lab, #screen-herd {
+#screen-weigh, #screen-sort, #screen-lab, #screen-herd, #screen-quiz, #screen-forest {
   color: var(--cream);
   background-color: var(--floor);
   background-image: conic-gradient(from 270deg at var(--u) var(--u), var(--floor2) 25%, transparent 0), conic-gradient(from 270deg at var(--u) var(--u), var(--floor2) 25%, transparent 0);

@@ -986,6 +986,8 @@ PLACES = {
     'sort': {'x': 296, 'y': 392, 'w': 96, 'h': 78, 'label': 438},
     'lab': {'x': 282, 'y': 604, 'w': 104, 'h': 60, 'label': 644},
     'barn': {'x': 56, 'y': 400, 'w': 80, 'h': 50, 'label': 448},
+    'quiz': {'x': 155, 'y': 285, 'w': 110, 'h': 70, 'label': 300},     # La piazza: the village
+    'forest': {'x': 315, 'y': 236, 'w': 130, 'h': 38, 'label': 250},  # Il bosco: the forest at the back
 }
 
 if __name__ == '__main__':

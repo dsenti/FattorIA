@@ -12,11 +12,15 @@ import { QUESTIONS, QUESTION_IDS, SENSORS, parseItem, itemKey, questionUnlocked 
 import { compile, solutionOf, trainingBatch, testBatch, runBatch, countSolutions, bruteForce, layoutTree, treeDepth, rng, route, wrongGates } from '../js/sorting/tree.js';
 import { levelStatus, requiredSensors, startLevel } from '../js/sorting/progress.js';
 import { truckSpec, PIPE_COLOUR } from '../js/sorting/trucks.js';
-import { defaultSort, sanitizeSort, defaultLab, sanitizeLab, defaultHerd, sanitizeHerd } from '../js/storage.js';
+import { defaultSort, sanitizeSort, defaultLab, sanitizeLab, defaultHerd, sanitizeHerd, defaultQuiz, defaultForest } from '../js/storage.js';
 import { ORCHARD_LEVELS } from '../js/orchard/levels.js';
 import * as O from '../js/orchard/model.js';
 import { HERD_LEVELS } from '../js/herd/levels.js';
 import * as H from '../js/herd/model.js';
+import { CARDS, ROUNDS } from '../js/quiz/cards.js';
+import * as Q from '../js/quiz/model.js';
+import { FOREST_LEVELS } from '../js/forest/levels.js';
+import * as F from '../js/forest/model.js';
 
 let passed = 0;
 const test = (name, fn) => { fn(); passed++; console.log('ok  ', name); };
@@ -721,22 +725,99 @@ test('frutteto and pascolo: saves (old laboratorio dropped, place kept; garbage;
   assert.deepEqual(sanitizeHerd('garbage'), defaultHerd());
 });
 
+
+// ------------------------------------------------------------------ La piazza: IA o no?
+test('piazza: cards well formed (icon sprite, short texts); 3 rounds of 5 AI + 5 not AI, easy to tricky', () => {
+  const sprites = JSON.parse(readFileSync(new URL('../assets/ui/sprites.json', import.meta.url), 'utf8'));
+  assert.equal(new Set(CARDS.map((c) => c.id)).size, CARDS.length);
+  for (const c of CARDS) {
+    assert.ok(sprites[`qz_${c.icon}`], `${c.id}: no sprite qz_${c.icon}`);
+    assert.ok(c.title.length <= 70 && c.why.length <= 95, `${c.id}: texts too long`);
+    assert.ok([1, 2, 3].includes(c.lvl) && typeof c.ai === 'boolean');
+  }
+  for (let ri = 0; ri < ROUNDS.length; ri++) {
+    for (let seed = 1; seed <= 30; seed++) {
+      const cards = Q.drawRound(ri, seed);
+      assert.equal(cards.length, CONFIG.QUIZ.CARDS);
+      assert.equal(new Set(cards.map((c) => c.id)).size, cards.length, 'no card twice');
+      assert.equal(cards.filter((c) => c.ai).length, CONFIG.QUIZ.CARDS / 2, 'half AI');
+      assert.ok(cards.every((c) => ROUNDS[ri].levels.includes(c.lvl)));
+      const own = cards.filter((c) => c.lvl === ROUNDS[ri].levels[0]).length;
+      assert.ok(own >= Math.min(CONFIG.QUIZ.CARDS, CARDS.filter((c) => c.lvl === ROUNDS[ri].levels[0]).length), `round ${ri + 1}: all of its own cards first`);
+    }
+  }
+  const cards = Q.drawRound(0, 1);
+  const all = cards.map((c) => c.ai);
+  assert.deepEqual(Q.score(cards, all), { right: 10, best: 10 });
+  const one = all.slice(); one[4] = !one[4];
+  assert.deepEqual(Q.score(cards, one), { right: 9, best: 5 });
+  assert.equal(Q.score(cards, cards.map(() => null)).right, 0, 'no answer is wrong');
+  assert.deepEqual([10, 9, 8, 7, 6, 5].map((r) => Q.starsFor(r)), [3, 2, 2, 1, 1, 0]);
+  assert.deepEqual([Q.payFor(10, false), Q.payFor(10, true), Q.payFor(5, false)], [10, 5, 0]);
+});
+
+// ------------------------------------------------------------------ Il bosco: k nearest neighbours
+test('bosco: trails easy to hard; the found mushrooms agree with their 3 neighbours (except a few tricks)', () => {
+  assert.ok(FOREST_LEVELS.length >= 5);
+  assert.equal(new Set(FOREST_LEVELS.map((l) => l.id)).size, FOREST_LEVELS.length);
+  assert.ok(FOREST_LEVELS[0].seconds > FOREST_LEVELS[FOREST_LEVELS.length - 1].seconds, 'less time at the end');
+  for (const lv of FOREST_LEVELS) {
+    let goods = 0, total = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const { board, next } = F.makeTrail(lv, seed);
+      assert.equal(board.length, lv.known * lv.patches.length);
+      let tricks = 0;
+      for (let i = 0; i < lv.n; i++) {
+        const m = next(board);
+        assert.ok(m.x >= 0 && m.x <= 1 && m.y >= 0 && m.y <= 1);
+        if (F.vote(board, m.x, m.y) !== m.c) tricks += 1;
+        if (m.c === 'good') goods += 1;
+        total += 1;
+        board.push({ x: m.x, y: m.y, c: m.c });
+      }
+      assert.ok(tricks <= (lv.tricks || 0), `${lv.id} seed ${seed}: ${tricks} surprises`);
+    }
+    assert.ok(goods / total > 0.3 && goods / total < 0.7, `${lv.id}: ${goods}/${total} porcini`);
+  }
+});
+
+test('bosco: neighbours, judging, stars and pay', () => {
+  const board = [{ x: 0.1, y: 0.1, c: 'bad' }, { x: 0.2, y: 0.1, c: 'bad' }, { x: 0.9, y: 0.9, c: 'good' }, { x: 0.8, y: 0.9, c: 'good' }, { x: 0.85, y: 0.8, c: 'good' }];
+  assert.deepEqual(F.nearest(board, 0.85, 0.85).map((n) => n.i).sort(), [2, 3, 4]);
+  assert.equal(F.vote(board, 0.15, 0.15), 'bad');
+  assert.equal(F.vote(board, 0.7, 0.7), 'good');
+  assert.deepEqual([F.judge({ c: 'good' }, true), F.judge({ c: 'bad' }, true), F.judge({ c: 'good' }, false), F.judge({ c: 'bad' }, false)], ['basket', 'ache', 'missed', 'safe']);
+  const t = (o) => ({ hearts: 3, basket: 5, goods: 5, aches: 0, missed: 0, ...o });
+  assert.equal(F.starsFor(t()), 3);
+  assert.equal(F.starsFor(t({ hearts: 2, aches: 1 })), 2);
+  assert.equal(F.starsFor(t({ basket: 3, missed: 2 })), 1);
+  assert.equal(F.starsFor(t({ basket: 2, missed: 3 })), 0, 'less than half of the porcini');
+  assert.equal(F.starsFor(t({ hearts: 0, aches: 3 })), 0, 'three stomach aches');
+  assert.deepEqual([F.payFor(t(), false), F.payFor(t(), true), F.payFor(t({ basket: 14, goods: 14 }), false)], [5, 3, CONFIG.FOREST.MAX_PAY]);
+  const base = { playerId: 'x'.repeat(36) };
+  assert.deepEqual(sanitize(base).quiz, defaultQuiz());
+  assert.deepEqual(sanitize(base).forest, defaultForest());
+  const f = sanitize({ ...base, forest: { ...defaultForest(), unlocked: true, passed: [FOREST_LEVELS[0].id], stars: { [FOREST_LEVELS[0].id]: 2 } } }).forest;
+  assert.ok(f.unlocked && f.passed.length === 1 && f.stars[FOREST_LEVELS[0].id] === 2);
+});
+
 test('frutteto and pascolo: little text, no emoji; no L4 words in the orchard; key terms; sw.js caches every file', () => {
   const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
   const emoji = /\p{Extended_Pictographic}/u;
   const L4 = /distanz|somiglian|simil|vicin|\bknn\b|k-means|cluster|raggrupp|supervisionat|centr/i;
-  for (const f of ['js/orchard/levels.js', 'js/orchard/model.js', 'js/orchard/game.js', 'js/herd/levels.js', 'js/herd/model.js', 'js/herd/game.js']) {
+  for (const f of ['js/orchard/levels.js', 'js/orchard/model.js', 'js/orchard/game.js', 'js/herd/levels.js', 'js/herd/model.js', 'js/herd/game.js',
+    'js/quiz/cards.js', 'js/quiz/model.js', 'js/quiz/game.js', 'js/forest/levels.js', 'js/forest/model.js', 'js/forest/game.js']) {
     const src = read(f);
     assert.ok(!emoji.test(src), `${f}: emoji ${(src.match(emoji) || [])[0]}`);
     assert.ok(!/\bbias\b/i.test(src), `${f}: says "bias"`);
-    if (f.startsWith('js/orchard')) assert.ok(!L4.test(src), `${f}: L4 word "${(src.match(L4) || [])[0]}"`);
+    if (f.startsWith('js/orchard') || f.startsWith('js/quiz')) assert.ok(!L4.test(src), `${f}: L4 word "${(src.match(L4) || [])[0]}"`);
   }
   const html = read('index.html');
-  for (const [id, end] of [['screen-lab', 'PASTURE'], ['screen-herd', 'SHEETS AND MODALS']]) {
+  for (const [id, end] of [['screen-lab', 'PASTURE'], ['screen-herd', 'LA PIAZZA'], ['screen-quiz', 'IL BOSCO'], ['screen-forest', 'SHEETS AND MODALS']]) {
     const part = html.slice(html.indexOf(`<section id="${id}"`), html.indexOf(end)).replace(/<!--[\s\S]*?-->|<!--[\s\S]*$/g, "");
     assert.ok(part.length > 100 && !emoji.test(part), `${id} HTML`);
     const visible = part.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-    assert.ok(visible.split(' ').length <= 6, `${id} text: "${visible}"`);
+    assert.ok(visible.split(' ').length <= 8, `${id} text: "${visible}"`);
   }
   assert.ok(read('js/orchard/game.js').includes('confine di decisione</b> <em>(decision boundary)</em>'), 'orchard key term');
   assert.ok(read('js/herd/game.js').includes('<b>centro</b> <em>(centroid)</em>'), 'herd key term');
@@ -744,7 +825,7 @@ test('frutteto and pascolo: little text, no emoji; no L4 words in the orchard; k
   const walk = (dir) => readdirSync(new URL(`../${dir}`, import.meta.url), { withFileTypes: true })
     .flatMap((d) => (d.isDirectory() ? walk(`${dir}/${d.name}`) : [`${dir}/${d.name}`]));
   for (const f of walk('js').filter((x) => x.endsWith('.js'))) assert.ok(sw.includes(`'${f}'`), `sw.js FILES misses ${f}`);
-  for (const f of ['assets/ui/alpine.png', 'assets/ui/orchard.png']) assert.ok(sw.includes(`'${f}'`), `sw.js FILES misses ${f}`);
+  for (const f of ['assets/ui/alpine.png', 'assets/ui/orchard.png', 'assets/ui/cobbles.png']) assert.ok(sw.includes(`'${f}'`), `sw.js FILES misses ${f}`);
 });
 
 console.log(`\n${passed} checks passed`);

@@ -519,7 +519,7 @@ def walls():
 
 
 def build_all():
-    produce_all(); overlays(); animals(); questions(); symbol_parts(); trucks(); lab_icons(); ui_icons(); farm_sprites()
+    produce_all(); overlays(); animals(); questions(); symbol_parts(); trucks(); lab_icons(); ui_icons(); farm_sprites(); fun_sprites()
 
 
 def pack():
@@ -710,6 +710,267 @@ def farm_backgrounds():
                 col = GR[5]
             t.set(x, y, col)
     t.im.save(os.path.join(OUT, 'orchard.png'))
+    # the village square: warm cobbles (La piazza)
+    CB = R('#7a6650', '#9a846a', '#b39d80', '#c9b496', '#dccaa8')
+    t = Cv(32, 32)
+    for y in range(32):
+        for x in range(32):
+            row = y // 8
+            ox = (x + (4 if row % 2 else 0)) % 32
+            bx, by = ox % 8, y % 8
+            if bx == 0 or by == 0:
+                col = CB[0]
+            else:
+                tt = 0.55 + (vn(x / 5.0, y / 5.0, 13) - 0.5) * 0.5 + (0.15 if by == 1 or bx == 1 else 0) - (0.15 if by == 7 or bx == 7 else 0)
+                col = pick(CB[1:], tt, x, y, True)
+            t.set(x, y, col)
+    t.im.save(os.path.join(OUT, 'cobbles.png'))
+
+
+# ======================================================================== LA PIAZZA (quiz) AND IL BOSCO (mushrooms)
+def fun_sprites():
+    from weighgen import SKIN, HAIR, GLASS
+    S = 24
+    def q(name):
+        return new('qz_' + name, S, S)
+    def phone(c, x=6, y=2, w=12, h=20, screen=GLASS):
+        box(c, x, y, w, h, DARK, OL, 'v', 0.7, 0.4)
+        box(c, x + 1, y + 2, w - 2, h - 5, screen, None, 'v', 0.9, 0.5)
+        hline(c, x + w // 2 - 1, x + w // 2, y + h - 2, METAL[3])
+    def leaf(c, cx, cy, r, ramp=GRN):
+        c.blob(cx, cy, r, r * 0.7, ramp[1:], OL, dither=False)
+        c.line(cx - r + 1, cy + 1, cx + r - 1, cy - 1, ramp[0])
+    def bubble(c, x, y, w, h, ramp, tail_left=True):
+        box(c, x, y, w, h, ramp, OL, 'v', 0.95, 0.6)
+        tx = x + 2 if tail_left else x + w - 4
+        for i in range(3):
+            hline(c, tx, tx + 2 - i, y + h + i, ramp[3] if i < 2 else OL)
+    # ---- AI
+    c = q('phone_leaf'); phone(c); leaf(c, 12, 10, 4)
+    c.set(13, 9, RED[1]); c.set(12, 10, RED[2]); c.set(11, 12, RED[1])
+    box(c, 13, 15, 5, 4, GRN[1:], OL, 'v', 0.9, 0.6); c.set(14, 17, WHITE); c.set(15, 18, WHITE); c.set(16, 16, WHITE)
+    c = q('drone')
+    for x0 in (1, 15):
+        hline(c, x0, x0 + 7, 3, METAL[3]); hline(c, x0 + 1, x0 + 6, 4, METAL[2])
+    vline(c, 5, 4, 7, DARK[1]); vline(c, 18, 4, 7, DARK[1])
+    box(c, 4, 7, 16, 4, RED, OL, 'v', 0.95, 0.5); box(c, 10, 11, 4, 2, DARK, OL, 'v', 0.8, 0.5)
+    for i in range(8):
+        c.blend(12 - i, 13 + i, (255, 240, 160, 255), 0.5); c.blend(12 + i, 13 + i, (255, 240, 160, 255), 0.5)
+    for x in (4, 9, 14, 19):
+        leaf(c, x, 21, 2)
+    c.set(14, 20, RED[2]); c.set(15, 21, RED[2])
+    c = q('chat'); bubble(c, 2, 3, 20, 12, CREAM)
+    for x in (7, 11, 15):
+        box(c, x, 8, 2, 2, TEAL[1:], None)
+    box(c, 13, 18, 9, 4, GRN, OL, 'v', 0.9, 0.5); c.blob(15, 22, 1.6, 1.6, DARK[1:], None, dither=False); c.blob(20, 22, 1.6, 1.6, DARK[1:], None, dither=False)
+    c = q('robot')
+    box(c, 5, 6, 12, 8, YEL, OL, 'v', 0.95, 0.5); box(c, 7, 8, 3, 2, GLASS, None); box(c, 12, 8, 3, 2, GLASS, None)
+    vline(c, 11, 3, 5, DARK[1]); c.set(11, 2, RED[2])
+    c.line(17, 11, 20, 15, METAL[1]); c.line(20, 15, 19, 18, METAL[1])
+    for x in (6, 15):
+        c.blob(x, 16, 2.4, 2.4, DARK[1:], OL, dither=False)
+    for (x, y) in ((3, 21), (4, 20), (5, 21)):
+        c.set(x, y, GRN[2])
+    for (x, y) in ((19, 20), (18, 21), (20, 21), (19, 22), (21, 19)):
+        c.set(x, y, YEL[1])
+    hline(c, 0, 23, 23, WOOD[1])
+    c = q('bubbles'); bubble(c, 1, 2, 13, 9, ORG); bubble(c, 10, 11, 13, 9, BLUE, False)
+    for (x, y) in ((5, 5), (6, 4), (7, 5), (5, 6), (7, 6), (6, 6), (8, 7), (4, 7)):
+        c.set(x, y, WHITE)
+    for x in range(13, 21, 2):
+        c.set(x, 14, WHITE); c.set(x, 16, WHITE)
+    hline(c, 13, 20, 15, BLUE[4])
+    c = q('camera_cow')
+    vline(c, 3, 2, 22, METAL[1]); box(c, 3, 3, 9, 5, METAL, OL, 'v', 0.95, 0.5); c.set(11, 5, GLASS[2]); c.set(4, 2, RED[2])
+    c.blob(16, 15, 6, 4, CREAM[1:], OL, dither=False); c.blob(21, 12, 2.6, 2.2, CREAM[1:], OL, dither=False)
+    for (x, y) in ((14, 14), (15, 14), (17, 16), (18, 15)):
+        c.set(x, y, DARK[1])
+    for x in (12, 14, 18):
+        vline(c, x, 19, 22, DARK[1])
+    c.line(20, 19, 22, 22, DARK[1])                                     # the sore leg
+    c.set(23, 17, RED[2]); c.set(23, 19, RED[2])
+    c = q('trap')
+    vline(c, 11, 14, 23, WOOD[1]); box(c, 4, 3, 15, 12, YEL, OL, 'v', 0.95, 0.75)
+    for (x, y) in ((7, 6), (12, 9), (15, 5), (8, 11), (16, 12)):
+        c.set(x, y, DARK[0]); c.set(x + 1, y, DARK[1]); c.set(x, y + 1, DARK[1])
+    c.blob(19, 17, 3.2, 3.2, DARK[1:], OL, dither=False); c.blob(19, 17, 1.6, 1.6, GLASS, None, dither=False)
+    c = q('satellite')
+    box(c, 1, 4, 7, 4, BLUE, OL, 'v', 0.9, 0.5); box(c, 14, 4, 7, 4, BLUE, OL, 'v', 0.9, 0.5)
+    box(c, 9, 3, 4, 6, METAL, OL, 'v', 0.95, 0.5); vline(c, 11, 9, 10, DARK[1])
+    for i in range(6):
+        c.blend(11 - i, 11 + i, (255, 240, 160, 255), 0.5); c.blend(11 + i, 11 + i, (255, 240, 160, 255), 0.5)
+    for y in range(18, 24):
+        for x in range(24):
+            c.set(x, y, pick(GRN if (x // 6 + (y > 20)) % 2 else YEL, 0.6, x, y, True))
+    c = q('phone_face'); phone(c)
+    c.blob(12, 10, 3.4, 4, SKIN[1:], None, dither=False); hline(c, 9, 15, 6, HAIR[1]); hline(c, 9, 14, 7, HAIR[1])
+    c.set(11, 10, INK); c.set(13, 10, INK); hline(c, 11, 13, 12, SKIN[0])
+    for (x, y) in ((7, 4), (8, 4), (7, 5), (16, 4), (17, 4), (17, 5), (7, 15), (7, 16), (8, 16), (17, 15), (17, 16), (16, 16)):
+        c.set(x, y, YEL[3])
+    c = q('keyboard'); phone(c, 5, 1, 14, 22)
+    box(c, 7, 4, 10, 3, CREAM, None, 'v', 1, 1)
+    for x in (8, 10, 12):
+        c.set(x, 5, DARK[1])
+    box(c, 7, 9, 10, 3, YEL, None, 'v', 0.9, 0.9); hline(c, 9, 14, 10, YEL[0])
+    for y in (14, 16, 18):
+        for x in range(7, 17, 2):
+            c.set(x, y, METAL[3])
+    c = q('music'); phone(c)
+    vline(c, 13, 6, 13, WHITE); vline(c, 14, 6, 7, WHITE); c.set(15, 7, WHITE); c.set(15, 8, WHITE)
+    c.blob(11.5, 13.5, 1.8, 1.4, PURP[2:], None, dither=False)
+    hline(c, 8, 16, 16, PURP[2]); hline(c, 8, 12, 16, PURP[3])
+    c = q('mail')
+    box(c, 2, 6, 20, 13, CREAM, OL, 'v', 1, 0.75)
+    c.line(2, 6, 12, 13, CREAM[0]); c.line(21, 6, 12, 13, CREAM[0])
+    c.blob(18, 17, 4, 4, RED[1:], OL, dither=False)
+    for i in range(5):
+        c.set(16 + i, 15 + i, WHITE); c.set(20 - i, 15 + i, WHITE)
+    # ---- not AI
+    c = q('sprinkler')
+    vline(c, 7, 12, 22, METAL[1]); box(c, 5, 10, 5, 3, METAL, OL, 'v', 0.9, 0.5)
+    for (dx, dy) in ((-4, -4), (-2, -6), (0, -7), (2, -6), (4, -4), (-5, -1), (5, -1)):
+        c.set(7 + dx, 9 + dy, BLUE[3]); c.set(7 + dx, 10 + dy, BLUE[2])
+    c.blob(17, 15, 6, 6, CREAM[2:], OL, dither=False)
+    vline(c, 17, 11, 15, INK); hline(c, 17, 20, 15, INK)
+    hline(c, 0, 23, 23, GRN[1])
+    c = q('calc')
+    box(c, 5, 2, 14, 20, METAL[1:], OL, 'v', 0.7, 0.4); box(c, 7, 4, 10, 4, GRN[3:], None, 'v', 1, 1)
+    for (x, y) in ((14, 5), (15, 5), (15, 6), (14, 7), (15, 7)):
+        c.set(x, y, GRN[0])
+    for y in (10, 13, 16, 19):
+        for x in (7, 10, 13, 16):
+            box(c, x, y, 2, 2, ORG if (x == 16) else CREAM, None, 'v', 0.9, 0.7)
+    c = q('scale')
+    box(c, 3, 18, 18, 4, METAL, OL, 'v', 0.95, 0.5); box(c, 9, 19, 6, 2, GRN[3:], None, 'v', 1, 1)
+    hline(c, 2, 21, 16, METAL[3]); hline(c, 2, 21, 17, METAL[1])
+    c.blob(12, 11, 6, 4.4, YEL[1:], OL, dither=False)
+    for (x, y) in ((10, 10), (14, 12), (9, 13)):
+        c.set(x, y, YEL[1])
+    c = q('fence_bolt')
+    for x in (3, 12, 21):
+        vline(c, x, 8, 22, WOOD[1]); vline(c, x + 1, 8, 22, WOOD[2])
+    for y in (11, 16):
+        hline(c, 3, 22, y, YEL[2])
+    for (x, y) in ((14, 1), (13, 2), (12, 3), (11, 4), (12, 5), (13, 5), (12, 6), (11, 7), (10, 8)):
+        c.set(x, y, YEL[3]); c.set(x + 1, y, YEL[2])
+    outline(c)
+    c = q('bell')
+    c.blob(12, 11, 7, 8, YEL[1:], OL, dither=False)
+    for x in range(4, 21):
+        for y in range(15, 20):
+            if c.get(x, y)[3] == 0 and abs(x - 12) <= 3 + (y - 14):
+                c.set(x, y, YEL[2])
+    hline(c, 3, 21, 19, YEL[0]); c.blob(12, 21, 2, 1.6, DARK[1:], None, dither=False)
+    for (x, y) in ((1, 8), (1, 10), (2, 12), (22, 8), (22, 10), (21, 12)):
+        c.set(x, y, RED[2])
+    outline(c)
+    c = q('thermo')
+    box(c, 1, 12, 14, 10, GLASS, OL, 'v', 0.95, 0.6)
+    c.line(1, 11, 8, 5, OL); c.line(8, 5, 15, 11, OL)
+    for y in range(6, 12):
+        hline(c, 8 - (y - 5) + 1, 8 + (y - 5) - 1, y, GLASS[2])
+    vline(c, 8, 12, 21, OL)
+    for (x, y) in ((4, 18), (5, 17), (11, 18), (12, 17)):
+        c.set(x, y, GRN[2])
+    box(c, 18, 2, 3, 16, CREAM, OL, 'v', 1, 0.8); vline(c, 19, 7, 18, RED[2]); c.blob(19.5, 19.5, 2.6, 2.6, RED[1:], OL, dither=False)
+    c = q('weather')
+    vline(c, 12, 6, 23, METAL[1])
+    hline(c, 6, 18, 6, METAL[2])
+    for x in (6, 18):
+        c.blob(x, 7, 1.8, 1.4, RED[1:], OL, dither=False)
+    c.blob(12, 4, 1.6, 1.6, METAL[2:], OL, dither=False)
+    box(c, 15, 14, 5, 8, GLASS, OL, 'v', 0.95, 0.6); box(c, 15, 18, 5, 4, BLUE[2:], None, 'v', 0.9, 0.6)
+    for (x, y) in ((3, 12), (4, 15), (2, 18), (6, 19)):
+        c.set(x, y, BLUE[3]); c.set(x, y + 1, BLUE[2])
+    c = q('traffic')
+    vline(c, 12, 18, 23, METAL[1]); box(c, 8, 1, 8, 18, DARK, OL, 'v', 0.6, 0.4)
+    for (y, col) in ((4, RED), (9, YEL), (14, GRN)):
+        c.blob(12, y, 2.2, 2.2, col[1:] if y == 14 else DARK[2:], None, dither=False)
+    c.blob(12, 14, 2.2, 2.2, GRN[2:], None, dither=False)
+    c = q('tractor_gps')
+    for x in range(0, 24, 3):
+        c.set(x, 20, CREAM[3]); c.set(x + 1, 20, CREAM[3])
+    box(c, 6, 11, 11, 5, RED, OL, 'v', 0.95, 0.5); box(c, 12, 7, 5, 4, GLASS, OL, 'v', 0.95, 0.6)
+    c.blob(9, 17, 3.6, 3.6, DARK[1:], OL, dither=False); c.blob(17, 18, 2.4, 2.4, DARK[1:], OL, dither=False)
+    vline(c, 14, 3, 6, METAL[1]); c.blob(14, 2.5, 2, 1.2, METAL[2:], OL, dither=False)
+    for (x, y) in ((18, 1), (20, 2), (21, 4)):
+        c.set(x, y, TEAL[3])
+    c = q('milk')
+    box(c, 5, 8, 14, 14, METAL[1:], OL, 'h', 0.95, 0.45); box(c, 7, 5, 10, 3, METAL[2:], OL, 'v', 0.9, 0.6)
+    box(c, 7, 12, 10, 7, CREAM[2:], None, 'v', 1, 0.8)
+    for (x, y) in ((11, 13), (12, 14), (13, 13)):
+        c.set(x, y, BLUE[2])
+    c.line(18, 4, 22, 1, DARK[1]); c.line(18, 5, 22, 2, DARK[2])
+    c = q('collar')
+    c.blob(12, 12, 9, 8, CREAM[1:], OL, dither=False)
+    for (x, y) in ((8, 9), (15, 9)):
+        c.set(x, y, INK); c.set(x, y - 1, INK)
+    c.blob(12, 15, 4, 2.4, SKIN[2:], OL, dither=False); c.set(10, 15, SKIN[0]); c.set(14, 15, SKIN[0])
+    hline(c, 3, 21, 20, BLUE[2]); hline(c, 3, 21, 21, BLUE[1]); box(c, 10, 19, 5, 4, METAL[2:], OL, 'v', 0.9, 0.6)
+    # ---- the forest: mushrooms (scene and board), the forager, a pine, basket and hearts
+    BRN = R('#4a2c1c', '#6e4128', '#94603a', '#b8844e')
+    STEM = R('#b8a88a', '#dcd0b4', '#f2ead8', '#ffffff')
+    GREYM = R('#4a5056', '#6a7278', '#8c949a', '#b0b6ba')
+    for name, cap, stem, dots in (('mush_good', BRN, STEM, False), ('mush_bad', RED, STEM, True), ('mush_unk', GREYM, GREYM, False)):
+        c = new(name, 16, 16)
+        box(c, 5, 9, 6, 6, stem, None, 'h', 0.95, 0.5) if name != 'mush_bad' else box(c, 6, 8, 4, 7, stem, None, 'h', 0.95, 0.5)
+        if name == 'mush_bad':
+            hline(c, 5, 10, 11, stem[1])
+        c.blob(8, 7, 7, 4.6, cap[1:], None, dither=False)
+        for x in range(1, 15):
+            if c.get(x, 9)[3] and c.get(x, 10)[3] == 0:
+                c.set(x, 10, cap[0])
+        if dots:
+            for (x, y) in ((5, 5), (9, 4), (11, 7), (6, 8), (8, 6)):
+                c.set(x, y, WHITE)
+        c.set(5, 4, cap[-1]); c.set(6, 4, cap[-1])
+        outline(c)
+    for name, cap, dots in (('mdot_good', BRN, False), ('mdot_bad', RED, True), ('mdot_unk', GREYM, False)):
+        c = new(name, 8, 7)
+        vline(c, 3, 3, 6, STEM[2] if name != 'mdot_unk' else GREYM[3]); vline(c, 4, 3, 6, STEM[1] if name != 'mdot_unk' else GREYM[2])
+        c.blob(3.5, 2.5, 3.4, 2.2, cap[1:], None, dither=False)
+        if dots:
+            c.set(2, 1, WHITE); c.set(5, 2, WHITE)
+        outline(c)
+    COAT = R('#2d4a3a', '#3f6650', '#568a6a')
+    for f in range(3):
+        c = new('forager_%d' % f, 16, 24)
+        legs = ((6, 9), (5, 10), (7, 8))[f]
+        for i, lx in enumerate(legs):
+            vline(c, lx, 17, 22, DWOOD[1] if i else DWOOD[2]); c.set(lx, 23, DARK[0]); c.set(lx + 1, 23, DARK[0])
+        box(c, 5, 9, 6, 9, COAT, None, 'h', 0.95, 0.4)
+        c.blob(8, 6, 2.6, 2.8, SKIN[1:], None, dither=False); c.set(9, 6, INK)
+        hline(c, 4, 12, 3, RED[1]); box(c, 6, 1, 5, 2, RED, None, 'v', 0.95, 0.6)
+        arm = (11, 12, 11)[f]
+        vline(c, arm, 10, 14, COAT[0])
+        box(c, arm - 1, 14, 5, 3, WOOD, None, 'v', 0.95, 0.5); c.line(arm - 1, 14, arm + 1, 12, WOOD[0]); c.line(arm + 1, 12, arm + 3, 14, WOOD[0])
+        c.set(4, 12, COAT[0]); c.set(4, 13, SKIN[1])
+        outline(c)
+    for name, ramp in (('fpine', GRN), ('fpine_d', R('#1e3a32', '#2a4c40', '#3a6050', '#4c7462'))):
+        c = new(name, 14, 26)
+        box(c, 6, 21, 2, 5, WOOD, None, 'h', 0.8, 0.4)
+        for k, (y, w) in enumerate(((3, 2), (7, 3), (11, 4.5), (15, 5.5), (19, 6.5))):
+            for yy in range(y - 3, y + 3):
+                half = w * (yy - (y - 4)) / 6
+                for xx in range(int(7 - half), int(7 + half) + 1):
+                    c.set(xx, yy, pick(ramp[1:], 0.75 - (xx - 7 + half) / (2 * half + 0.01) * 0.5, xx, yy, True))
+        outline(c, ramp[0])
+    c = new('u_basket', 16, 16)
+    c.line(3, 7, 7, 2, WOOD[0]); c.line(7, 2, 9, 2, WOOD[0]); c.line(9, 2, 13, 7, WOOD[0])
+    box(c, 2, 7, 12, 7, WOOD, OL, 'v', 0.95, 0.45)
+    for y in (9, 11):
+        hline(c, 2, 13, y, WOOD[1])
+    for x in (5, 8, 11):
+        vline(c, x, 7, 13, WOOD[2])
+    for name, ramp in (('u_heart', RED), ('u_heart_off', DARK)):
+        c = new(name, 16, 16)
+        c.blob(5, 6, 3.6, 3.4, ramp[1:], None, dither=False); c.blob(11, 6, 3.6, 3.4, ramp[1:], None, dither=False)
+        for y in range(7, 15):
+            hline(c, 2 + (y - 7) + (1 if y > 8 else 0), 13 - (y - 7) - (1 if y > 8 else 0), y, ramp[2] if y < 10 else ramp[1])
+        if name == 'u_heart':
+            c.set(4, 4, WHITE); c.set(5, 4, WHITE); c.set(4, 5, WHITE)
+        outline(c)
+
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

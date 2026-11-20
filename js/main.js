@@ -13,7 +13,7 @@ import { renderSortShop } from './sorting/shop.js';
 import { LEVELS as SORT_LEVELS } from './sorting/levels.js';
 import { ICON, svg40 } from './sorting/art.js';
 import { VERSION } from './version.js';
-import { portrait } from './weighing/sprites.js';
+import { portrait, spriteImgHTML, onSpritesReady } from './weighing/sprites.js';
 
 // The shop's machine icons: pixel portraits from the weighing sprites (emoji until they load).
 function shopIcon(it) {
@@ -22,6 +22,8 @@ function shopIcon(it) {
 }
 import { OrchardGame, helpHTML as labHelpHTML } from './orchard/game.js';
 import { HerdGame, helpHTML as herdHelpHTML } from './herd/game.js';
+import { QuizGame, helpHTML as quizHelpHTML } from './quiz/game.js';
+import { ForestGame, helpHTML as forestHelpHTML } from './forest/game.js';
 import { installDebugButton } from './debug.js'; // TODO(Dominik): remove before the course
 
 let state = loadState();
@@ -210,12 +212,16 @@ const sheetApp = {
   earn,
   openSheet: (title, render, onClose) => openSheet(title, render, onClose),
   closeSheet: () => closeSheet(),
+  overlayOpen: () => !$('#sheet').hidden || !$('#modal').hidden,   // the games pause their clocks
 };
 
 // Minigame 3: Il frutteto (stored as "lab", the place it replaced)
 const labGame = new OrchardGame($('#screen-lab'), sheetApp);
 // Minigame 4: Il pascolo
 const herdGame = new HerdGame($('#screen-herd'), sheetApp);
+// La piazza (IA o no?) and Il bosco (funghi)
+const quizGame = new QuizGame($('#screen-quiz'), sheetApp);
+const forestGame = new ForestGame($('#screen-forest'), sheetApp);
 
 async function daySummary() {
   const recent = state.fits.slice(-state.dayFarmers);
@@ -223,7 +229,8 @@ async function daySummary() {
   const avg = state.dayFarmers ? state.dayCoins / state.dayFarmers : 0;
   const nextPlace = !state.sort.unlocked ? ['lo smistamento', CONFIG.SORT.UNLOCK_COST]
     : !state.lab.unlocked ? ['il frutteto', CONFIG.ORCHARD.UNLOCK_COST]
-      : !state.herd.unlocked ? ['il pascolo', CONFIG.HERD.UNLOCK_COST] : null;
+      : !state.herd.unlocked ? ['il pascolo', CONFIG.HERD.UNLOCK_COST]
+        : !state.forest.unlocked ? ['il bosco', CONFIG.FOREST.UNLOCK_COST] : null;
   const tip = state.levels.scanner + state.levels.belt + state.levels.truck === 0
     ? 'Consiglio: nel negozio 🛒 puoi migliorare scanner, scarico e camion.'
     : nextPlace && state.coins >= nextPlace[1] * 0.6
@@ -255,6 +262,8 @@ function showScreen(id) {
   if (id === 'screen-sort') sortGame.show(); else sortGame.hide();
   if (id === 'screen-lab') labGame.show(); else labGame.hide();
   if (id === 'screen-herd') herdGame.show(); else herdGame.hide();
+  if (id === 'screen-quiz') quizGame.show(); else quizGame.hide();
+  if (id === 'screen-forest') forestGame.show(); else forestGame.hide();
   if (id === 'screen-map') renderMap();
 }
 
@@ -283,6 +292,12 @@ function renderMap() {
   barn.classList.toggle('buyable', !herdOpen);
   $('#place-barn-lock').innerHTML = herdOpen ? '' : `Sblocca · ${CONFIG.HERD.UNLOCK_COST} ${svg40(ICON.coin, 14, 'coin-ic')}`;
   barn.setAttribute('aria-label', herdOpen ? 'Il pascolo' : `Il pascolo, si sblocca con ${CONFIG.HERD.UNLOCK_COST} monete`);
+  const forestOpen = state.forest.unlocked;
+  const forest = $('#place-forest');
+  forest.classList.toggle('locked', !forestOpen);
+  forest.classList.toggle('buyable', !forestOpen);
+  $('#place-forest-lock').innerHTML = forestOpen ? '' : `Sblocca · ${CONFIG.FOREST.UNLOCK_COST} ${svg40(ICON.coin, 14, 'coin-ic')}`;
+  forest.setAttribute('aria-label', forestOpen ? 'Il bosco' : `Il bosco, si sblocca con ${CONFIG.FOREST.UNLOCK_COST} monete`);
   // the valley picture: day or dusk, with the places that are open
   const night = isNight();
   $('#map-img').src = `assets/map/map-${night ? 'night' : 'day'}-s${open ? 1 : 0}l${labOpen ? 1 : 0}.png?v=${VERSION}`;
@@ -354,9 +369,17 @@ const onLabPlace = () => openPlace('lab', 'screen-lab', CONFIG.ORCHARD.UNLOCK_CO
   'Le capre del vicino vogliono la frutta: chiudile fuori con i recinti, in pochi secondi.', showLabHelp);
 const onHerdPlace = () => openPlace('herd', 'screen-herd', CONFIG.HERD.UNLOCK_COST, 'Il pascolo',
   'In montagna ogni gregge ascolta un solo cane: mettilo nel mezzo del suo gregge.', showHerdHelp);
+const onForestPlace = () => openPlace('forest', 'screen-forest', CONFIG.FOREST.UNLOCK_COST, 'Il bosco',
+  'Al crepuscolo i funghi sembrano tutti grigi: la guida ti dice a chi somigliano.', showForestHelp);
+async function onQuizPlace() {   // open from the start
+  showScreen('screen-quiz');
+  if (!state.quiz.seenHelp) { await showQuizHelp(); state.quiz.seenHelp = true; save(); }
+}
 const gotIt = [{ label: 'Capito, si parte!', value: 'ok', cls: 'primary' }];
 function showLabHelp() { return modal(labHelpHTML(), gotIt); }
 function showHerdHelp() { return modal(herdHelpHTML(), gotIt); }
+function showQuizHelp() { return modal(quizHelpHTML(), gotIt); }
+function showForestHelp() { return modal(forestHelpHTML(), gotIt); }
 
 // ------------------------------------------------------------ help
 function showHelp() {
@@ -539,7 +562,7 @@ function openSettings() {
       '</div></div>' +
       '<div class="settings-row">I progressi restano solo su questo telefono (o computer). ' +
       'Nella classifica vanno solo il nome del gioco e il punteggio: niente nome vero, niente email.</div>' +
-      '<div class="settings-row">Ricomincia da zero: monete, migliorie e agricoltori serviti tornano a 0, lo smistamento, il frutteto e il pascolo si chiudono di nuovo.' +
+      '<div class="settings-row">Ricomincia da zero: monete, migliorie e agricoltori serviti tornano a 0, lo smistamento, il frutteto, il pascolo e il bosco si chiudono di nuovo.' +
       '<button class="btn danger" id="set-reset">Ricomincia</button></div>';
     body.querySelectorAll('.choice[data-mode]').forEach((b) => b.addEventListener('click', () => {
       state.lineMode = b.dataset.mode;
@@ -567,6 +590,8 @@ function openSettings() {
       sortGame.reset();
       labGame.reset();
       herdGame.reset();
+      quizGame.reset();
+      forestGame.reset();
       closeSheet();
       renderMap();
       toast('Si ricomincia! 🌱');
@@ -590,18 +615,22 @@ $('#screen-sort .coin-ic-slot').innerHTML = svg40(ICON.coin, 18, 'coin-ic');
 $('#screen-sort .s-levels-ic').innerHTML = svg40(ICON.levels, 20);
 $('#place-lab').addEventListener('click', onLabPlace);
 $('#place-barn').addEventListener('click', onHerdPlace);
-for (const [k, help] of [['l', showLabHelp], ['h', showHerdHelp]]) {
+$('#place-quiz').addEventListener('click', onQuizPlace);
+$('#place-forest').addEventListener('click', onForestPlace);
+for (const [k, help] of [['l', showLabHelp], ['h', showHerdHelp], ['q', showQuizHelp], ['f', showForestHelp]]) {
   $(`#${k}-back`).addEventListener('click', () => showScreen('screen-map'));
   $(`#${k}-help`).addEventListener('click', help);
   $(`#${k}-back`).innerHTML = svg40(ICON.map, 26);
   $(`#${k}-help`).innerHTML = svg40(ICON.help, 26);
 }
-for (const id of ['#screen-lab', '#screen-herd']) {
+for (const id of ['#screen-lab', '#screen-herd', '#screen-quiz', '#screen-forest']) {
   $(`${id} .coin-ic-slot`).innerHTML = svg40(ICON.coin, 18, 'coin-ic');
   $(`${id} .g-levels-ic`).innerHTML = svg40(ICON.levels, 20);
-  $(`${id} .g-restart`).innerHTML = svg40(ICON.restart, 24);
+  const r = $(`${id} .g-restart`);
+  if (r) r.innerHTML = svg40(ICON.restart, 24);
 }
 $('#h-whistle').innerHTML = svg40(ICON.whistle, 30);
+onSpritesReady(() => { $('#screen-forest .f-pick-ic').innerHTML = spriteImgHTML('u_basket', 24, 24); });
 $('#map-time').addEventListener('click', () => {
   mapTime = isNight() ? 'day' : 'night';
   try { localStorage.setItem('fattoria.mapTime', mapTime); } catch (e) { /* private mode */ }
@@ -609,7 +638,7 @@ $('#map-time').addEventListener('click', () => {
 });
 $('#btn-shop').innerHTML = svg40(ICON.shop, 26);
 $('#btn-board').innerHTML = svg40(ICON.trophy, 26);
-for (const id of ['#btn-settings', '#w-settings', '#s-settings', '#l-settings', '#h-settings']) {
+for (const id of ['#btn-settings', '#w-settings', '#s-settings', '#l-settings', '#h-settings', '#q-settings', '#f-settings']) {
   $(id).innerHTML = svg40(ICON.cog, 26);
   if (id !== '#btn-settings') $(id).addEventListener('click', openSettings);
 }
@@ -643,7 +672,7 @@ boot();
 installDebugButton({ getState: () => state, save, renderCoins: (a) => { renderCoins(a); sortGame.refresh(); labGame.refresh(); herdGame.refresh(); } }); // TODO(Dominik): remove before the course
 
 // Debug handle for play-testing from the browser console: open the game with ?debug
-if (new URLSearchParams(location.search).has('debug')) window.fattoriaDebug = { game, sortGame, labGame, herdGame, getState: () => state, save, renderMap };
+if (new URLSearchParams(location.search).has('debug')) window.fattoriaDebug = { game, sortGame, labGame, herdGame, quizGame, forestGame, getState: () => state, save, renderMap };
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   // When a new version takes over (after a push), reload once so the whole new set of files runs.
