@@ -18,7 +18,7 @@ const FILES = [
   'js/stats.js',
   'js/pixel.js',
   'js/version.js',
-  'assets/fonts/pixelify-sans.woff2',
+  'assets/fonts/nunito.woff2',
   'assets/map/map-day-s0l0.png',
   'assets/map/map-day-s0l1.png',
   'assets/map/map-day-s1l0.png',

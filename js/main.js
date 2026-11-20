@@ -613,6 +613,9 @@ $('#w-back').addEventListener('click', () => showScreen('screen-map'));
 $('#w-shop').addEventListener('click', () => openShop());
 $('#w-help').addEventListener('click', showHelp);
 
+// Canvases drawn before the font arrived: draw them again once it has.
+if (document.fonts) document.fonts.ready.then(() => { sortGame.refresh(); labGame.refresh(); });
+
 // Block pinch-zoom gestures on iOS Safari (it ignores user-scalable=no).
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 

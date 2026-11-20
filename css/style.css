@@ -504,9 +504,9 @@ svg.l-shape { display: inline-block; flex: none; vertical-align: -2px; }
    Style E (soft palette on a blue-grey floor, cream panels, 1.5 px pixel frames) for the minigames,
    style C (dusk) / day for the map. One art pixel = var(--u) = 1.5 CSS px. */
 @font-face {
-  font-family: 'Pixelify Sans';
-  src: url('../assets/fonts/pixelify-sans.woff2') format('woff2');
-  font-weight: 400 700;
+  font-family: 'Nunito';
+  src: url('../assets/fonts/nunito.woff2') format('woff2');
+  font-weight: 600 900;
   font-display: swap;
 }
 :root {
@@ -515,7 +515,7 @@ svg.l-shape { display: inline-block; flex: none; vertical-align: -2px; }
   --edge: #3A4850; --paper: #EFE6D6; --floor: #557579; --floor2: #4F6E72; --gold: #F5CA63; --gold-dk: #D8A443; --teal-dk: #46737D;
   --frame: 0 calc(-1 * var(--u)) 0 0 var(--edge), 0 var(--u) 0 0 var(--edge), calc(-1 * var(--u)) 0 0 0 var(--edge), var(--u) 0 0 0 var(--edge);
   --drop: 0 calc(3 * var(--u)) 0 0 rgba(20, 35, 40, 0.25);
-  font-family: 'Pixelify Sans', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--ink);
 }
 *, *::before, *::after { border-radius: 0 !important; }
@@ -672,7 +672,9 @@ em { opacity: 0.75; }
 /* readable text: the phone's own font for running text; the pixel font for titles, buttons, numbers */
 :root, .modal-body p, .modal-body li, .sheet-note, .shop-desc, .bubble-text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
 .btn, .title, .coins, .place-name, h2, .result-title, .result-coins, .s-level-title, .shop-name, .stat b, .s-lv-no, .l-coins, .s-pay, .bubble-who, .slider-label, .l-card-head b {
-  font-family: 'Pixelify Sans', system-ui, sans-serif;
+  font-family: 'Nunito', system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
 .plot-wrap, .scene-wrap, .l-field-wrap, .l-card, .preview-row { position: relative; }
 canvas.px-text { position: absolute; pointer-events: none; image-rendering: auto; touch-action: none; }
@@ -688,3 +690,8 @@ img.ic-px { height: 1.2em; width: auto; vertical-align: -0.2em; image-rendering:
 #screen-sort .s-scroll { background: url('../assets/ui/barnwall.png') repeat; background-size: 54px 54px; image-rendering: pixelated; }
 #screen-lab .l-scroll { background: url('../assets/ui/labwall.png') repeat; background-size: 36px 36px; image-rendering: pixelated; }
 #screen-sort .s-caption { color: #F3EADB; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45); }
+
+/* clear, smooth text everywhere (no pixel font): Nunito for titles, buttons and numbers */
+.coins, .result-coins, .l-coins, .s-pay, .s-lv-no, .stat b { font-variant-numeric: tabular-nums; }
+.place-name { font-weight: 800; }
+.s-gate .qmark, .l-node .qmark { font-family: 'Nunito', system-ui, sans-serif; font-weight: 900; }

@@ -62,7 +62,7 @@ js/lab/game.js          the minigame: field, player-built tree, node pop-up (dra
 js/lab/shop.js          the "Laboratorio" tab of the shop (più campioni, strumento più preciso, suggerimenti)
 sw.js                   service worker (offline cache, VERSION constant)
 manifest.webmanifest    "add to home screen" metadata
-assets/                 icons; fonts/ (Pixelify Sans, OFL); map/ (valley pictures, day and dusk, per unlock state; places.json)
+assets/                 icons; fonts/ (Nunito, OFL: titles, buttons, numbers); map/ (valley pictures, day and dusk, per unlock state; places.json)
 tools/pixelart/         Python + Pillow generators (dev only, not shipped): mapgen.py (map pictures), weighgen.py (weighing sprites + shed), uigen.py (sorting, lab and UI sprites + wall tiles), preview.py (contact sheets)
 assets/ui/              sprites.png + sprites.json (produce, animals, overlays, question icons, truck symbols, trucks, lab axis icons, UI icons), barnwall.png, labwall.png
 js/uiart.js             builds sorting items (with rot / soil / worm / snail), truck symbols and trucks from the UI sprites; art.js registers which SVG art has a pixel sprite (svg40, symbolHTML, truckArt use it)
