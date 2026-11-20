@@ -812,31 +812,65 @@ class Map:
             (352, 356, 38, 20, 'wheat'), (14, 366, 40, 22, 'veg'), (98, 374, 30, 16, 'wheat'), (226, 376, 30, 18, 'crop'),
             (238, 418, 34, 20, 'veg'), (336, 472, 44, 24, 'crop'), (320, 500, 60, 32, 'vine'), (10, 528, 36, 22, 'soil'),
             (196, 592, 36, 20, 'veg'), (300, 566, 44, 26, 'wheat'), (350, 600, 34, 22, 'crop'), (8, 616, 44, 28, 'crop'),
-            (96, 670, 32, 18, 'wheat'), (24, 700, 76, 44, 'crop'), (186, 702, 52, 30, 'wheat'), (312, 706, 64, 36, 'soil'),
+            (96, 670, 32, 18, 'wheat'), (24, 700, 76, 44, 'crop'), (208, 706, 46, 26, 'wheat'), (312, 706, 64, 36, 'soil'),
         ]
         for (x, y, w, d, k) in FIELDS:
             cols, rows, step = KINDS[k]
             sc = s.field_scale(y)
             s.iso_rows(x, y, w, d, cols, rows, step, sc)
             p = s.field_poly(x, y, w, d, sc)
+            for yy in range(int(min(q[1] for q in p)), int(max(q[1] for q in p)) + 1):
+                rx, rw = s.river_x(yy), s.river_w(yy)
+                if any(pip(xx, yy, p) for xx in range(int(rx - rw / 2 - 3), int(rx + rw / 2 + 4))):
+                    print('WARNING: field in the river', (x, y, w, d, k))
+                    break
             s.blocked.append([(px_ + (px_ - p[0][0]) * 0.05, py_) for (px_, py_) in p])
         # roads: farm tracks and the village streets
         s.road([(148, 336), (126, 398), (108, 488)], 8)
         s.road([(70, 420), (100, 446), (126, 430)], 6)
-        s.road([(108, 488), (180, 500), (236, 478), (262, 436)], 8)
         s.road([(236, 478), (250, 548), (252, 628)], 7)
         s.road([(148, 336), (156, 316), (170, 300), (186, 292)], 5)
         s.road([(104, 324), (130, 318), (156, 316), (190, 326)], 4.5)
         s.road([(130, 318), (126, 296), (138, 284)], 4)
         s.road([(108, 488), (98, 520), (100, 536)], 5)
+        _by = 497
+        _bx, _bw = s.river_x(_by), s.river_w(_by)
+        s.road([(108, 488), (_bx - _bw / 2 - 10, _by)], 8)
+        s.road([(_bx + _bw / 2 + 10, _by), (236, 478), (262, 436)], 8)
+        # the bridge: at a right angle to the river's flow there, the road meets both ends
         by = 497
         bx, bw = s.river_x(by), s.river_w(by)
-        s.slab(bx - bw / 2 - 5, by + 4, bw + 10, 10, 2, T['ROOFS']['wood'][1], T['ROOFS']['wood'][0])
-        n = int((bw + 10) / 3)
-        for k in range(n + 1):
-            px_ = bx - bw / 2 - 5 + k * 3
-            s.c.line(px_ * S, (by + 4 - k * 1.5 - 2) * S, px_ * S, (by + 4 - k * 1.5 - 6) * S, T['WALLS']['wood'][0][0])
-        s.c.line((bx - bw / 2 - 5) * S, (by - 2) * S, (bx + bw / 2 + 5) * S, (by - 2 - (bw + 10) / 2) * S, T['ROOFS']['wood'][1][2])
+        tx, ty = (s.river_x(by + 1) - s.river_x(by - 1)) / 2, 1.0        # flow direction
+        tl = math.hypot(tx, ty)
+        tx, ty = tx / tl, ty / tl
+        nx, ny = ty, -tx                                                  # across the river
+        half, deck = bw / 2 + 6, 4.5
+        L = (bx - nx * half, by - ny * half)
+        Rt = (bx + nx * half, by + ny * half)
+        s.bridge_ends = (L, Rt)
+        corners = [(L[0] - tx * deck, L[1] - ty * deck), (Rt[0] - tx * deck, Rt[1] - ty * deck),
+                   (Rt[0] + tx * deck, Rt[1] + ty * deck), (L[0] + tx * deck, L[1] + ty * deck)]
+        wd = T['ROOFS']['wood']
+        s.shadow([(c[0] + 1.5, c[1] + 3) for c in corners], 0.35)
+        sp = [s.P(*c) for c in corners]
+
+        def plank(px_, py_):
+            X, Y = px_ / S - bx, py_ / S - by
+            along = X * nx + Y * ny
+            return wd[0][2] if int(math.floor(along / 2.0)) % 2 else wd[1][1]
+        s.c.poly(sp, plank, T['OL'])
+        # railings with posts on both sides
+        for side in (-1, 1):
+            ox, oy = tx * deck * side, ty * deck * side
+            a = (L[0] + ox, L[1] + oy - 3)
+            b = (Rt[0] + ox, Rt[1] + oy - 3)
+            s.c.line(a[0] * S, a[1] * S, b[0] * S, b[1] * S, wd[1][2])
+            n = max(2, int(half * 2 / 5))
+            for k in range(n + 1):
+                t = k / n
+                px_ = L[0] + (Rt[0] - L[0]) * t + ox
+                py_ = L[1] + (Rt[1] - L[1]) * t + oy
+                s.c.line(px_ * S, py_ * S, px_ * S, (py_ - 3) * S, wd[0][0])
         s.items = []
         # the village, a little smaller (it is further away), with streets between the houses
         k = 0.84
